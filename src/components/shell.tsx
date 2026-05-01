@@ -8,32 +8,77 @@ type SidebarProps = {
   density: "comfortable" | "compact";
   collapsed: boolean;
   setCollapsed: (v: boolean) => void;
+  isMobile?: boolean;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 };
 
-export const Sidebar = ({ active, onNav, density, collapsed, setCollapsed }: SidebarProps) => {
-  const w = collapsed ? 64 : density === "compact" ? 200 : 240;
+export const Sidebar = ({
+  active,
+  onNav,
+  density,
+  collapsed,
+  setCollapsed,
+  isMobile = false,
+  mobileOpen = false,
+  onCloseMobile,
+}: SidebarProps) => {
+  // On mobile, the drawer always renders at full 240px width (collapsed mode
+  // doesn't make sense in a slide-out panel). Desktop respects the user's
+  // collapse toggle.
+  const showCollapsed = !isMobile && collapsed;
+  const w = isMobile ? 240 : showCollapsed ? 64 : density === "compact" ? 200 : 240;
   const padY = density === "compact" ? 6 : 8;
-  return (
-    <aside
-      style={{
-        width: w,
-        flexShrink: 0,
-        background: "var(--bg)",
-        borderInlineEnd: "1px solid var(--border)",
-        display: "flex",
-        flexDirection: "column",
-        transition: "width .2s",
-        position: "sticky",
-        top: 0,
+
+  const handleNav = (k: RouteKey) => {
+    onNav(k);
+    if (isMobile) onCloseMobile?.();
+  };
+
+  const positionStyle: CSSProperties = isMobile
+    ? {
+        position: "fixed",
+        insetBlock: 0,
+        insetInlineStart: 0,
         height: "100vh",
-      }}
-    >
+        zIndex: 60,
+        transform: mobileOpen ? "translateX(0)" : "translateX(-100%)",
+        transition: "transform .25s cubic-bezier(0.32, 0.72, 0, 1)",
+        boxShadow: mobileOpen ? "8px 0 32px rgba(0,0,0,0.4)" : "none",
+      }
+    : { position: "sticky", top: 0, height: "100vh", transition: "width .2s" };
+
+  return (
+    <>
+      {isMobile && mobileOpen && (
+        <div
+          onClick={onCloseMobile}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 59,
+            animation: "fadeIn 0.15s",
+          }}
+        />
+      )}
+      <aside
+        style={{
+          width: w,
+          flexShrink: 0,
+          background: "var(--bg)",
+          borderInlineEnd: "1px solid var(--border)",
+          display: "flex",
+          flexDirection: "column",
+          ...positionStyle,
+        }}
+      >
       <div
         style={{
-          padding: collapsed ? "16px 0" : "18px 18px",
+          padding: showCollapsed ? "16px 0" : "18px 18px",
           display: "flex",
           alignItems: "center",
-          justifyContent: collapsed ? "center" : "space-between",
+          justifyContent: showCollapsed ? "center" : "space-between",
           gap: 8,
         }}
       >
@@ -65,7 +110,7 @@ export const Sidebar = ({ active, onNav, density, collapsed, setCollapsed }: Sid
               <path d="M13 2 4 14h7l-1 8 9-12h-7Z" />
             </svg>
           </div>
-          {!collapsed && (
+          {!showCollapsed && (
             <div>
               <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.02em" }}>Charj</div>
               <div
@@ -82,9 +127,10 @@ export const Sidebar = ({ active, onNav, density, collapsed, setCollapsed }: Sid
             </div>
           )}
         </div>
-        {!collapsed && (
+        {!showCollapsed && (
           <button
-            onClick={() => setCollapsed(true)}
+            onClick={() => (isMobile ? onCloseMobile?.() : setCollapsed(true))}
+            aria-label={isMobile ? "Close menu" : "Collapse sidebar"}
             style={{
               background: "transparent",
               border: "1px solid var(--border)",
@@ -96,12 +142,12 @@ export const Sidebar = ({ active, onNav, density, collapsed, setCollapsed }: Sid
               color: "var(--text-dim)",
             }}
           >
-            <Icons.Sidebar size={12} />
+            {isMobile ? <Icons.X size={12} /> : <Icons.Sidebar size={12} />}
           </button>
         )}
       </div>
 
-      {collapsed && (
+      {showCollapsed && (
         <button
           onClick={() => setCollapsed(false)}
           style={{
@@ -125,7 +171,7 @@ export const Sidebar = ({ active, onNav, density, collapsed, setCollapsed }: Sid
           display: "flex",
           flexDirection: "column",
           gap: 1,
-          padding: collapsed ? "0 8px" : "0 10px",
+          padding: showCollapsed ? "0 8px" : "0 10px",
           flex: 1,
         }}
       >
@@ -135,14 +181,14 @@ export const Sidebar = ({ active, onNav, density, collapsed, setCollapsed }: Sid
           return (
             <button
               key={n.k}
-              onClick={() => onNav(n.k)}
-              title={collapsed ? n.l : ""}
+              onClick={() => handleNav(n.k)}
+              title={showCollapsed ? n.l : ""}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
-                padding: collapsed ? `${padY + 2}px 0` : `${padY}px 10px`,
-                justifyContent: collapsed ? "center" : "flex-start",
+                padding: showCollapsed ? `${padY + 2}px 0` : `${padY}px 10px`,
+                justifyContent: showCollapsed ? "center" : "flex-start",
                 background: isActive ? "var(--surface-hover)" : "transparent",
                 border: "none",
                 borderRadius: 6,
@@ -164,7 +210,7 @@ export const Sidebar = ({ active, onNav, density, collapsed, setCollapsed }: Sid
                 <span
                   style={{
                     position: "absolute",
-                    insetInlineStart: collapsed ? 0 : -10,
+                    insetInlineStart: showCollapsed ? 0 : -10,
                     top: "50%",
                     transform: "translateY(-50%)",
                     width: 2,
@@ -175,7 +221,7 @@ export const Sidebar = ({ active, onNav, density, collapsed, setCollapsed }: Sid
                 />
               )}
               <Ic size={15} />
-              {!collapsed && (
+              {!showCollapsed && (
                 <>
                   <span style={{ flex: 1 }}>{n.l}</span>
                   {n.count !== undefined && (
@@ -200,7 +246,7 @@ export const Sidebar = ({ active, onNav, density, collapsed, setCollapsed }: Sid
         })}
       </nav>
 
-      {!collapsed && (
+      {!showCollapsed && (
         <div style={{ padding: 14, borderTop: "1px solid var(--border)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
@@ -237,7 +283,8 @@ export const Sidebar = ({ active, onNav, density, collapsed, setCollapsed }: Sid
           </div>
         </div>
       )}
-    </aside>
+      </aside>
+    </>
   );
 };
 
@@ -256,9 +303,11 @@ type TopbarProps = {
   theme: "dark" | "light";
   setTheme: (v: "dark" | "light") => void;
   active: RouteKey;
+  isMobile?: boolean;
+  onOpenMenu?: () => void;
 };
 
-export const Topbar = ({ theme, setTheme, active }: TopbarProps) => {
+export const Topbar = ({ theme, setTheme, active, isMobile = false, onOpenMenu }: TopbarProps) => {
   return (
     <header
       style={{
@@ -267,8 +316,8 @@ export const Topbar = ({ theme, setTheme, active }: TopbarProps) => {
         borderBottom: "1px solid var(--border)",
         display: "flex",
         alignItems: "center",
-        paddingInline: 28,
-        gap: 20,
+        paddingInline: isMobile ? 14 : 28,
+        gap: isMobile ? 10 : 20,
         background: "color-mix(in srgb, var(--bg) 85%, transparent)",
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
@@ -277,6 +326,26 @@ export const Topbar = ({ theme, setTheme, active }: TopbarProps) => {
         zIndex: 10,
       }}
     >
+      {isMobile && (
+        <button
+          onClick={onOpenMenu}
+          aria-label="Open menu"
+          style={{
+            width: 34,
+            height: 34,
+            display: "grid",
+            placeItems: "center",
+            background: "transparent",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            color: "var(--text)",
+            flexShrink: 0,
+          }}
+        >
+          <Icons.Filter size={16} />
+        </button>
+      )}
+
       <div
         style={{
           display: "flex",
@@ -284,19 +353,34 @@ export const Topbar = ({ theme, setTheme, active }: TopbarProps) => {
           gap: 6,
           fontSize: 13,
           color: "var(--text-dim)",
+          minWidth: 0,
         }}
       >
-        <span>Admin</span>
-        <Icons.ChevronRight size={12} />
-        <span style={{ color: "var(--text)", textTransform: "capitalize" }}>{active}</span>
+        {!isMobile && <span>Admin</span>}
+        {!isMobile && <Icons.ChevronRight size={12} />}
+        <span
+          style={{
+            color: "var(--text)",
+            textTransform: "capitalize",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontWeight: isMobile ? 600 : 400,
+            fontSize: isMobile ? 15 : 13,
+          }}
+        >
+          {active}
+        </span>
       </div>
 
       <div
+        className="topbar-search"
         style={{
           flex: 1,
           maxWidth: 520,
           marginInline: "auto",
           position: "relative",
+          minWidth: 0,
         }}
       >
         <Icons.Search
@@ -343,24 +427,28 @@ export const Topbar = ({ theme, setTheme, active }: TopbarProps) => {
         </span>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <button title="Help" style={topIconStyle}>
-          <Icons.Help size={14} />
-        </button>
-        <button title="Notifications" style={{ ...topIconStyle, position: "relative" }}>
-          <Icons.Bell size={14} />
-          <span
-            style={{
-              position: "absolute",
-              top: 6,
-              insetInlineEnd: 6,
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              background: "var(--accent)",
-            }}
-          />
-        </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+        {!isMobile && (
+          <button title="Help" style={topIconStyle}>
+            <Icons.Help size={14} />
+          </button>
+        )}
+        {!isMobile && (
+          <button title="Notifications" style={{ ...topIconStyle, position: "relative" }}>
+            <Icons.Bell size={14} />
+            <span
+              style={{
+                position: "absolute",
+                top: 6,
+                insetInlineEnd: 6,
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "var(--accent)",
+              }}
+            />
+          </button>
+        )}
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           title="Toggle theme"
@@ -368,16 +456,18 @@ export const Topbar = ({ theme, setTheme, active }: TopbarProps) => {
         >
           {theme === "dark" ? <Icons.Sun size={14} /> : <Icons.Moon size={14} />}
         </button>
-        <div style={{ width: 1, height: 20, background: "var(--border)", marginInline: 4 }} />
+        {!isMobile && (
+          <div style={{ width: 1, height: 20, background: "var(--border)", marginInline: 4 }} />
+        )}
         <button
           style={{
             display: "inline-flex",
             alignItems: "center",
             gap: 8,
             background: "transparent",
-            border: "1px solid var(--border)",
+            border: isMobile ? "none" : "1px solid var(--border)",
             borderRadius: 7,
-            padding: "4px 8px 4px 4px",
+            padding: isMobile ? 0 : "4px 8px 4px 4px",
           }}
         >
           <span
@@ -395,21 +485,25 @@ export const Topbar = ({ theme, setTheme, active }: TopbarProps) => {
           >
             AD
           </span>
-          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Amine</span>
-          <span
-            style={{
-              fontSize: 9,
-              padding: "1px 5px",
-              borderRadius: 3,
-              background: "var(--accent-soft)",
-              color: "var(--accent)",
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-              fontWeight: 600,
-            }}
-          >
-            Super
-          </span>
+          {!isMobile && (
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Amine</span>
+          )}
+          {!isMobile && (
+            <span
+              style={{
+                fontSize: 9,
+                padding: "1px 5px",
+                borderRadius: 3,
+                background: "var(--accent-soft)",
+                color: "var(--accent)",
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                fontWeight: 600,
+              }}
+            >
+              Super
+            </span>
+          )}
         </button>
       </div>
     </header>

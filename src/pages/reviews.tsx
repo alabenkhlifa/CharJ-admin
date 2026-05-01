@@ -23,7 +23,7 @@ const REPORTED: Reported[] = [
 export const ReviewsPage = () => (
   <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
     <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Reviews & reports</h1>
-    <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16 }}>
+    <div className="row-2" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16 }}>
       <Card>
         <CardHeader title="Recent reviews" subtitle="Stream · all chargers" periodSelector={false} />
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

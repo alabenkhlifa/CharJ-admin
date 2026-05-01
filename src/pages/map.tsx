@@ -88,12 +88,13 @@ export const MapPage = () => {
 
   return (
     <div
-      className="fade-in"
+      className="fade-in map-grid"
       style={{
         display: "grid",
         gridTemplateColumns: "1fr 280px",
         gap: 16,
         height: "calc(100vh - var(--topbar-h) - 56px)",
+        minHeight: 0,
       }}
     >
       <Card padding={0} style={{ position: "relative", overflow: "hidden", minHeight: 500 }}>

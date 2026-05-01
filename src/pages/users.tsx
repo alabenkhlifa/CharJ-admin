@@ -17,7 +17,8 @@ export const UsersPage = () => (
   <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
     <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Users</h1>
     <Card padding={0}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+      <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 720 }}>
         <thead>
           <tr style={{ borderBottom: "1px solid var(--border)" }}>
             {HEAD.map((h) => (
@@ -78,6 +79,7 @@ export const UsersPage = () => (
           ))}
         </tbody>
       </table>
+      </div>
     </Card>
   </div>
 );

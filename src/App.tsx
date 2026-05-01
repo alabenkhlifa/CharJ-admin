@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Sidebar, Topbar } from "./components/shell";
 import { useTweaks } from "./lib/theme";
+import { useIsMobile } from "./lib/use-is-mobile";
 import type { RouteKey } from "./lib/routes";
 import { OverviewPage } from "./pages/overview";
 import { ChargersPage } from "./pages/chargers";
@@ -28,9 +29,15 @@ const App = () => {
   const [tweaks, setTweak] = useTweaks();
   const [active, setActive] = useState<RouteKey>("overview");
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const Page = ROUTE_COMPONENTS[active];
-  const padding = tweaks.density === "compact" ? "20px 24px" : "28px 32px";
+  const padding = isMobile
+    ? "16px 14px"
+    : tweaks.density === "compact"
+      ? "20px 24px"
+      : "28px 32px";
 
   return (
     <div
@@ -43,12 +50,17 @@ const App = () => {
         density={tweaks.density}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
+        isMobile={isMobile}
+        mobileOpen={mobileNavOpen}
+        onCloseMobile={() => setMobileNavOpen(false)}
       />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         <Topbar
           theme={tweaks.theme}
           setTheme={(v) => setTweak("theme", v)}
           active={active}
+          isMobile={isMobile}
+          onOpenMenu={() => setMobileNavOpen(true)}
         />
         <main style={{ flex: 1, padding, overflow: "auto" }}>
           <Page />

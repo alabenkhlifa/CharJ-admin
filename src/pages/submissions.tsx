@@ -71,6 +71,7 @@ export const SubmissionsPage = () => {
         ))}
       </div>
       <div
+        className="card-grid-260"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",

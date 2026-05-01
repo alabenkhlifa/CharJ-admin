@@ -21,6 +21,7 @@ export const FeedbackPage = () => (
     <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Feedback</h1>
     <Card padding={0}>
       <div
+        className="feedback-grid"
         style={{
           display: "grid",
           gridTemplateColumns: "320px 1fr",

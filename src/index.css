@@ -168,8 +168,26 @@ a {
     grid-template-columns: 1fr !important;
   }
 }
+@media (max-width: 900px) {
+  /* Stack the Map page rail under the map and the Feedback inbox/detail */
+  .map-grid,
+  .feedback-grid {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+  }
+  .feedback-grid {
+    grid-template-rows: auto auto !important;
+  }
+}
 @media (max-width: 640px) {
   .kpi-grid {
     grid-template-columns: 1fr !important;
+  }
+  .topbar-search {
+    display: none !important;
+  }
+  /* Drop the minmax floor so cards can shrink below 320px */
+  .card-grid-260 {
+    grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)) !important;
   }
 }

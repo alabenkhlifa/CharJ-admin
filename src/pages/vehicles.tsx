@@ -15,6 +15,7 @@ export const VehiclesPage = () => (
   <div className="fade-in">
     <h1 style={{ margin: "0 0 16px", fontSize: 22, fontWeight: 600 }}>Vehicles</h1>
     <div
+      className="card-grid-260"
       style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
