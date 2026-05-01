@@ -30,6 +30,8 @@ jobs:
       - name: Build
         env:
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_ADMIN_USER: ${{ secrets.VITE_ADMIN_USER }}
           VITE_ADMIN_PASS: ${{ secrets.VITE_ADMIN_PASS }}
         run: npm run build

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
-import { CHARGERS, STATUS_COLORS } from "../data/mock";
+import { STATUS_COLORS, useChargers } from "../data/chargers";
 import {
   TUNISIA_CENTER,
   TUNISIA_ZOOM,
@@ -27,6 +27,7 @@ type TunisiaMapProps = {
 
 export const TunisiaMap = ({ height = 360 }: TunisiaMapProps) => {
   const theme = useCurrentTheme();
+  const { data: chargers, loading, error } = useChargers();
   const [opOnly, setOpOnly] = useState(false);
 
   const styles = useMemo(
@@ -35,8 +36,8 @@ export const TunisiaMap = ({ height = 360 }: TunisiaMapProps) => {
   );
 
   const visible = useMemo(
-    () => (opOnly ? CHARGERS.filter((c) => c.status === "operational") : CHARGERS),
-    [opOnly],
+    () => (opOnly ? chargers.filter((c) => c.status === "operational") : chargers),
+    [opOnly, chargers],
   );
 
   if (!API_KEY) {
@@ -127,8 +128,28 @@ export const TunisiaMap = ({ height = 360 }: TunisiaMapProps) => {
           pointerEvents: "none",
         }}
       >
-        {visible.length} chargers · 24 gouvernorats
+        {loading ? "Loading…" : `${visible.length} chargers · 24 gouvernorats`}
       </div>
+
+      {error && (
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            insetInlineStart: 10,
+            background: "color-mix(in srgb, var(--red) 15%, var(--bg-elev))",
+            border: "1px solid color-mix(in srgb, var(--red) 35%, transparent)",
+            borderRadius: 6,
+            padding: "5px 10px",
+            fontSize: 11,
+            color: "var(--red)",
+            zIndex: 1,
+            maxWidth: 240,
+          }}
+        >
+          {error}
+        </div>
+      )}
     </div>
   );
 };

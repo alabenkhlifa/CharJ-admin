@@ -1,26 +1,26 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Card, EmptyState } from "../components/card";
 import { iconBtnStyle } from "../components/charts";
 import { Icons } from "../lib/icons";
 import {
-  CHARGERS,
   CONNECTOR_COLORS,
   CONNECTOR_LABELS,
+  useChargers,
   type AccessType,
   type Charger,
   type ChargerSource,
   type ChargerStatus,
   type ConnectorKey,
-} from "../data/mock";
+  type WorkingHours,
+} from "../data/chargers";
 
-type FilterValue = string;
 type Filters = {
-  status: FilterValue;
-  access: FilterValue;
-  verified: FilterValue;
-  source: FilterValue;
-  connector: FilterValue;
+  status: string;
+  access: string;
+  verified: string;
+  source: string;
+  connector: string;
 };
 
 const DEFAULT_FILTERS: Filters = {
@@ -125,19 +125,29 @@ const FilterChip = ({ label, value, options, onChange }: FilterChipProps) => (
 );
 
 export const ChargersPage = () => {
+  const { data: chargers, loading, error } = useChargers();
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [selected, setSelected] = useState<Charger | null>(null);
 
-  const filtered = CHARGERS.filter((c) => {
-    if (filters.status !== "all" && c.status !== filters.status) return false;
-    if (filters.access !== "all" && c.access !== filters.access) return false;
-    if (filters.verified === "yes" && !c.verified) return false;
-    if (filters.verified === "no" && c.verified) return false;
-    if (filters.source !== "all" && c.source !== filters.source) return false;
-    if (filters.connector !== "all" && !c.connectors.includes(filters.connector as ConnectorKey))
-      return false;
-    return true;
-  });
+  const filtered = useMemo(
+    () =>
+      chargers.filter((c) => {
+        if (filters.status !== "all" && c.status !== filters.status) return false;
+        if (filters.access !== "all" && c.access !== filters.access) return false;
+        if (filters.verified === "yes" && !c.verified) return false;
+        if (filters.verified === "no" && c.verified) return false;
+        if (filters.source !== "all" && c.source !== filters.source) return false;
+        if (
+          filters.connector !== "all" &&
+          !c.connectors.includes(filters.connector as ConnectorKey)
+        )
+          return false;
+        return true;
+      }),
+    [chargers, filters],
+  );
+
+  const verifiedCount = chargers.filter((c) => c.verified).length;
 
   return (
     <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -155,9 +165,15 @@ export const ChargersPage = () => {
             Chargers
           </h1>
           <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>
-            <span className="num">{filtered.length}</span> of{" "}
-            <span className="num">{CHARGERS.length}</span> shown ·{" "}
-            <span className="num">{CHARGERS.filter((c) => c.verified).length}</span> verified
+            {loading ? (
+              <span style={{ color: "var(--text-dim)" }}>Loading…</span>
+            ) : (
+              <>
+                <span className="num">{filtered.length}</span> of{" "}
+                <span className="num">{chargers.length}</span> shown ·{" "}
+                <span className="num">{verifiedCount}</span> verified
+              </>
+            )}
           </div>
         </div>
         <button
@@ -250,6 +266,21 @@ export const ChargersPage = () => {
         )}
       </div>
 
+      {error && (
+        <div
+          style={{
+            padding: 12,
+            border: "1px solid color-mix(in srgb, var(--red) 35%, transparent)",
+            background: "color-mix(in srgb, var(--red) 10%, transparent)",
+            borderRadius: 8,
+            color: "var(--red)",
+            fontSize: 12,
+          }}
+        >
+          Failed to load chargers: {error}
+        </div>
+      )}
+
       <Card padding={0}>
         <div style={{ overflow: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -257,7 +288,7 @@ export const ChargersPage = () => {
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
                 {[
                   "Name",
-                  "Gouvernorat",
+                  "City",
                   "Connectors",
                   "Power",
                   "Status",
@@ -284,75 +315,96 @@ export const ChargersPage = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c) => (
-                <tr
-                  key={c.id}
-                  onClick={() => setSelected(c)}
-                  style={{ borderBottom: "1px solid var(--border)", cursor: "pointer" }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "var(--surface-hover)")
-                  }
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <td style={{ padding: "12px 16px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {c.verified && (
-                        <Icons.Verify size={13} style={{ color: "var(--accent)" }} />
-                      )}
-                      <span style={{ color: "var(--text)", fontWeight: 500 }}>{c.name}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: "12px 16px", color: "var(--text-muted)" }}>{c.gouv}</td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <div style={{ display: "flex", gap: 4 }}>
-                      {c.connectors.map((k) => (
-                        <span
-                          key={k}
-                          style={{
-                            fontSize: 10,
-                            padding: "2px 6px",
-                            borderRadius: 3,
-                            color: CONNECTOR_COLORS[k],
-                            background: `color-mix(in srgb, ${CONNECTOR_COLORS[k]} 14%, transparent)`,
-                          }}
-                        >
-                          {CONNECTOR_LABELS[k]}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td style={{ padding: "12px 16px" }} className="num">
-                    <span style={{ color: "var(--text)", fontWeight: 500 }}>{c.power}</span>
-                    <span style={{ color: "var(--text-dim)" }}> kW</span>
-                  </td>
-                  <td style={{ padding: "12px 16px" }}>{statusChip(c.status)}</td>
-                  <td style={{ padding: "12px 16px" }}>{accessChip(c.access)}</td>
-                  <td
-                    style={{ padding: "12px 16px", color: "var(--text-muted)" }}
-                    className="num"
+              {loading &&
+                Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
+                    {Array.from({ length: 9 }).map((__, j) => (
+                      <td key={j} style={{ padding: "12px 16px" }}>
+                        <div
+                          className="skeleton"
+                          style={{ height: 12, width: j === 0 ? "60%" : "70%" }}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              {!loading &&
+                filtered.map((c) => (
+                  <tr
+                    key={c.id}
+                    onClick={() => setSelected(c)}
+                    style={{ borderBottom: "1px solid var(--border)", cursor: "pointer" }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = "var(--surface-hover)")
+                    }
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   >
-                    {c.hours}
-                  </td>
-                  <td
-                    style={{
-                      padding: "12px 16px",
-                      color: "var(--text-dim)",
-                      textTransform: "uppercase",
-                      fontSize: 10,
-                      letterSpacing: "0.04em",
-                    }}
-                  >
-                    {sourceLabel(c.source)}
-                  </td>
-                  <td style={{ padding: "12px 16px", textAlign: "end" }}>
-                    <Icons.More size={14} style={{ color: "var(--text-dim)" }} />
-                  </td>
-                </tr>
-              ))}
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {c.verified && (
+                          <Icons.Verify size={13} style={{ color: "var(--accent)" }} />
+                        )}
+                        <span style={{ color: "var(--text)", fontWeight: 500 }}>{c.name}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: "12px 16px", color: "var(--text-muted)" }}>{c.city}</td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {c.connectors.map((k) => (
+                          <span
+                            key={k}
+                            style={{
+                              fontSize: 10,
+                              padding: "2px 6px",
+                              borderRadius: 3,
+                              color: CONNECTOR_COLORS[k],
+                              background: `color-mix(in srgb, ${CONNECTOR_COLORS[k]} 14%, transparent)`,
+                            }}
+                          >
+                            {CONNECTOR_LABELS[k]}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td style={{ padding: "12px 16px" }} className="num">
+                      <span style={{ color: "var(--text)", fontWeight: 500 }}>{c.power}</span>
+                      <span style={{ color: "var(--text-dim)" }}> kW</span>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>{statusChip(c.status)}</td>
+                    <td style={{ padding: "12px 16px" }}>{accessChip(c.access)}</td>
+                    <td
+                      style={{ padding: "12px 16px", color: "var(--text-muted)" }}
+                      className="num"
+                    >
+                      {c.hours}
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 16px",
+                        color: "var(--text-dim)",
+                        textTransform: "uppercase",
+                        fontSize: 10,
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      {sourceLabel(c.source)}
+                    </td>
+                    <td style={{ padding: "12px 16px", textAlign: "end" }}>
+                      <Icons.More size={14} style={{ color: "var(--text-dim)" }} />
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
-          {filtered.length === 0 && (
-            <EmptyState title="No chargers match" subtitle="Try clearing some filters." />
+          {!loading && !error && filtered.length === 0 && (
+            <EmptyState
+              title={chargers.length === 0 ? "No chargers in the database yet" : "No chargers match"}
+              subtitle={
+                chargers.length === 0
+                  ? "Run the OCM sync or add a charger to see rows here."
+                  : "Try clearing some filters."
+              }
+            />
           )}
         </div>
       </Card>
@@ -364,7 +416,36 @@ export const ChargersPage = () => {
 
 const sourceLabel = (s: ChargerSource) => s.toUpperCase();
 
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+
+const dayCellLabel = (wh: WorkingHours, idx: number): string => {
+  if (!wh) return "—";
+  const v = wh[DAY_KEYS[idx]];
+  if (!v) return "—";
+  if (v.closed) return "Closed";
+  if (!v.open || !v.close) return "—";
+  if (v.open === "00:00" && v.close === "24:00") return "24h";
+  return `${v.open.slice(0, 5)}–${v.close.slice(0, 5)}`;
+};
+
+const todayIndex = () => (new Date().getDay() + 6) % 7;
+
+const fmtAgo = (iso: string) => {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return "—";
+  const min = Math.round(ms / 60_000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  const hrs = Math.round(min / 60);
+  if (hrs < 24) return `${hrs} h ago`;
+  const days = Math.round(hrs / 24);
+  if (days < 30) return `${days} d ago`;
+  return new Date(iso).toLocaleDateString();
+};
+
 const DetailDrawer = ({ charger, onClose }: { charger: Charger; onClose: () => void }) => {
+  const today = todayIndex();
   return (
     <>
       <div
@@ -410,7 +491,7 @@ const DetailDrawer = ({ charger, onClose }: { charger: Charger; onClose: () => v
                 letterSpacing: "0.06em",
               }}
             >
-              {charger.id}
+              {charger.id.slice(0, 8)}
             </div>
             <h2 style={{ margin: "2px 0 0", fontSize: 16, fontWeight: 600 }}>{charger.name}</h2>
           </div>
@@ -475,12 +556,22 @@ const DetailDrawer = ({ charger, onClose }: { charger: Charger; onClose: () => v
               />
               <circle cx="100" cy="70" r="6" fill="var(--accent)" opacity="0.3" />
               <circle cx="100" cy="70" r="3" fill="var(--accent)" />
+              <text
+                x="100"
+                y="120"
+                fill="var(--text-dim)"
+                fontSize="9"
+                textAnchor="middle"
+                className="num"
+              >
+                {charger.lat.toFixed(4)}, {charger.lng.toFixed(4)}
+              </text>
             </svg>
           </div>
 
           <div>
             <div style={smallLbl}>Connectors · Power</div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
               {charger.connectors.map((k) => (
                 <span
                   key={k}
@@ -517,48 +608,51 @@ const DetailDrawer = ({ charger, onClose }: { charger: Charger; onClose: () => v
                 marginTop: 8,
               }}
             >
-              {(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const).map((d, i) => (
-                <div
-                  key={d}
-                  style={{
-                    background: i === 2 ? "var(--accent-soft)" : "var(--bg-elev-2)",
-                    border: `1px solid ${i === 2 ? "var(--accent-border)" : "var(--border)"}`,
-                    borderRadius: 4,
-                    padding: "8px 4px",
-                    textAlign: "center",
-                  }}
-                >
+              {DAYS.map((d, i) => {
+                const isToday = i === today;
+                return (
                   <div
+                    key={d}
                     style={{
-                      fontSize: 10,
-                      color: i === 2 ? "var(--accent)" : "var(--text-dim)",
-                      fontWeight: 500,
+                      background: isToday ? "var(--accent-soft)" : "var(--bg-elev-2)",
+                      border: `1px solid ${isToday ? "var(--accent-border)" : "var(--border)"}`,
+                      borderRadius: 4,
+                      padding: "8px 4px",
+                      textAlign: "center",
                     }}
                   >
-                    {d}
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: isToday ? "var(--accent)" : "var(--text-dim)",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {d}
+                    </div>
+                    <div
+                      className="num"
+                      style={{
+                        fontSize: 10,
+                        color: isToday ? "var(--accent)" : "var(--text-muted)",
+                        marginTop: 2,
+                      }}
+                    >
+                      {dayCellLabel(charger.workingHours, i)}
+                    </div>
                   </div>
-                  <div
-                    className="num"
-                    style={{
-                      fontSize: 10,
-                      color: i === 2 ? "var(--accent)" : "var(--text-muted)",
-                      marginTop: 2,
-                    }}
-                  >
-                    {charger.hours.includes("24/7") ? "24h" : "08–20"}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <KV k="Gouvernorat" v={charger.gouv} />
+            <KV k="City" v={charger.city} />
             <KV k="Source" v={charger.source.toUpperCase()} />
-            <KV k="OCM ID" v={charger.source === "ocm" ? "127482" : "—"} />
-            <KV k="Last sync" v={charger.source === "ocm" ? "12 min ago" : "—"} />
-            <KV k="Verified by" v={charger.verified ? "Amine" : "—"} />
-            <KV k="Verified at" v={charger.verified ? "2 days ago" : "—"} />
+            <KV k="OCM ID" v={charger.ocmId ?? "—"} />
+            <KV k="Updated" v={fmtAgo(charger.updatedAt)} />
+            <KV k="Verified by" v={charger.verifiedBy ?? "—"} />
+            <KV k="Coordinates" v={`${charger.lat.toFixed(4)}, ${charger.lng.toFixed(4)}`} />
           </div>
 
           <div style={{ display: "flex", gap: 8 }}>

@@ -2,13 +2,13 @@ import { useMemo, useState } from "react";
 import { APIProvider, InfoWindow, Map, Marker } from "@vis.gl/react-google-maps";
 import { Card } from "../components/card";
 import {
-  CHARGERS,
   CONNECTOR_COLORS,
   CONNECTOR_LABELS,
   STATUS_COLORS,
+  useChargers,
   type Charger,
   type ChargerStatus,
-} from "../data/mock";
+} from "../data/chargers";
 import {
   TUNISIA_CENTER,
   TUNISIA_ZOOM,
@@ -33,6 +33,16 @@ const LEGEND: { label: string; status: ChargerStatus }[] = [
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
 
+const codeStyle = {
+  padding: "1px 5px",
+  borderRadius: 3,
+  background: "var(--bg-elev-2)",
+  border: "1px solid var(--border)",
+  fontFamily: "JetBrains Mono, ui-monospace, monospace",
+  fontSize: 11,
+  color: "var(--text)",
+};
+
 const MissingKey = () => (
   <Card padding={24}>
     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", marginBottom: 6 }}>
@@ -47,16 +57,6 @@ const MissingKey = () => (
   </Card>
 );
 
-const codeStyle = {
-  padding: "1px 5px",
-  borderRadius: 3,
-  background: "var(--bg-elev-2)",
-  border: "1px solid var(--border)",
-  fontFamily: "JetBrains Mono, ui-monospace, monospace",
-  fontSize: 11,
-  color: "var(--text)",
-};
-
 const buildPinIcon = (color: string): google.maps.Symbol => ({
   path: "M 0,0 m -8,0 a 8,8 0 1,0 16,0 a 8,8 0 1,0 -16,0",
   fillColor: color,
@@ -69,6 +69,7 @@ const buildPinIcon = (color: string): google.maps.Symbol => ({
 
 export const MapPage = () => {
   const theme = useCurrentTheme();
+  const { data: chargers, loading, error } = useChargers();
   const [selected, setSelected] = useState<Charger | null>(null);
 
   const styles = useMemo(
@@ -111,7 +112,7 @@ export const MapPage = () => {
             backgroundColor={theme === "dark" ? "#18181B" : "#DBEAFE"}
             style={{ width: "100%", height: "100%" }}
           >
-            {CHARGERS.map((c) => (
+            {chargers.map((c) => (
               <Marker
                 key={c.id}
                 position={{ lat: c.lat, lng: c.lng }}
@@ -138,7 +139,7 @@ export const MapPage = () => {
                     {selected.name}
                   </div>
                   <div style={{ fontSize: 11, color: "#52525b", marginBottom: 8 }}>
-                    {selected.gouv} · {selected.power} kW · {selected.hours}
+                    {selected.city} · {selected.power} kW · {selected.hours}
                   </div>
                   <div
                     style={{
@@ -197,8 +198,27 @@ export const MapPage = () => {
             zIndex: 1,
           }}
         >
-          {CHARGERS.length} chargers · {CHARGERS.length} visible
+          {loading ? "Loading…" : `${chargers.length} chargers`}
         </div>
+        {error && (
+          <div
+            style={{
+              position: "absolute",
+              top: 12,
+              insetInlineEnd: 12,
+              background: "color-mix(in srgb, var(--red) 15%, var(--bg-elev))",
+              border: "1px solid color-mix(in srgb, var(--red) 35%, transparent)",
+              borderRadius: 6,
+              padding: "6px 10px",
+              fontSize: 11,
+              color: "var(--red)",
+              zIndex: 1,
+              maxWidth: 280,
+            }}
+          >
+            {error}
+          </div>
+        )}
       </Card>
       <Card padding={16}>
         <div
