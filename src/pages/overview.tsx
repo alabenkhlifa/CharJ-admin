@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 import {
-  Sparkline,
   AreaChart,
   StackedAreaChart,
   StackedBarChart,
@@ -15,7 +14,6 @@ import { Card, CardHeader } from "../components/card";
 import { TunisiaMap } from "../components/tunisia-map";
 import { Icons } from "../lib/icons";
 import {
-  KPIS,
   STATUS_DONUT,
   CONNECTOR_STACK,
   CONNECTOR_KEYS,
@@ -28,39 +26,29 @@ import {
   RATING_TREND,
   VERIFY_VELOCITY,
   TOP_REQUESTED,
-  RATING_DIST,
   OCM_SYNC,
   ACTIVITY,
   fmt,
-  type Kpi,
-  type AccentTone,
 } from "../data/mock";
+import { useOverviewStats } from "../data/overview-stats";
 
-const tone: Record<AccentTone, string> = {
+type LiveKpi = {
+  id: string;
+  label: string;
+  value: string;
+  hint?: string;
+  accent?: "teal" | "green" | "amber" | "indigo";
+};
+
+const accentVar: Record<NonNullable<LiveKpi["accent"]>, string> = {
   teal: "var(--accent)",
   green: "var(--green)",
   amber: "var(--amber)",
   indigo: "var(--indigo)",
-  red: "var(--red)",
-  slate: "var(--slate)",
 };
 
-const KpiCard = ({ k }: { k: Kpi }) => {
-  const positive = k.delta > 0;
-  const negative = k.delta < 0;
-  const neutralDelta = k.delta === 0;
-  const inverted = k.id === "fb" || k.id === "subs" || k.id === "reports";
-  const deltaColor = inverted
-    ? positive
-      ? "var(--amber)"
-      : "var(--green)"
-    : positive
-      ? "var(--green)"
-      : negative
-        ? "var(--red)"
-        : "var(--text-dim)";
-  const accentColor = tone[k.accent] ?? "var(--accent)";
-
+const LiveKpiCard = ({ k, loading }: { k: LiveKpi; loading: boolean }) => {
+  const accentColor = k.accent ? accentVar[k.accent] : "var(--accent)";
   return (
     <div
       style={{
@@ -68,39 +56,40 @@ const KpiCard = ({ k }: { k: Kpi }) => {
         border: "1px solid var(--border)",
         borderRadius: 10,
         padding: 18,
-        position: "relative",
-        overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         gap: 10,
-        minHeight: 130,
+        minHeight: 110,
+        position: "relative",
+        overflow: "hidden",
       }}
     >
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
+          position: "absolute",
+          insetInlineStart: 0,
+          top: 0,
+          width: 3,
+          height: 28,
+          background: accentColor,
+          opacity: 0.6,
+          borderRadius: "0 2px 2px 0",
+        }}
+      />
+      <div
+        style={{
+          fontSize: 12,
+          color: "var(--text-muted)",
+          letterSpacing: "0.02em",
+          textTransform: "uppercase",
+          fontWeight: 500,
         }}
       >
-        <div
-          style={{
-            fontSize: 12,
-            color: "var(--text-muted)",
-            letterSpacing: "0.02em",
-            textTransform: "uppercase",
-            fontWeight: 500,
-          }}
-        >
-          {k.label}
-        </div>
-        <button style={{ ...iconBtnStyle, width: 22, height: 22, border: "none" }}>
-          <Icons.More size={12} />
-        </button>
+        {k.label}
       </div>
-
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+      {loading ? (
+        <div className="skeleton" style={{ height: 30, width: "60%" }} />
+      ) : (
         <div
           className="num"
           style={{
@@ -111,113 +100,75 @@ const KpiCard = ({ k }: { k: Kpi }) => {
             letterSpacing: "-0.02em",
           }}
         >
-          {k.fmt(k.value)}
-        </div>
-        {!neutralDelta && (
-          <div
-            className="num"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 2,
-              fontSize: 12,
-              fontWeight: 500,
-              color: deltaColor,
-              background: `color-mix(in srgb, ${deltaColor} 12%, transparent)`,
-              padding: "2px 6px",
-              borderRadius: 4,
-            }}
-          >
-            {positive ? (
-              <Icons.ArrowUp size={10} stroke={2.4} />
-            ) : (
-              <Icons.ArrowDown size={10} stroke={2.4} />
-            )}
-            {Math.abs(k.delta).toFixed(1)}%
-          </div>
-        )}
-        {neutralDelta && (
-          <div
-            className="num"
-            style={{ fontSize: 11, color: "var(--text-dim)", padding: "2px 6px" }}
-          >
-            ±0%
-          </div>
-        )}
-      </div>
-
-      {k.multi && (
-        <div
-          className="num"
-          style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--text-dim)" }}
-        >
-          <span>
-            WAU <span style={{ color: "var(--text-muted)" }}>{fmt(k.multi.wau)}</span>
-          </span>
-          <span>
-            MAU <span style={{ color: "var(--text-muted)" }}>{fmt(k.multi.mau)}</span>
-          </span>
+          {k.value}
         </div>
       )}
-
-      {k.stars && <StarMiniBar />}
-
-      <div
-        style={{
-          marginTop: "auto",
-          display: "flex",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-          gap: 8,
-        }}
-      >
-        <div style={{ fontSize: 10, color: "var(--text-dim)" }}>{k.period}</div>
-        <Sparkline data={k.series} color={accentColor} width={96} height={32} />
-      </div>
+      {k.hint && !loading && (
+        <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{k.hint}</div>
+      )}
     </div>
   );
 };
 
-const StarMiniBar = () => {
-  const total = RATING_DIST.reduce((s, d) => s + d.count, 0);
+const LiveKpiGrid = ({ stats }: { stats: ReturnType<typeof useOverviewStats> }) => {
+  const { data, loading } = stats;
+  const cards: LiveKpi[] = [
+    {
+      id: "total",
+      label: "Total chargers",
+      value: fmt(data.totalChargers),
+      hint: `+${fmt(data.newChargersThisWeek)} this week`,
+      accent: "teal",
+    },
+    {
+      id: "operational",
+      label: "Operational",
+      value: `${data.operationalPct.toFixed(1)}%`,
+      hint: `${fmt(Math.round((data.totalChargers * data.operationalPct) / 100))} of ${fmt(data.totalChargers)}`,
+      accent: "green",
+    },
+    {
+      id: "verified",
+      label: "Verified",
+      value: `${data.verifiedPct.toFixed(1)}%`,
+      hint: `${fmt(data.verifiedThisWeek)} verified this week`,
+      accent: "teal",
+    },
+    {
+      id: "public",
+      label: "Public access",
+      value: fmt(data.publicCount),
+      hint: data.totalChargers
+        ? `${((data.publicCount / data.totalChargers) * 100).toFixed(0)}% of catalogue`
+        : undefined,
+      accent: "teal",
+    },
+    {
+      id: "pending",
+      label: "Pending submissions",
+      value: fmt(data.pendingSubmissions),
+      hint: "Community queue",
+      accent: data.pendingSubmissions > 0 ? "amber" : "teal",
+    },
+    {
+      id: "rating",
+      label: "Avg rating",
+      value: data.avgRating == null ? "—" : data.avgRating.toFixed(2),
+      hint:
+        data.ratingsCount > 0
+          ? `${fmt(data.ratingsCount)} reviews`
+          : "No reviews yet",
+      accent: "amber",
+    },
+  ];
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 2 }}>
-      {RATING_DIST.map((d) => (
-        <div
-          key={d.stars}
-          style={{
-            display: "grid",
-            gridTemplateColumns: "14px 1fr 32px",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <span style={{ fontSize: 10, color: "var(--text-dim)" }} className="num">
-            {d.stars}★
-          </span>
-          <div
-            style={{
-              height: 4,
-              background: "var(--bg-elev-2)",
-              borderRadius: 2,
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                width: `${(d.count / total) * 100}%`,
-                height: "100%",
-                background: "var(--amber)",
-              }}
-            />
-          </div>
-          <span
-            className="num"
-            style={{ fontSize: 10, color: "var(--text-dim)", textAlign: "end" }}
-          >
-            {fmt(d.count)}
-          </span>
-        </div>
+    <div
+      className="kpi-grid"
+      style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}
+    >
+      {cards.map((k) => (
+        <LiveKpiCard key={k.id} k={k} loading={loading} />
       ))}
     </div>
   );
@@ -393,7 +344,15 @@ const kvVal: CSSProperties = {
   fontWeight: 500,
 };
 
+const todayLabel = () =>
+  new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
 export const OverviewPage = () => {
+  const stats = useOverviewStats();
   return (
     <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div
@@ -415,7 +374,7 @@ export const OverviewPage = () => {
               fontWeight: 500,
             }}
           >
-            Wednesday, 1 May
+            {todayLabel()}
           </div>
           <h1
             style={{
@@ -426,17 +385,22 @@ export const OverviewPage = () => {
               color: "var(--text)",
             }}
           >
-            Good morning, Amine.
+            Charj Overview
           </h1>
           <div style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 4 }}>
-            <span className="num" style={{ color: "var(--amber)" }}>
-              47
-            </span>{" "}
-            submissions and{" "}
-            <span className="num" style={{ color: "var(--indigo)" }}>
-              23
-            </span>{" "}
-            messages need your attention.
+            {stats.loading ? (
+              <span style={{ color: "var(--text-dim)" }}>Loading…</span>
+            ) : stats.data.pendingSubmissions > 0 ? (
+              <>
+                <span className="num" style={{ color: "var(--amber)" }}>
+                  {stats.data.pendingSubmissions}
+                </span>{" "}
+                pending {stats.data.pendingSubmissions === 1 ? "submission" : "submissions"}{" "}
+                waiting for review.
+              </>
+            ) : (
+              <>No pending submissions — you're caught up.</>
+            )}
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -475,14 +439,22 @@ export const OverviewPage = () => {
         </div>
       </div>
 
-      <div
-        className="kpi-grid"
-        style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}
-      >
-        {KPIS.map((k) => (
-          <KpiCard key={k.id} k={k} />
-        ))}
-      </div>
+      <LiveKpiGrid stats={stats} />
+
+      {stats.error && (
+        <div
+          style={{
+            padding: 12,
+            border: "1px solid color-mix(in srgb, var(--red) 35%, transparent)",
+            background: "color-mix(in srgb, var(--red) 10%, transparent)",
+            borderRadius: 8,
+            color: "var(--red)",
+            fontSize: 12,
+          }}
+        >
+          Failed to load stats: {stats.error}
+        </div>
+      )}
 
       <div
         className="row-3"
