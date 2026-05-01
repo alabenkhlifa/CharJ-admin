@@ -161,18 +161,20 @@ a {
   .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
+  /* minmax(0, 1fr) — without the 0 floor, intrinsic-width SVGs (charts)
+     blow the column out and the whole row overflows the viewport. */
   .row-3 {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
   }
   .row-2 {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 }
 @media (max-width: 900px) {
   /* Stack the Map page rail under the map and the Feedback inbox/detail */
   .map-grid,
   .feedback-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
     height: auto !important;
   }
   .feedback-grid {

@@ -13,13 +13,19 @@ if (!URL || !ANON) {
   );
 }
 
-export const supabase = createClient(URL, ANON, {
-  auth: {
-    // No auth flow yet; treat the admin as a stateless anon client.
-    // Supabase persists tokens by default, so disable to keep things clean.
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
-
 export const SUPABASE_CONFIGURED = Boolean(URL && ANON);
+
+// createClient throws on empty URL. When env vars are missing (e.g. local
+// dev with no .env populated), hand it a placeholder so the module loads.
+// Downstream hooks must short-circuit on !SUPABASE_CONFIGURED before
+// touching this client.
+export const supabase = createClient(
+  SUPABASE_CONFIGURED ? URL : "https://placeholder.invalid",
+  SUPABASE_CONFIGURED ? ANON : "placeholder",
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  },
+);
