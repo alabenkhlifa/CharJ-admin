@@ -1,0 +1,417 @@
+import type { CSSProperties } from "react";
+import { Icons } from "../lib/icons";
+import { NAV, type RouteKey } from "../lib/routes";
+
+type SidebarProps = {
+  active: RouteKey;
+  onNav: (k: RouteKey) => void;
+  density: "comfortable" | "compact";
+  collapsed: boolean;
+  setCollapsed: (v: boolean) => void;
+};
+
+export const Sidebar = ({ active, onNav, density, collapsed, setCollapsed }: SidebarProps) => {
+  const w = collapsed ? 64 : density === "compact" ? 200 : 240;
+  const padY = density === "compact" ? 6 : 8;
+  return (
+    <aside
+      style={{
+        width: w,
+        flexShrink: 0,
+        background: "var(--bg)",
+        borderInlineEnd: "1px solid var(--border)",
+        display: "flex",
+        flexDirection: "column",
+        transition: "width .2s",
+        position: "sticky",
+        top: 0,
+        height: "100vh",
+      }}
+    >
+      <div
+        style={{
+          padding: collapsed ? "16px 0" : "18px 18px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: collapsed ? "center" : "space-between",
+          gap: 8,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 7,
+              display: "grid",
+              placeItems: "center",
+              background: "linear-gradient(135deg, var(--accent) 0%, #06a085 100%)",
+              color: "#0a0a0b",
+              fontWeight: 700,
+              fontSize: 15,
+              boxShadow: "0 0 0 1px var(--accent-border)",
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M13 2 4 14h7l-1 8 9-12h-7Z" />
+            </svg>
+          </div>
+          {!collapsed && (
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.02em" }}>Charj</div>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "var(--text-dim)",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  marginTop: -1,
+                }}
+              >
+                Admin
+              </div>
+            </div>
+          )}
+        </div>
+        {!collapsed && (
+          <button
+            onClick={() => setCollapsed(true)}
+            style={{
+              background: "transparent",
+              border: "1px solid var(--border)",
+              width: 24,
+              height: 24,
+              borderRadius: 5,
+              display: "grid",
+              placeItems: "center",
+              color: "var(--text-dim)",
+            }}
+          >
+            <Icons.Sidebar size={12} />
+          </button>
+        )}
+      </div>
+
+      {collapsed && (
+        <button
+          onClick={() => setCollapsed(false)}
+          style={{
+            margin: "0 auto 8px",
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            background: "transparent",
+            border: "1px solid var(--border)",
+            color: "var(--text-dim)",
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
+          <Icons.Sidebar size={13} />
+        </button>
+      )}
+
+      <nav
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+          padding: collapsed ? "0 8px" : "0 10px",
+          flex: 1,
+        }}
+      >
+        {NAV.map((n) => {
+          const Ic = Icons[n.ic];
+          const isActive = active === n.k;
+          return (
+            <button
+              key={n.k}
+              onClick={() => onNav(n.k)}
+              title={collapsed ? n.l : ""}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: collapsed ? `${padY + 2}px 0` : `${padY}px 10px`,
+                justifyContent: collapsed ? "center" : "flex-start",
+                background: isActive ? "var(--surface-hover)" : "transparent",
+                border: "none",
+                borderRadius: 6,
+                color: isActive ? "var(--text)" : "var(--text-muted)",
+                fontSize: 13,
+                fontWeight: isActive ? 500 : 400,
+                position: "relative",
+                cursor: "pointer",
+                textAlign: "start",
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) e.currentTarget.style.background = "var(--surface-hover)";
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) e.currentTarget.style.background = "transparent";
+              }}
+            >
+              {isActive && (
+                <span
+                  style={{
+                    position: "absolute",
+                    insetInlineStart: collapsed ? 0 : -10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: 2,
+                    height: 16,
+                    background: "var(--accent)",
+                    borderRadius: 2,
+                  }}
+                />
+              )}
+              <Ic size={15} />
+              {!collapsed && (
+                <>
+                  <span style={{ flex: 1 }}>{n.l}</span>
+                  {n.count !== undefined && (
+                    <span
+                      className="num"
+                      style={{
+                        fontSize: 10,
+                        padding: "1px 6px",
+                        borderRadius: 10,
+                        background: n.accent ? "var(--accent-soft)" : "var(--bg-elev-2)",
+                        color: n.accent ? "var(--accent)" : "var(--text-dim)",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {n.count}
+                    </span>
+                  )}
+                </>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      {!collapsed && (
+        <div style={{ padding: 14, borderTop: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, var(--indigo), var(--accent))",
+                display: "grid",
+                placeItems: "center",
+                color: "#fff",
+                fontSize: 11,
+                fontWeight: 600,
+              }}
+            >
+              AD
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "var(--text)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Amine Dkhili
+              </div>
+              <div style={{ fontSize: 10, color: "var(--text-dim)" }}>Super admin</div>
+            </div>
+            <Icons.More size={14} style={{ color: "var(--text-dim)" }} />
+          </div>
+        </div>
+      )}
+    </aside>
+  );
+};
+
+const topIconStyle: CSSProperties = {
+  width: 30,
+  height: 30,
+  display: "grid",
+  placeItems: "center",
+  background: "transparent",
+  border: "1px solid var(--border)",
+  borderRadius: 7,
+  color: "var(--text-muted)",
+};
+
+type TopbarProps = {
+  theme: "dark" | "light";
+  setTheme: (v: "dark" | "light") => void;
+  active: RouteKey;
+};
+
+export const Topbar = ({ theme, setTheme, active }: TopbarProps) => {
+  return (
+    <header
+      style={{
+        height: "var(--topbar-h)",
+        flexShrink: 0,
+        borderBottom: "1px solid var(--border)",
+        display: "flex",
+        alignItems: "center",
+        paddingInline: 28,
+        gap: 20,
+        background: "color-mix(in srgb, var(--bg) 85%, transparent)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        position: "sticky",
+        top: 0,
+        zIndex: 10,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 13,
+          color: "var(--text-dim)",
+        }}
+      >
+        <span>Admin</span>
+        <Icons.ChevronRight size={12} />
+        <span style={{ color: "var(--text)", textTransform: "capitalize" }}>{active}</span>
+      </div>
+
+      <div
+        style={{
+          flex: 1,
+          maxWidth: 520,
+          marginInline: "auto",
+          position: "relative",
+        }}
+      >
+        <Icons.Search
+          size={15}
+          style={{
+            position: "absolute",
+            insetInlineStart: 12,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "var(--text-dim)",
+          }}
+        />
+        <input
+          placeholder="Search chargers, users, feedback…"
+          style={{
+            width: "100%",
+            height: 38,
+            background: "var(--bg-elev)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            paddingInline: "38px 64px",
+            color: "var(--text)",
+            fontFamily: "inherit",
+            fontSize: 13,
+            outline: "none",
+          }}
+        />
+        <span
+          className="num"
+          style={{
+            position: "absolute",
+            insetInlineEnd: 10,
+            top: "50%",
+            transform: "translateY(-50%)",
+            fontSize: 10,
+            color: "var(--text-dim)",
+            padding: "2px 6px",
+            background: "var(--bg-elev-2)",
+            border: "1px solid var(--border)",
+            borderRadius: 4,
+          }}
+        >
+          ⌘K
+        </span>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <button title="Help" style={topIconStyle}>
+          <Icons.Help size={14} />
+        </button>
+        <button title="Notifications" style={{ ...topIconStyle, position: "relative" }}>
+          <Icons.Bell size={14} />
+          <span
+            style={{
+              position: "absolute",
+              top: 6,
+              insetInlineEnd: 6,
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: "var(--accent)",
+            }}
+          />
+        </button>
+        <button
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          title="Toggle theme"
+          style={{ ...topIconStyle, color: "var(--accent)" }}
+        >
+          {theme === "dark" ? <Icons.Sun size={14} /> : <Icons.Moon size={14} />}
+        </button>
+        <div style={{ width: 1, height: 20, background: "var(--border)", marginInline: 4 }} />
+        <button
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            background: "transparent",
+            border: "1px solid var(--border)",
+            borderRadius: 7,
+            padding: "4px 8px 4px 4px",
+          }}
+        >
+          <span
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, var(--indigo), var(--accent))",
+              color: "#fff",
+              display: "grid",
+              placeItems: "center",
+              fontSize: 10,
+              fontWeight: 600,
+            }}
+          >
+            AD
+          </span>
+          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Amine</span>
+          <span
+            style={{
+              fontSize: 9,
+              padding: "1px 5px",
+              borderRadius: 3,
+              background: "var(--accent-soft)",
+              color: "var(--accent)",
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              fontWeight: 600,
+            }}
+          >
+            Super
+          </span>
+        </button>
+      </div>
+    </header>
+  );
+};
