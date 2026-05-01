@@ -34,6 +34,7 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_ADMIN_USER: ${{ secrets.VITE_ADMIN_USER }}
           VITE_ADMIN_PASS: ${{ secrets.VITE_ADMIN_PASS }}
+          VITE_ADMIN_API_SECRET: ${{ secrets.VITE_ADMIN_API_SECRET }}
         run: npm run build
 
       # SPA fallback: GitHub Pages serves 404.html for any unknown path,
