@@ -74,39 +74,87 @@ const SubmissionCard = ({ s }: { s: Submission }) => (
         {truncate(s.notes)}
       </div>
     ) : null}
-    <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-      <button
-        // TODO: needs service-role
-        style={{
-          flex: 1,
-          padding: "6px 10px",
-          background: "var(--accent)",
-          color: "#0a0a0b",
-          border: "none",
-          borderRadius: 4,
-          fontSize: 11,
-          fontWeight: 500,
-        }}
-      >
-        Approve
-      </button>
-      <button
-        // TODO: needs service-role
-        style={{
-          flex: 1,
-          padding: "6px 10px",
-          background: "var(--bg-elev-2)",
-          color: "var(--text-muted)",
-          border: "1px solid var(--border)",
-          borderRadius: 4,
-          fontSize: 11,
-        }}
-      >
-        Reject
-      </button>
-    </div>
+    {s.status === "pending" ? (
+      <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+        <button
+          // TODO: needs service-role
+          style={{
+            flex: 1,
+            padding: "6px 10px",
+            background: "var(--accent)",
+            color: "#0a0a0b",
+            border: "none",
+            borderRadius: 4,
+            fontSize: 11,
+            fontWeight: 500,
+          }}
+        >
+          Approve
+        </button>
+        <button
+          // TODO: needs service-role
+          style={{
+            flex: 1,
+            padding: "6px 10px",
+            background: "var(--bg-elev-2)",
+            color: "var(--text-muted)",
+            border: "1px solid var(--border)",
+            borderRadius: 4,
+            fontSize: 11,
+          }}
+        >
+          Reject
+        </button>
+      </div>
+    ) : (
+      <ResolvedStatusRow status={s.status} reviewedAt={s.reviewedAt} />
+    )}
   </Card>
 );
+
+const ResolvedStatusRow = ({
+  status,
+  reviewedAt,
+}: {
+  status: "approved" | "rejected";
+  reviewedAt: string | null;
+}) => {
+  const color = status === "approved" ? "var(--green)" : "var(--red)";
+  const label = status === "approved" ? "Approved" : "Rejected";
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginTop: 12,
+      }}
+    >
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 5,
+          fontSize: 11,
+          color,
+          padding: "2px 8px",
+          borderRadius: 4,
+          background: `color-mix(in srgb, ${color} 12%, transparent)`,
+        }}
+      >
+        <span
+          style={{ width: 6, height: 6, borderRadius: "50%", background: color }}
+        />
+        {label}
+      </span>
+      {reviewedAt ? (
+        <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
+          {status === "approved" ? "approved" : "rejected"} {fmtAgo(reviewedAt)}
+        </span>
+      ) : null}
+    </div>
+  );
+};
 
 const SkeletonCard = () => (
   <Card padding={16}>

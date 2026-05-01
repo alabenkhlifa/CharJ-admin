@@ -2,6 +2,12 @@ import type { CSSProperties } from "react";
 import { Icons } from "../lib/icons";
 import { NAV, type RouteKey } from "../lib/routes";
 
+type SidebarCountsInput = {
+  chargers?: number;
+  pendingSubmissions?: number;
+  ratings?: number;
+};
+
 type SidebarProps = {
   active: RouteKey;
   onNav: (k: RouteKey) => void;
@@ -11,6 +17,25 @@ type SidebarProps = {
   isMobile?: boolean;
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
+  counts?: SidebarCountsInput;
+};
+
+// Resolve which numeric badge value (if any) belongs next to a given nav key.
+// Returning `undefined` means "render no badge" — used for nav items we
+// don't track (overview/users/vehicles/map/settings) and for `feedback`,
+// which would need service-role access we don't have here.
+const countFor = (k: RouteKey, counts?: SidebarCountsInput): number | undefined => {
+  if (!counts) return undefined;
+  switch (k) {
+    case "chargers":
+      return counts.chargers;
+    case "submissions":
+      return counts.pendingSubmissions;
+    case "reviews":
+      return counts.ratings;
+    default:
+      return undefined;
+  }
 };
 
 export const Sidebar = ({
@@ -22,6 +47,7 @@ export const Sidebar = ({
   isMobile = false,
   mobileOpen = false,
   onCloseMobile,
+  counts,
 }: SidebarProps) => {
   // On mobile, the drawer always renders at full 240px width (collapsed mode
   // doesn't make sense in a slide-out panel). Desktop respects the user's
@@ -178,6 +204,12 @@ export const Sidebar = ({
         {NAV.map((n) => {
           const Ic = Icons[n.ic];
           const isActive = active === n.k;
+          const c = countFor(n.k, counts);
+          const hasCount = typeof c === "number" && c >= 0;
+          // `accent` only glows when the relevant count is actually > 0.
+          // While loading (count undefined) keep it neutral so we don't
+          // pre-glow before we know whether there's anything to act on.
+          const glow = Boolean(n.accent) && typeof c === "number" && c > 0;
           return (
             <button
               key={n.k}
@@ -224,19 +256,19 @@ export const Sidebar = ({
               {!showCollapsed && (
                 <>
                   <span style={{ flex: 1 }}>{n.l}</span>
-                  {n.count !== undefined && (
+                  {hasCount && (
                     <span
                       className="num"
                       style={{
                         fontSize: 10,
                         padding: "1px 6px",
                         borderRadius: 10,
-                        background: n.accent ? "var(--accent-soft)" : "var(--bg-elev-2)",
-                        color: n.accent ? "var(--accent)" : "var(--text-dim)",
+                        background: glow ? "var(--accent-soft)" : "var(--bg-elev-2)",
+                        color: glow ? "var(--accent)" : "var(--text-dim)",
                         fontWeight: 500,
                       }}
                     >
-                      {n.count}
+                      {c}
                     </span>
                   )}
                 </>

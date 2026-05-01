@@ -3,6 +3,7 @@ import { Sidebar, Topbar } from "./components/shell";
 import { useTweaks } from "./lib/theme";
 import { useIsMobile } from "./lib/use-is-mobile";
 import type { RouteKey } from "./lib/routes";
+import { useSidebarCounts } from "./data/sidebar-counts";
 import { OverviewPage } from "./pages/overview";
 import { ChargersPage } from "./pages/chargers";
 import { SubmissionsPage } from "./pages/submissions";
@@ -31,6 +32,10 @@ const App = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isMobile = useIsMobile();
+  const { data: countsData, loading: countsLoading } = useSidebarCounts();
+  // While loading we pass `undefined` so the sidebar simply omits badges
+  // rather than flashing a 0 → real-number sequence.
+  const sidebarCounts = countsLoading ? undefined : countsData;
 
   const Page = ROUTE_COMPONENTS[active];
   const padding = isMobile
@@ -53,6 +58,7 @@ const App = () => {
         isMobile={isMobile}
         mobileOpen={mobileNavOpen}
         onCloseMobile={() => setMobileNavOpen(false)}
+        counts={sidebarCounts}
       />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         <Topbar
