@@ -22,14 +22,16 @@ const fmtAgo = (iso: string | null) => {
 
 const MONO_FONT = "JetBrains Mono, ui-monospace, monospace";
 
+// Reviews + Submissions intentionally absent. Charj uses anonymous Supabase
+// auth; UIDs rotate when sessions expire, so rating.rater / submission
+// .submitted_by almost never match a current auth.users row. Surfacing
+// "0 / 0" for every user was misleading.
 const COLUMNS = [
   "User ID",
   "Vehicle",
   "Joined",
   "Last active",
   "Vehicles",
-  "Reviews",
-  "Submissions",
 ] as const;
 
 const pickPrimary = (
@@ -137,12 +139,6 @@ const UserRow = ({ user: u }: UserRowProps) => (
     <td style={{ padding: "12px 16px", color: "var(--text)" }} className="num">
       {u.vehiclesCount}
     </td>
-    <td style={{ padding: "12px 16px", color: "var(--text)" }} className="num">
-      {u.ratingsCount}
-    </td>
-    <td style={{ padding: "12px 16px", color: "var(--text)" }} className="num">
-      {u.submissionsCount}
-    </td>
   </tr>
 );
 
@@ -174,7 +170,10 @@ export const UsersPage = () => {
             </span>
           ) : (
             <>
-              <span className="num">{total}</span> loaded
+              <span className="num">{total}</span> anonymous sessions ·{" "}
+              <span style={{ color: "var(--text-dim)" }}>
+                ratings + submissions intentionally hidden — orphaned by anon auth pruning
+              </span>
             </>
           )}
         </div>
