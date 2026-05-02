@@ -221,3 +221,11 @@ const kindStyle: CSSProperties = {
   background: "var(--bg-elev-2)",
   flexShrink: 0,
 };
+
+const footerStyle: CSSProperties = {
+  marginTop: 4,
+  padding: "8px 16px",
+  borderTop: "1px solid var(--border)",
+  fontSize: 11,
+  color: "var(--text-dim)",
+};
