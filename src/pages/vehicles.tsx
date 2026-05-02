@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Card, EmptyState } from "../components/card";
+import { Pagination, usePaginated } from "../components/pagination";
 import { CONNECTOR_COLORS, CONNECTOR_LABELS } from "../data/chargers";
 import { useEvModels, type EvModel } from "../data/vehicles";
 
@@ -39,6 +40,15 @@ export const VehiclesPage = () => {
     for (const m of models) counts.set(m.source, (counts.get(m.source) ?? 0) + 1);
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
   }, [models]);
+
+  const {
+    pageItems: pageModels,
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    total,
+  } = usePaginated(models, null, 24);
 
   return (
     <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -117,7 +127,7 @@ export const VehiclesPage = () => {
           ))}
 
         {!loading &&
-          models.map((m) => {
+          pageModels.map((m) => {
             const charge = formatMaxCharge(m);
             return (
               <Card key={m.id} padding={16}>
@@ -244,6 +254,18 @@ export const VehiclesPage = () => {
             );
           })}
       </div>
+
+      {!loading && !error && total > 0 && (
+        <Card padding={0}>
+          <Pagination
+            page={page}
+            perPage={perPage}
+            total={total}
+            onPageChange={setPage}
+            onPerPageChange={setPerPage}
+          />
+        </Card>
+      )}
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { AddChargerModal } from "../components/add-charger-modal";
 import { Card, EmptyState } from "../components/card";
 import { iconBtnStyle } from "../components/charts";
+import { Pagination, usePaginated } from "../components/pagination";
 import { Icons } from "../lib/icons";
 import { darkMapStyle, lightMapStyle } from "../lib/map-styles";
 import { useCurrentTheme } from "../lib/use-theme";
@@ -159,6 +160,14 @@ export const ChargersPage = () => {
   );
 
   const verifiedCount = chargers.filter((c) => c.verified).length;
+  const {
+    pageItems: pageChargers,
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    total: pageTotal,
+  } = usePaginated(filtered, filters);
 
   return (
     <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -345,7 +354,7 @@ export const ChargersPage = () => {
                   </tr>
                 ))}
               {!loading &&
-                filtered.map((c) => (
+                pageChargers.map((c) => (
                   <tr
                     key={c.id}
                     onClick={() => setSelected(c)}
@@ -423,6 +432,15 @@ export const ChargersPage = () => {
             />
           )}
         </div>
+        {!loading && !error && pageTotal > 0 && (
+          <Pagination
+            page={page}
+            perPage={perPage}
+            total={pageTotal}
+            onPageChange={setPage}
+            onPerPageChange={setPerPage}
+          />
+        )}
       </Card>
 
       {selected && (

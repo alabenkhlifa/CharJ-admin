@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Card, EmptyState } from "../components/card";
+import { Pagination, usePaginated } from "../components/pagination";
 import { useSubmissions, type Submission, type SubmissionStatus } from "../data/submissions";
 
 type Tab = "pending" | "review" | "approved" | "rejected";
@@ -204,6 +205,15 @@ export const SubmissionsPage = () => {
     return submissions.filter((s) => s.status === target);
   }, [submissions, tab]);
 
+  const {
+    pageItems: pageFiltered,
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    total,
+  } = usePaginated(filtered, tab, 12);
+
   return (
     <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
@@ -303,18 +313,31 @@ export const SubmissionsPage = () => {
           />
         </Card>
       ) : (
-        <div
-          className="card-grid-260"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-            gap: 12,
-          }}
-        >
-          {filtered.map((s) => (
-            <SubmissionCard key={s.id} s={s} />
-          ))}
-        </div>
+        <>
+          <div
+            className="card-grid-260"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {pageFiltered.map((s) => (
+              <SubmissionCard key={s.id} s={s} />
+            ))}
+          </div>
+          {total > 0 && (
+            <Card padding={0}>
+              <Pagination
+                page={page}
+                perPage={perPage}
+                total={total}
+                onPageChange={setPage}
+                onPerPageChange={setPerPage}
+              />
+            </Card>
+          )}
+        </>
       )}
     </div>
   );

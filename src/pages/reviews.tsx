@@ -1,4 +1,5 @@
 import { Card, CardHeader, EmptyState } from "../components/card";
+import { Pagination, usePaginated } from "../components/pagination";
 import { Icons } from "../lib/icons";
 import { formatRelative, useReviews } from "../data/reviews";
 import type { Review } from "../data/reviews";
@@ -90,6 +91,14 @@ const ReviewRow = ({ r }: { r: Review }) => (
 
 export const ReviewsPage = () => {
   const { data, loading, error } = useReviews();
+  const {
+    pageItems: pageReviews,
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    total,
+  } = usePaginated(data, null, 20);
 
   return (
     <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -116,7 +125,7 @@ export const ReviewsPage = () => {
           subtitle={
             loading
               ? "Loading…"
-              : `Latest ${data.length} · all chargers`
+              : `Latest ${total} · all chargers`
           }
           periodSelector={false}
         />
@@ -153,9 +162,21 @@ export const ReviewsPage = () => {
 
         {!loading && data.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {data.map((r) => (
+            {pageReviews.map((r) => (
               <ReviewRow key={r.id} r={r} />
             ))}
+          </div>
+        )}
+
+        {!loading && total > 0 && (
+          <div style={{ marginTop: 12, marginInline: -16, marginBottom: -16 }}>
+            <Pagination
+              page={page}
+              perPage={perPage}
+              total={total}
+              onPageChange={setPage}
+              onPerPageChange={setPerPage}
+            />
           </div>
         )}
 

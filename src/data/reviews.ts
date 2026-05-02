@@ -26,7 +26,7 @@ export type Review = {
   createdAt: string;
 };
 
-const RECENT_LIMIT = 50;
+const RECENT_LIMIT = 200;
 
 // First 6 chars of the UID + ellipsis. Anonymous fallback for empty strings
 // just in case (the column is NOT NULL but values can still be whitespace-y).

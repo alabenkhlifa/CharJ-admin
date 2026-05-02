@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Card, EmptyState } from "../components/card";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/pagination";
 import {
   useAdminUsers,
   type AdminUser,
@@ -143,7 +144,9 @@ const UserRow = ({ user: u }: UserRowProps) => (
 );
 
 export const UsersPage = () => {
-  const { data: users, total, loading, error } = useAdminUsers();
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(DEFAULT_PAGE_SIZE);
+  const { data: users, total, loading, error } = useAdminUsers(page, perPage);
 
   return (
     <div
@@ -249,6 +252,19 @@ export const UsersPage = () => {
             <EmptyState title="No users yet" />
           )}
         </div>
+        {!error && total > 0 && (
+          <Pagination
+            page={page}
+            perPage={perPage}
+            total={total}
+            onPageChange={setPage}
+            onPerPageChange={(n) => {
+              setPerPage(n);
+              setPage(1);
+            }}
+            loading={loading}
+          />
+        )}
       </Card>
     </div>
   );
