@@ -460,27 +460,6 @@ export const Topbar = ({ theme, setTheme, active, isMobile = false, onOpenMenu }
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-        {!isMobile && (
-          <button title="Help" style={topIconStyle}>
-            <Icons.Help size={14} />
-          </button>
-        )}
-        {!isMobile && (
-          <button title="Notifications" style={{ ...topIconStyle, position: "relative" }}>
-            <Icons.Bell size={14} />
-            <span
-              style={{
-                position: "absolute",
-                top: 6,
-                insetInlineEnd: 6,
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "var(--accent)",
-              }}
-            />
-          </button>
-        )}
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           title="Toggle theme"
@@ -515,10 +494,10 @@ export const Topbar = ({ theme, setTheme, active, isMobile = false, onOpenMenu }
               fontWeight: 600,
             }}
           >
-            AD
+            AB
           </span>
           {!isMobile && (
-            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Amine</span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Ala</span>
           )}
           {!isMobile && (
             <span
