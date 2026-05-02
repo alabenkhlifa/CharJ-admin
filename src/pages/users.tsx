@@ -1,5 +1,10 @@
+import { useState } from "react";
 import { Card, EmptyState } from "../components/card";
-import { useAdminUsers } from "../data/admin-users";
+import {
+  useAdminUsers,
+  type AdminUser,
+  type AdminUserVehicle,
+} from "../data/admin-users";
 
 const fmtAgo = (iso: string | null) => {
   if (!iso) return "Never";
@@ -15,14 +20,131 @@ const fmtAgo = (iso: string | null) => {
   return new Date(iso).toLocaleDateString();
 };
 
+const MONO_FONT = "JetBrains Mono, ui-monospace, monospace";
+
 const COLUMNS = [
-  "Email",
+  "User ID",
+  "Vehicle",
   "Joined",
   "Last active",
   "Vehicles",
   "Reviews",
   "Submissions",
 ] as const;
+
+const pickPrimary = (
+  vehicles: AdminUserVehicle[],
+): AdminUserVehicle | null => {
+  if (vehicles.length === 0) return null;
+  const primary = vehicles.find((v) => v.is_primary);
+  return primary ?? vehicles[0];
+};
+
+type UserIdCellProps = { id: string };
+
+const UserIdCell = ({ id }: UserIdCellProps) => {
+  const [flashed, setFlashed] = useState(false);
+  const short = `${id.slice(0, 8)}…`;
+
+  const onCopy = () => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(id).catch(() => {});
+    }
+    setFlashed(true);
+    window.setTimeout(() => setFlashed(false), 600);
+  };
+
+  return (
+    <span
+      className="num"
+      onClick={onCopy}
+      title={`Click to copy ${id}`}
+      style={{
+        cursor: "pointer",
+        fontFamily: MONO_FONT,
+        color: flashed ? "var(--accent)" : "var(--text)",
+        transition: "color 200ms ease",
+        fontWeight: 500,
+      }}
+    >
+      {short}
+    </span>
+  );
+};
+
+type VehicleCellProps = { vehicles: AdminUserVehicle[] };
+
+const VehicleCell = ({ vehicles }: VehicleCellProps) => {
+  const primary = pickPrimary(vehicles);
+  if (!primary) {
+    return <span style={{ color: "var(--text-dim)" }}>—</span>;
+  }
+  const extra = vehicles.length - 1;
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        color: "var(--text)",
+      }}
+    >
+      <span style={{ fontWeight: 500 }}>
+        {primary.make} {primary.model}
+      </span>
+      {primary.variant && (
+        <span style={{ color: "var(--text-dim)", fontSize: 12 }}>
+          {primary.variant}
+        </span>
+      )}
+      {extra > 0 && (
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            padding: "1px 6px",
+            borderRadius: 999,
+            fontSize: 10,
+            fontWeight: 600,
+            color: "var(--text-muted)",
+            background: "color-mix(in srgb, var(--text) 8%, transparent)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          +{extra}
+        </span>
+      )}
+    </span>
+  );
+};
+
+type UserRowProps = { user: AdminUser };
+
+const UserRow = ({ user: u }: UserRowProps) => (
+  <tr style={{ borderBottom: "1px solid var(--border)" }}>
+    <td style={{ padding: "12px 16px" }}>
+      <UserIdCell id={u.id} />
+    </td>
+    <td style={{ padding: "12px 16px" }}>
+      <VehicleCell vehicles={u.vehicles ?? []} />
+    </td>
+    <td style={{ padding: "12px 16px", color: "var(--text-muted)" }}>
+      {fmtAgo(u.createdAt)}
+    </td>
+    <td style={{ padding: "12px 16px", color: "var(--text-muted)" }}>
+      {fmtAgo(u.lastSignInAt)}
+    </td>
+    <td style={{ padding: "12px 16px", color: "var(--text)" }} className="num">
+      {u.vehiclesCount}
+    </td>
+    <td style={{ padding: "12px 16px", color: "var(--text)" }} className="num">
+      {u.ratingsCount}
+    </td>
+    <td style={{ padding: "12px 16px", color: "var(--text)" }} className="num">
+      {u.submissionsCount}
+    </td>
+  </tr>
+);
 
 export const UsersPage = () => {
   const { data: users, total, loading, error } = useAdminUsers();
@@ -121,52 +243,7 @@ export const UsersPage = () => {
                 ))}
               {!loading &&
                 !error &&
-                users.map((u) => (
-                  <tr
-                    key={u.id}
-                    style={{ borderBottom: "1px solid var(--border)" }}
-                  >
-                    <td style={{ padding: "12px 16px" }}>
-                      <span style={{ color: "var(--text)", fontWeight: 500 }}>
-                        {u.email ?? "—"}
-                      </span>
-                    </td>
-                    <td
-                      style={{
-                        padding: "12px 16px",
-                        color: "var(--text-muted)",
-                      }}
-                    >
-                      {fmtAgo(u.createdAt)}
-                    </td>
-                    <td
-                      style={{
-                        padding: "12px 16px",
-                        color: "var(--text-muted)",
-                      }}
-                    >
-                      {fmtAgo(u.lastSignInAt)}
-                    </td>
-                    <td
-                      style={{ padding: "12px 16px", color: "var(--text)" }}
-                      className="num"
-                    >
-                      {u.vehiclesCount}
-                    </td>
-                    <td
-                      style={{ padding: "12px 16px", color: "var(--text)" }}
-                      className="num"
-                    >
-                      {u.ratingsCount}
-                    </td>
-                    <td
-                      style={{ padding: "12px 16px", color: "var(--text)" }}
-                      className="num"
-                    >
-                      {u.submissionsCount}
-                    </td>
-                  </tr>
-                ))}
+                users.map((u) => <UserRow key={u.id} user={u} />)}
             </tbody>
           </table>
           {!loading && !error && users.length === 0 && (

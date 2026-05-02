@@ -5,6 +5,14 @@ import { useEffect, useState } from "react";
 // Auth: bearer with VITE_ADMIN_API_SECRET (NOT the anon key — this calls
 // the Supabase Admin SDK to read auth.users which is not exposed via PostgREST).
 
+export type AdminUserVehicle = {
+  make: string;
+  model: string;
+  variant: string | null;
+  year_from: number | null;
+  is_primary: boolean;
+};
+
 export type AdminUser = {
   id: string;
   email: string | null;
@@ -13,6 +21,15 @@ export type AdminUser = {
   vehiclesCount: number;
   ratingsCount: number;
   submissionsCount: number;
+  vehicles: AdminUserVehicle[];
+};
+
+type RawAdminUserVehicle = {
+  make: string;
+  model: string;
+  variant: string | null;
+  year_from: number | null;
+  is_primary: boolean;
 };
 
 type RawAdminUser = {
@@ -23,6 +40,7 @@ type RawAdminUser = {
   vehicles_count: number;
   ratings_count: number;
   submissions_count: number;
+  vehicles?: RawAdminUserVehicle[];
 };
 
 type RawAdminUsersResponse = {
@@ -40,6 +58,13 @@ const mapRaw = (r: RawAdminUser): AdminUser => ({
   vehiclesCount: r.vehicles_count ?? 0,
   ratingsCount: r.ratings_count ?? 0,
   submissionsCount: r.submissions_count ?? 0,
+  vehicles: (r.vehicles ?? []).map((v) => ({
+    make: v.make,
+    model: v.model,
+    variant: v.variant,
+    year_from: v.year_from,
+    is_primary: v.is_primary,
+  })),
 });
 
 // ── Hook ──────────────────────────────────────────────────────────────────
