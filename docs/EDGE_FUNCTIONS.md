@@ -6,8 +6,9 @@ Live in **`../charj/supabase/functions/`** (mobile-app repo). Deployed against t
 |---|---|---|
 | `admin-users` | List `auth.users` + per-user vehicles / counts | Bearer `ADMIN_API_SECRET` |
 | `admin-verify-charger` | Set `is_verified=true` + stamp `verified_at`/`verified_by` | Bearer `ADMIN_API_SECRET` |
+| `admin-add-charger` | Insert a new `chargers` row from the dashboard's Add-charger modal | Bearer `ADMIN_API_SECRET` |
 
-Both follow the same pattern, both are deployed with `--no-verify-jwt`, both handle CORS preflight before auth.
+All three follow the same pattern, all deploy with `--no-verify-jwt`, all answer CORS preflight before the auth check.
 
 ## `admin-users`
 
@@ -95,12 +96,73 @@ If we ever add real Supabase Auth, replace this constant with `auth.uid()` so in
 
 `chargers.is_verified` is RLS-protected — anon clients can't write. We could add an RLS policy for "admin allowlist", but that requires real auth. Until then, the EF is the simpler path: it owns the service-role write inside a server boundary.
 
+## `admin-add-charger`
+
+**File**: `../charj/supabase/functions/admin-add-charger/index.ts`
+**URL**: `https://<project>.supabase.co/functions/v1/admin-add-charger`
+
+Server-side equivalent of the migrations the mobile-app `charger-adder` agent writes. Takes a fully-validated payload and inserts one row into `chargers` with `source = 'community'`. The PostGIS POINT is built as `SRID=4326;POINT(lng lat)` (longitude first per WKT) so PostgREST can pass it straight to `ST_GeogFromText`.
+
+### Wire format
+
+```http
+POST /functions/v1/admin-add-charger
+Authorization: Bearer <ADMIN_API_SECRET>
+Content-Type: application/json
+
+{
+  "name": "Hotel Le Corail",
+  "name_ar": "فندق لو كوراي",
+  "name_fr": "Hotel Le Corail",
+  "latitude": 36.84,
+  "longitude": 10.27,
+  "address": "Avenue de la République, Tunis",
+  "city": "Tunis",
+  "connectors": [{ "type": "Type 2", "power_kw": 22, "count": 2 }],
+  "operator": "Le Corail",
+  "status": "operational",
+  "access_type": "customers_only",
+  "exclusive_to": null,
+  "amenities": ["wifi", "restaurant"],
+  "is_verified": true
+}
+```
+
+### Response
+
+```ts
+// 201 Created
+{ id: "<uuid>", name: "Hotel Le Corail" }
+
+// 400 — validation failure (the response `error` describes which field)
+// 401 — bad/missing bearer
+// 500 — Supabase insert error (rare; usually FK or check-constraint trip)
+```
+
+### Validation enforced server-side
+
+Even though the modal validates client-side, the EF re-validates everything since the bearer + bundle are public:
+
+- `name`, `name_ar`, `name_fr`, `city` non-empty strings.
+- `latitude` ∈ [-90, 90], `longitude` ∈ [-180, 180].
+- `connectors[*].type` ∈ {Type 2, CCS, CHAdeMO}; `power_kw > 0`; `count` positive integer.
+- `status` ∈ {operational, under_repair, planned, unknown}.
+- `access_type` ∈ {public, customers_only, brand_exclusive}; `exclusive_to` required iff `brand_exclusive`.
+- `amenities[]` slugs must be in the same allowlist as `set_charger_override` (`toilet`, `restaurant`, `cafe`, `shop`, `air_pump`, `wifi`, `atm`, `lounge`, `mosque`, `pharmacy`, `car_wash`, `kids_playground`).
+
+When `is_verified` is true, `verified_at = now()` and `verified_by = 'a2000000-0000-0000-0000-000000000000'` (same admin-dashboard UID as `admin-verify-charger`).
+
+### Deep-link from search
+
+The topbar search calls `search_chargers` and surfaces results. Clicking a charger row sets `pendingChargerId` in `App.tsx`, which the Chargers page consumes to auto-open the detail drawer. No DB call required for the deep-link itself — it reuses the already-loaded `useChargers()` data.
+
 ## Deployment
 
 ```bash
 cd ../charj
 npx supabase functions deploy admin-users --no-verify-jwt
 npx supabase functions deploy admin-verify-charger --no-verify-jwt
+npx supabase functions deploy admin-add-charger --no-verify-jwt
 ```
 
 `--no-verify-jwt` is **required**. Without it the Supabase API gateway rejects requests whose `Authorization` header isn't a valid Supabase JWT — and our bearer secret is just a hex string, not a JWT. With the flag, the gateway passes the `Authorization` header through unmodified and the function does its own bearer comparison.
@@ -170,6 +232,19 @@ curl -i -X POST $URL/admin-verify-charger \
   -H "Content-Type: application/json" \
   -d '{"charger_id":"<uuid>"}'
 # Expect: 200 with the updated row
+
+# 6. Add charger (creates a real row — clean it up after!)
+curl -i -X POST $URL/admin-add-charger \
+  -H "Authorization: Bearer $SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name":"Smoke test","name_ar":"اختبار","name_fr":"Smoke test",
+    "latitude":36.8,"longitude":10.2,"city":"Tunis",
+    "connectors":[{"type":"Type 2","power_kw":22,"count":1}],
+    "status":"operational","access_type":"public",
+    "exclusive_to":null,"amenities":[],"is_verified":false
+  }'
+# Expect: 201 with { id, name }
 ```
 
 After a manual smoke test that flips real production state, undo it:
@@ -178,6 +253,9 @@ After a manual smoke test that flips real production state, undo it:
 -- supabase db query --linked
 UPDATE chargers SET is_verified = false, verified_at = NULL, verified_by = NULL
 WHERE id = '<test-charger-id>';
+
+-- For the add-charger smoke test:
+DELETE FROM chargers WHERE id = '<smoke-test-id>' AND source = 'community';
 ```
 
 ## Adding a new admin Edge Function

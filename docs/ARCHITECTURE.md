@@ -53,7 +53,13 @@ All colors flow from CSS vars in `src/index.css` so a theme swap is one attribut
 
 `src/lib/use-is-mobile.ts` is a matchMedia hook at `(max-width: 900px)`. When true:
 - `Sidebar` becomes a fixed-position slide-out drawer with a backdrop
-- `Topbar` shows a hamburger button, hides Help/Notifications/search/user-name
+- `Topbar` shows a hamburger button, hides search / user-name
 - Page-level `gridTemplateColumns` collapse via `.row-2`/`.row-3` CSS classes
 
 See `docs/RESPONSIVENESS.md` for the breakpoint cheatsheet and the `minmax(0, 1fr)` chart-overflow story.
+
+## Cross-cutting UI helpers
+
+- **`src/components/pagination.tsx`** — single `<Pagination>` + `usePaginated<T>(items, resetKey, initialPerPage)`. Used by every list page (chargers, vehicles, reviews, submissions client-side; users wires it to the EF's server-side paging).
+- **`src/lib/amenity-icons.tsx`** — 12-slug allowlist (mirrors `charj/lib/amenities.ts` and the `set_charger_override` validator) plus an `<AmenityIcon>` drawn lucide-style. Both the add-charger modal chips and the detail-drawer chips render through it.
+- **`src/lib/use-global-search.ts`** + **`src/components/search-panel.tsx`** — power the topbar spotlight. ⌘K focuses, debounced `search_chargers` calls drive the Chargers group, in-memory matching against `NAV` drives the Pages group. Charger picks deep-link via `pendingChargerId` lifted into `App.tsx`; the chargers page consumes + clears it on mount.

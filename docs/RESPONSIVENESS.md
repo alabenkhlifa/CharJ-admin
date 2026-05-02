@@ -82,9 +82,10 @@ Wrap in `<div style={{ overflowX: "auto" }}>` and set `min-width` on the table s
 
 On mobile:
 - Hamburger button shows
-- Help + Notifications + divider hidden
 - User button collapses to avatar only (label + role badge hidden)
 - Search input hidden via `.topbar-search { display: none !important; }` at <= 640px
+
+(Help + Notifications buttons were removed entirely — no source of data for either yet, so they were dead UI on every viewport.)
 
 ## Verifying a page is mobile-clean
 

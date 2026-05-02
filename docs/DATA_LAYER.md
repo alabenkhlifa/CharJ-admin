@@ -27,9 +27,11 @@ If `SUPABASE_CONFIGURED` is false, the hook short-circuits to `{ data: [], loadi
 | `useOverviewCharts()` | Single Promise.all over chargers / submissions / ratings (12 weeks for rating trend) | anon |
 | `useSidebarCounts()` | 3 COUNT queries (chargers / pending submissions / ratings) | anon |
 | `useSubmissions()` | `community_submissions` ordered by created_at desc | anon |
-| `useReviews()` | `ratings` (latest 50) joined client-side with `chargers(id, name)` | anon |
+| `useReviews()` | `ratings` (latest 200) joined client-side with `chargers(id, name)` | anon |
 | `useEvModels()` | `ev_models` ordered by make, model | anon |
-| `useAdminUsers()` | `${SUPABASE_URL}/functions/v1/admin-users` | bearer secret |
+| `useAdminUsers(page, perPage)` | `${SUPABASE_URL}/functions/v1/admin-users` | bearer secret |
+| `useGlobalSearch(query)` | Debounced `search_chargers` RPC + in-memory NAV match (powers the topbar spotlight) | anon |
+| `addCharger` (modal submit) | `${SUPABASE_URL}/functions/v1/admin-add-charger` | bearer secret |
 
 ## Mappers
 
@@ -122,3 +124,11 @@ If the new data needs service-role:
 1. Add an Edge Function in `../charj/supabase/functions/` (see `docs/EDGE_FUNCTIONS.md`).
 2. The hook uses raw `fetch` against the function URL with the `VITE_ADMIN_API_SECRET` bearer.
 3. Defensive: short-circuit when the env vars are missing, surface as `error: "Admin API not configured"`.
+
+## Cross-cutting UI helpers
+
+A few helpers worth knowing about — they're not data hooks but every list page touches them:
+
+- **`src/components/pagination.tsx`** — exports `<Pagination>` plus `usePaginated<T>(items, resetKey, initialPerPage)`. The hook auto-resets to page 1 when `resetKey` changes (filter / tab) and snaps back to the last valid page when `items` shrinks. Used by chargers, vehicles, reviews, and submissions for client-side slicing; users wires the same `<Pagination>` to the server-paginated `useAdminUsers(page, perPage)` hook directly.
+- **`src/lib/amenity-icons.tsx`** — single source of truth for the 12 amenity slugs (kept in sync with `charj/lib/amenities.ts` and the `set_charger_override` allowlist). Exports `AMENITY_SLUGS`, `AMENITY_LABELS`, `labelForAmenity`, and an `<AmenityIcon slug=… size=… />` component drawn lucide-style. Used by both the add-charger modal chips and the charger detail-drawer chips.
+- **`src/lib/use-global-search.ts`** + **`src/components/search-panel.tsx`** — power the topbar spotlight. The hook debounces `search_chargers` and matches NAV labels in-memory; the panel renders grouped results with arrow-key + ⌘K + ESC handling. Charger picks deep-link via `pendingChargerId` lifted into `App.tsx`.

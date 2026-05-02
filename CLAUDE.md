@@ -82,7 +82,7 @@ Read these before touching the related area. Each is short and gotcha-focused.
 
 - **[Architecture](docs/ARCHITECTURE.md)** — stack choices, why no Tailwind, module boundaries
 - **[Auth + access control](docs/AUTH.md)** — the gate (security theater) + bearer-secret pattern for admin Edge Functions, when to migrate to real Supabase Auth
-- **[Edge Functions](docs/EDGE_FUNCTIONS.md)** — `admin-users` and `admin-verify-charger`: contract, deployment, CORS gotcha
+- **[Edge Functions](docs/EDGE_FUNCTIONS.md)** — `admin-users`, `admin-verify-charger`, `admin-add-charger`: contract, deployment, CORS gotcha
 - **[Data layer](docs/DATA_LAYER.md)** — hooks pattern, JSONB shapes, what's anon-readable vs needs an EF
 - **[Deployment](docs/DEPLOYMENT.md)** — GH Pages + GH Actions, required secrets, Vite `base` path
 - **[Responsiveness](docs/RESPONSIVENESS.md)** — sidebar drawer pattern, breakpoints, `minmax(0, 1fr)` gotcha
@@ -121,6 +121,7 @@ npm run dev
 cd ../charj
 npx supabase functions deploy admin-users --no-verify-jwt
 npx supabase functions deploy admin-verify-charger --no-verify-jwt
+npx supabase functions deploy admin-add-charger --no-verify-jwt
 # --no-verify-jwt is REQUIRED — see docs/EDGE_FUNCTIONS.md
 
 # Verify CORS preflight on a deployed function

@@ -45,11 +45,15 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 |---|---|---|
 | Name, city, connectors, power, status, access, source | ✅ | `search_chargers` RPC |
 | Working hours (table column + drawer grid) | ✅ | `working_hours` JSONB |
+| Amenities chips in drawer (icons + labels) | ✅ | `amenities` TEXT[] from `search_chargers` |
 | Verified flag | ✅ | `is_verified` |
 | Verified-by chip in drawer | ✅ | `verified_by` |
 | Map link button | ✅ | `window.open` to Google Maps |
 | Mini map in drawer | ✅ | Google Maps via `@vis.gl/react-google-maps` |
+| Pagination (table footer) | ✅ | client-side slice via `usePaginated`; default 25/page |
 | **Verify** button → mark verified | 🔐 | `admin-verify-charger` EF |
+| **Add charger** modal | 🔐 | `admin-add-charger` EF — same fields as the `charger-adder` agent's migration template |
+| Deep-link from topbar search | ✅ | `pendingChargerId` lifted in `App.tsx`; page opens drawer on mount |
 | ~~Edit override~~ | ⚠️ | UI exists but no-op for now |
 | ~~Gouvernorat column~~ | ⚠️ | no column — replaced by `city` |
 
@@ -60,6 +64,7 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 | Status tabs + counts | ✅ |
 | Card list (id, name, submitter, notes, created date) | ✅ |
 | `reviewed_at` chip on approved/rejected | ✅ |
+| Pagination (per-tab, default 12/page; resets on tab switch) | ✅ |
 | ~~Type chip (new/edit/report)~~ | ⚠️ schema only supports "new charger" |
 | ~~Mini-map per card~~ | ⚠️ removed for v1 |
 | Approve/Reject buttons | ⚠️ rendered for pending only; not wired (would need an EF) |
@@ -68,9 +73,10 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 
 | Field | Status |
 |---|---|
-| Stream of latest 50 ratings + charger name | ✅ |
+| Stream of latest 200 ratings + charger name | ✅ |
 | Star rating 1-5 + comment | ✅ |
 | Rater UID (truncated) | ✅ |
+| Pagination (default 20/page) | ✅ client-side slice over the cap |
 | ~~Helpful count~~ | ⚠️ no column on `ratings` |
 | ~~Reported reviews queue~~ | ⚠️ `review_reports` service-role |
 | ~~Hide / Approve actions~~ | ⚠️ would need an EF |
@@ -83,6 +89,7 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 | Vehicle (make + model + variant + +N chip) | 🔐 |
 | Joined / Last active | 🔐 |
 | Vehicles count | 🔐 |
+| Pagination | 🔐 server-side via the EF's `page` / `perPage` query params |
 | ~~Email~~ | ⚠️ Charj uses anon auth, almost always empty |
 | ~~Reviews count~~ | ⚠️ all 0 due to anon-auth orphans (see SCHEMA_NOTES) |
 | ~~Submissions count~~ | ⚠️ same |
@@ -99,6 +106,7 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 | Connector chips | ✅ |
 | Source badge | ✅ |
 | Header breakdown by source | ✅ |
+| Pagination (default 24/page, grid-friendly) | ✅ client-side slice |
 | ~~Owners count~~ | ⚠️ user_vehicles RLS-blocked from anon |
 | ~~Color~~ | ⚠️ no column |
 
@@ -122,3 +130,15 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 | Submissions (with accent glow when > 0) | ✅ `count(*) where status='pending'` |
 | Reviews | ✅ `count(*) from ratings` |
 | Feedback | ⚠️ no badge — service-role required |
+
+## Topbar
+
+| Element | Status | Source |
+|---|---|---|
+| User avatar (`AB` / "Ala") | ✅ hardcoded — single admin today |
+| Theme toggle | ✅ `useTweaks` |
+| Global search (⌘K) | ✅ `useGlobalSearch` — `search_chargers` RPC + in-memory NAV match |
+| Search → page row click | ✅ navigates via `setActive` |
+| Search → charger row click | ✅ deep-links via `pendingChargerId` (App.tsx) → drawer opens on the chargers page |
+| ~~Search across users / vehicles / reviews~~ | ⚠️ would need EF query params or a cross-page state lift |
+| ~~Help / Notifications buttons~~ | ⚠️ removed — nothing to surface yet |

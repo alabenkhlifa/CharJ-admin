@@ -71,6 +71,7 @@ Live in **`../charj/supabase/functions/`** — that's a different repo (mobile a
 cd ../charj
 npx supabase functions deploy admin-users --no-verify-jwt
 npx supabase functions deploy admin-verify-charger --no-verify-jwt
+npx supabase functions deploy admin-add-charger --no-verify-jwt
 ```
 
 `--no-verify-jwt` is required — see `docs/EDGE_FUNCTIONS.md`.
