@@ -1,6 +1,10 @@
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { SearchPanel } from "./search-panel";
 import { Icons } from "../lib/icons";
 import { NAV, type RouteKey } from "../lib/routes";
+import { useGlobalSearch } from "../lib/use-global-search";
+import type { SearchHit } from "../lib/use-global-search";
 
 type SidebarCountsInput = {
   chargers?: number;
@@ -337,9 +341,94 @@ type TopbarProps = {
   active: RouteKey;
   isMobile?: boolean;
   onOpenMenu?: () => void;
+  onNavigate?: (k: RouteKey) => void;
+  onOpenCharger?: (id: string) => void;
 };
 
-export const Topbar = ({ theme, setTheme, active, isMobile = false, onOpenMenu }: TopbarProps) => {
+export const Topbar = ({
+  theme,
+  setTheme,
+  active,
+  isMobile = false,
+  onOpenMenu,
+  onNavigate,
+  onOpenCharger,
+}: TopbarProps) => {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const search = useGlobalSearch(query);
+
+  // ⌘K / Ctrl+K opens + focuses the search anywhere in the app.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.select();
+        setOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Click-outside the search wrapper closes the dropdown.
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  // Reset cursor whenever the result set changes shape — otherwise the
+  // highlighted index can land on nothing after a query refines.
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [query, search.routes.length, search.chargers.length]);
+
+  const flatHits: SearchHit[] = [...search.routes, ...search.chargers];
+
+  const pick = (hit: SearchHit) => {
+    if (hit.kind === "route") {
+      onNavigate?.(hit.k);
+    } else {
+      onOpenCharger?.(hit.id);
+    }
+    setQuery("");
+    setOpen(false);
+    inputRef.current?.blur();
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") {
+      setOpen(false);
+      setQuery("");
+      inputRef.current?.blur();
+      return;
+    }
+    if (!open) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => (flatHits.length === 0 ? 0 : (i + 1) % flatHits.length));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) =>
+        flatHits.length === 0 ? 0 : (i - 1 + flatHits.length) % flatHits.length,
+      );
+    } else if (e.key === "Enter") {
+      const hit = flatHits[activeIndex];
+      if (hit) {
+        e.preventDefault();
+        pick(hit);
+      }
+    }
+  };
+
   return (
     <header
       style={{
@@ -406,6 +495,7 @@ export const Topbar = ({ theme, setTheme, active, isMobile = false, onOpenMenu }
       </div>
 
       <div
+        ref={wrapRef}
         className="topbar-search"
         style={{
           flex: 1,
@@ -423,15 +513,25 @@ export const Topbar = ({ theme, setTheme, active, isMobile = false, onOpenMenu }
             top: "50%",
             transform: "translateY(-50%)",
             color: "var(--text-dim)",
+            pointerEvents: "none",
           }}
         />
         <input
-          placeholder="Search chargers, users, feedback…"
+          ref={inputRef}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={onKeyDown}
+          placeholder="Search chargers and pages…"
+          aria-label="Search"
           style={{
             width: "100%",
             height: 38,
             background: "var(--bg-elev)",
-            border: "1px solid var(--border)",
+            border: `1px solid ${open ? "var(--accent-border)" : "var(--border)"}`,
             borderRadius: 8,
             paddingInline: "38px 64px",
             color: "var(--text)",
@@ -440,23 +540,60 @@ export const Topbar = ({ theme, setTheme, active, isMobile = false, onOpenMenu }
             outline: "none",
           }}
         />
-        <span
-          className="num"
-          style={{
-            position: "absolute",
-            insetInlineEnd: 10,
-            top: "50%",
-            transform: "translateY(-50%)",
-            fontSize: 10,
-            color: "var(--text-dim)",
-            padding: "2px 6px",
-            background: "var(--bg-elev-2)",
-            border: "1px solid var(--border)",
-            borderRadius: 4,
-          }}
-        >
-          ⌘K
-        </span>
+        {query ? (
+          <button
+            onClick={() => {
+              setQuery("");
+              inputRef.current?.focus();
+            }}
+            aria-label="Clear search"
+            style={{
+              position: "absolute",
+              insetInlineEnd: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: 20,
+              height: 20,
+              display: "grid",
+              placeItems: "center",
+              background: "var(--bg-elev-2)",
+              border: "1px solid var(--border)",
+              borderRadius: 4,
+              color: "var(--text-dim)",
+              cursor: "pointer",
+            }}
+          >
+            <Icons.X size={11} />
+          </button>
+        ) : (
+          <span
+            className="num"
+            style={{
+              position: "absolute",
+              insetInlineEnd: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              fontSize: 10,
+              color: "var(--text-dim)",
+              padding: "2px 6px",
+              background: "var(--bg-elev-2)",
+              border: "1px solid var(--border)",
+              borderRadius: 4,
+              pointerEvents: "none",
+            }}
+          >
+            ⌘K
+          </span>
+        )}
+
+        {open && (
+          <SearchPanel
+            state={search}
+            activeIndex={activeIndex}
+            setActiveIndex={setActiveIndex}
+            onPick={pick}
+          />
+        )}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { AddChargerModal } from "../components/add-charger-modal";
@@ -136,11 +136,28 @@ const FilterChip = ({ label, value, options, onChange }: FilterChipProps) => (
   </div>
 );
 
-export const ChargersPage = () => {
+type ChargersPageProps = {
+  pendingChargerId?: string | null;
+  onChargerOpened?: () => void;
+};
+
+export const ChargersPage = ({ pendingChargerId, onChargerOpened }: ChargersPageProps = {}) => {
   const { data: chargers, loading, error, refetch } = useChargers();
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [selected, setSelected] = useState<Charger | null>(null);
   const [adding, setAdding] = useState(false);
+
+  // Deep-link from the global search: when the parent passes a pending id,
+  // find that charger in the local list and open its drawer. Clear the
+  // pending id so navigating back doesn't re-trigger.
+  useEffect(() => {
+    if (!pendingChargerId || chargers.length === 0) return;
+    const found = chargers.find((c) => c.id === pendingChargerId);
+    if (found) {
+      setSelected(found);
+      onChargerOpened?.();
+    }
+  }, [pendingChargerId, chargers, onChargerOpened]);
 
   const filtered = useMemo(
     () =>

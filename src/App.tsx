@@ -31,6 +31,10 @@ const App = () => {
   const [active, setActive] = useState<RouteKey>("overview");
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Cross-page deep-link: set by the topbar search to make the chargers
+  // page open the corresponding detail drawer when it mounts. Cleared by
+  // the page itself once consumed so navigating back doesn't reopen.
+  const [pendingChargerId, setPendingChargerId] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const { data: countsData, loading: countsLoading } = useSidebarCounts();
   // While loading we pass `undefined` so the sidebar simply omits badges
@@ -67,9 +71,21 @@ const App = () => {
           active={active}
           isMobile={isMobile}
           onOpenMenu={() => setMobileNavOpen(true)}
+          onNavigate={setActive}
+          onOpenCharger={(id) => {
+            setPendingChargerId(id);
+            setActive("chargers");
+          }}
         />
         <main style={{ flex: 1, padding, overflow: "auto" }}>
-          <Page />
+          {active === "chargers" ? (
+            <ChargersPage
+              pendingChargerId={pendingChargerId}
+              onChargerOpened={() => setPendingChargerId(null)}
+            />
+          ) : (
+            <Page />
+          )}
         </main>
       </div>
     </div>
