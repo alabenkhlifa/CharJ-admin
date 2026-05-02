@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { SUPABASE_CONFIGURED, supabase } from "../lib/supabase";
 
 // ── Types matching the search_chargers RPC return shape ───────────────────
@@ -15,20 +15,27 @@ export type RawConnector = {
   count: number;
 };
 
-export type WorkingHoursDay = {
-  open?: string;
-  close?: string;
-  closed?: boolean;
-} | null;
+// Database shape (`chargers.working_hours` JSONB):
+//   { "weekly": { "mon": [{ "from": "08:00", "to": "17:30" }], ..., "sun": [] } }
+// Lowercase 3-letter day keys, an array of `{from, to}` ranges per day.
+// Empty array means closed that day. 24/7 is encoded as `00:00`–`24:00`.
+export type WorkingHoursRange = {
+  from: string;
+  to: string;
+};
+
+export type WorkingHoursWeekly = {
+  mon?: WorkingHoursRange[];
+  tue?: WorkingHoursRange[];
+  wed?: WorkingHoursRange[];
+  thu?: WorkingHoursRange[];
+  fri?: WorkingHoursRange[];
+  sat?: WorkingHoursRange[];
+  sun?: WorkingHoursRange[];
+};
 
 export type WorkingHours = {
-  mon?: WorkingHoursDay;
-  tue?: WorkingHoursDay;
-  wed?: WorkingHoursDay;
-  thu?: WorkingHoursDay;
-  fri?: WorkingHoursDay;
-  sat?: WorkingHoursDay;
-  sun?: WorkingHoursDay;
+  weekly?: WorkingHoursWeekly;
 } | null;
 
 export type RawChargerRow = {
@@ -93,15 +100,15 @@ const CONNECTOR_TYPE_TO_KEY: Record<string, ConnectorKey> = {
 const connectorTypeToKey = (t: ConnectorTypeRaw): ConnectorKey =>
   CONNECTOR_TYPE_TO_KEY[t] ?? "other";
 
+const summarizeRanges = (ranges: WorkingHoursRange[] | undefined): string | null => {
+  if (!ranges || ranges.length === 0) return null;
+  return ranges.map((r) => `${r.from}-${r.to}`).join(",");
+};
+
 const summarizeHours = (wh: WorkingHours): string => {
-  if (!wh) return "—";
+  if (!wh || !wh.weekly) return "—";
   const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
-  const opens = days.map((d) => {
-    const v = wh[d];
-    if (!v || v.closed) return null;
-    if (!v.open || !v.close) return null;
-    return `${v.open}-${v.close}`;
-  });
+  const opens = days.map((d) => summarizeRanges(wh.weekly?.[d]));
 
   // All seven days share the same window.
   if (opens.every((o) => o === "00:00-24:00")) return "24/7";
@@ -175,46 +182,57 @@ type UseChargersState = {
   error: string | null;
 };
 
-export const useChargers = (): UseChargersState => {
+type UseChargersResult = UseChargersState & {
+  refetch: () => Promise<void>;
+};
+
+export const useChargers = (): UseChargersResult => {
   const [state, setState] = useState<UseChargersState>({
     data: [],
     loading: true,
     error: null,
   });
 
-  useEffect(() => {
+  const fetchOnce = useCallback(async (signal?: { cancelled: boolean }) => {
     if (!SUPABASE_CONFIGURED) {
-      setState({ data: [], loading: false, error: "Supabase not configured" });
+      if (!signal?.cancelled) {
+        setState({ data: [], loading: false, error: "Supabase not configured" });
+      }
       return;
     }
 
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase.rpc("search_chargers", {
-        query: "",
-        sort_by: "name",
-        max_results: 1000,
-      });
+    const { data, error } = await supabase.rpc("search_chargers", {
+      query: "",
+      sort_by: "name",
+      max_results: 1000,
+    });
 
-      if (cancelled) return;
+    if (signal?.cancelled) return;
 
-      if (error) {
-        setState({ data: [], loading: false, error: error.message });
-        return;
-      }
+    if (error) {
+      setState({ data: [], loading: false, error: error.message });
+      return;
+    }
 
-      const rows = (data ?? []) as RawChargerRow[];
-      const mapped = rows
-        .map(mapRawCharger)
-        .filter((c): c is Charger => c !== null);
+    const rows = (data ?? []) as RawChargerRow[];
+    const mapped = rows
+      .map(mapRawCharger)
+      .filter((c): c is Charger => c !== null);
 
-      setState({ data: mapped, loading: false, error: null });
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    setState({ data: mapped, loading: false, error: null });
   }, []);
 
-  return state;
+  useEffect(() => {
+    const signal = { cancelled: false };
+    void fetchOnce(signal);
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [fetchOnce]);
+
+  const refetch = useCallback(async () => {
+    await fetchOnce();
+  }, [fetchOnce]);
+
+  return { ...state, refetch };
 };

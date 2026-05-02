@@ -1,11 +1,15 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { Card, EmptyState } from "../components/card";
 import { iconBtnStyle } from "../components/charts";
 import { Icons } from "../lib/icons";
+import { darkMapStyle, lightMapStyle } from "../lib/map-styles";
+import { useCurrentTheme } from "../lib/use-theme";
 import {
   CONNECTOR_COLORS,
   CONNECTOR_LABELS,
+  STATUS_COLORS,
   useChargers,
   type AccessType,
   type Charger,
@@ -14,6 +18,11 @@ import {
   type ConnectorKey,
   type WorkingHours,
 } from "../data/chargers";
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
+const ADMIN_API_SECRET = import.meta.env.VITE_ADMIN_API_SECRET ?? "";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "";
+const ADMIN_API_CONFIGURED = Boolean(ADMIN_API_SECRET && SUPABASE_URL);
 
 type Filters = {
   status: string;
@@ -125,7 +134,7 @@ const FilterChip = ({ label, value, options, onChange }: FilterChipProps) => (
 );
 
 export const ChargersPage = () => {
-  const { data: chargers, loading, error } = useChargers();
+  const { data: chargers, loading, error, refetch } = useChargers();
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [selected, setSelected] = useState<Charger | null>(null);
 
@@ -409,7 +418,16 @@ export const ChargersPage = () => {
         </div>
       </Card>
 
-      {selected && <DetailDrawer charger={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <DetailDrawer
+          charger={selected}
+          onClose={() => setSelected(null)}
+          onLocalUpdate={(patch) =>
+            setSelected((prev) => (prev ? { ...prev, ...patch } : prev))
+          }
+          refetch={refetch}
+        />
+      )}
     </div>
   );
 };
@@ -419,14 +437,17 @@ const sourceLabel = (s: ChargerSource) => s.toUpperCase();
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
+// Database shape: `{ weekly: { mon: [{from, to}], ..., sun: [] } }`.
+// Empty array → closed that day. Missing day entirely → unknown ("—").
 const dayCellLabel = (wh: WorkingHours, idx: number): string => {
-  if (!wh) return "—";
-  const v = wh[DAY_KEYS[idx]];
-  if (!v) return "—";
-  if (v.closed) return "Closed";
-  if (!v.open || !v.close) return "—";
-  if (v.open === "00:00" && v.close === "24:00") return "24h";
-  return `${v.open.slice(0, 5)}–${v.close.slice(0, 5)}`;
+  if (!wh || !wh.weekly) return "—";
+  const ranges = wh.weekly[DAY_KEYS[idx]];
+  if (ranges === undefined) return "—";
+  if (ranges.length === 0) return "Closed";
+  const r = ranges[0];
+  if (!r?.from || !r?.to) return "—";
+  if (r.from === "00:00" && r.to === "24:00") return "24h";
+  return `${r.from.slice(0, 5)}–${r.to.slice(0, 5)}`;
 };
 
 const todayIndex = () => (new Date().getDay() + 6) % 7;
@@ -444,8 +465,141 @@ const fmtAgo = (iso: string) => {
   return new Date(iso).toLocaleDateString();
 };
 
-const DetailDrawer = ({ charger, onClose }: { charger: Charger; onClose: () => void }) => {
+type AdminVerifyResponse = {
+  id: string;
+  is_verified: boolean;
+  verified_at: string | null;
+  verified_by: string | null;
+  name: string;
+};
+
+type AdminVerifyError = { error?: string };
+
+const verifyCharger = async (chargerId: string): Promise<AdminVerifyResponse> => {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-verify-charger`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${ADMIN_API_SECRET}`,
+    },
+    body: JSON.stringify({ charger_id: chargerId }),
+  });
+  let body: AdminVerifyResponse | AdminVerifyError = {};
+  try {
+    body = (await res.json()) as AdminVerifyResponse | AdminVerifyError;
+  } catch {
+    // fall through; non-JSON response
+  }
+  if (!res.ok) {
+    const msg = (body as AdminVerifyError)?.error ?? `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return body as AdminVerifyResponse;
+};
+
+type DetailDrawerProps = {
+  charger: Charger;
+  onClose: () => void;
+  onLocalUpdate: (patch: Partial<Charger>) => void;
+  refetch: () => Promise<void>;
+};
+
+const MiniMap = ({ charger, theme }: { charger: Charger; theme: "dark" | "light" }) => {
+  const styles = theme === "dark" ? darkMapStyle : lightMapStyle;
+  const center = { lat: charger.lat, lng: charger.lng };
+  return (
+    <div
+      style={{
+        height: 170,
+        background: "var(--bg-elev-2)",
+        border: "1px solid var(--border)",
+        borderRadius: 8,
+        overflow: "hidden",
+      }}
+    >
+      <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+        <Map
+          defaultCenter={center}
+          defaultZoom={14}
+          styles={styles}
+          disableDefaultUI
+          gestureHandling="none"
+          clickableIcons={false}
+          backgroundColor={theme === "dark" ? "#18181B" : "#DBEAFE"}
+          style={{ width: "100%", height: "100%" }}
+        >
+          <Marker
+            position={center}
+            icon={{
+              path: "M 0,0 m -8,0 a 8,8 0 1,0 16,0 a 8,8 0 1,0 -16,0",
+              fillColor: STATUS_COLORS[charger.status],
+              fillOpacity: 1,
+              strokeColor: "#0a0a0b",
+              strokeWeight: 1.5,
+              scale: 1,
+              anchor: { x: 0, y: 0 } as google.maps.Point,
+            }}
+          />
+        </Map>
+      </APIProvider>
+    </div>
+  );
+};
+
+const MissingMapKeyHint = () => (
+  <div
+    style={{
+      height: 170,
+      background: "var(--bg-elev-2)",
+      border: "1px dashed var(--border)",
+      borderRadius: 8,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+      textAlign: "center",
+      fontSize: 11,
+      color: "var(--text-muted)",
+      lineHeight: 1.5,
+    }}
+  >
+    Set <code style={{ marginInline: 4 }}>VITE_GOOGLE_MAPS_API_KEY</code> in
+    {" "}<code style={{ marginInline: 4 }}>charj-admin/.env</code> to render the map.
+  </div>
+);
+
+const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawerProps) => {
   const today = todayIndex();
+  const theme = useCurrentTheme();
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+
+  const handleVerify = async () => {
+    if (!ADMIN_API_CONFIGURED) return;
+    setVerifyError(null);
+    setVerifying(true);
+    try {
+      const updated = await verifyCharger(charger.id);
+      onLocalUpdate({
+        verified: updated.is_verified,
+        verifiedBy: updated.verified_by,
+      });
+      await refetch();
+    } catch (err) {
+      setVerifyError(err instanceof Error ? err.message : "Verification failed");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const openInGoogleMaps = () => {
+    window.open(
+      `https://www.google.com/maps?q=${charger.lat},${charger.lng}`,
+      "_blank",
+      "noopener",
+    );
+  };
+
   return (
     <>
       <div
@@ -531,43 +685,11 @@ const DetailDrawer = ({ charger, onClose }: { charger: Charger; onClose: () => v
             )}
           </div>
 
-          <div
-            style={{
-              height: 140,
-              background: "var(--bg-elev-2)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <svg width="100%" height="100%" viewBox="0 0 200 140">
-              <defs>
-                <pattern id="g1" width="20" height="20" patternUnits="userSpaceOnUse">
-                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--grid)" strokeWidth="0.5" />
-                </pattern>
-              </defs>
-              <rect width="200" height="140" fill="url(#g1)" />
-              <path
-                d="M 0 90 Q 50 70 100 80 T 200 60"
-                stroke="var(--border-strong)"
-                strokeWidth="2"
-                fill="none"
-              />
-              <circle cx="100" cy="70" r="6" fill="var(--accent)" opacity="0.3" />
-              <circle cx="100" cy="70" r="3" fill="var(--accent)" />
-              <text
-                x="100"
-                y="120"
-                fill="var(--text-dim)"
-                fontSize="9"
-                textAnchor="middle"
-                className="num"
-              >
-                {charger.lat.toFixed(4)}, {charger.lng.toFixed(4)}
-              </text>
-            </svg>
-          </div>
+          {GOOGLE_MAPS_API_KEY ? (
+            <MiniMap charger={charger} theme={theme} />
+          ) : (
+            <MissingMapKeyHint />
+          )}
 
           <div>
             <div style={smallLbl}>Connectors · Power</div>
@@ -655,50 +777,92 @@ const DetailDrawer = ({ charger, onClose }: { charger: Charger; onClose: () => v
             <KV k="Coordinates" v={`${charger.lat.toFixed(4)}, ${charger.lng.toFixed(4)}`} />
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              style={{
-                flex: 1,
-                padding: "10px 12px",
-                background: "var(--accent)",
-                color: "#0a0a0b",
-                border: "none",
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 500,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
-              }}
-            >
-              <Icons.Verify size={13} /> Verify
-            </button>
-            <button
-              style={{
-                flex: 1,
-                padding: "10px 12px",
-                background: "var(--bg-elev-2)",
-                color: "var(--text)",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 500,
-              }}
-            >
-              Edit override
-            </button>
-            <button
-              style={{
-                padding: "10px 12px",
-                background: "var(--bg-elev-2)",
-                color: "var(--text-muted)",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-              }}
-            >
-              <Icons.Map size={13} />
-            </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+              {charger.verified ? (
+                <span
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    background: "var(--accent-soft)",
+                    color: "var(--accent)",
+                    border: "1px solid var(--accent-border)",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Icons.Verify size={13} />
+                  Verified by {charger.verifiedBy ?? "admin"}
+                </span>
+              ) : (
+                <button
+                  onClick={handleVerify}
+                  disabled={verifying || !ADMIN_API_CONFIGURED}
+                  title={
+                    ADMIN_API_CONFIGURED
+                      ? undefined
+                      : "Admin API not configured"
+                  }
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    background: "var(--accent)",
+                    color: "#0a0a0b",
+                    border: "none",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    opacity: verifying || !ADMIN_API_CONFIGURED ? 0.6 : 1,
+                    cursor:
+                      verifying || !ADMIN_API_CONFIGURED ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <Icons.Verify size={13} /> {verifying ? "Verifying…" : "Verify"}
+                </button>
+              )}
+              <button
+                style={{
+                  flex: 1,
+                  padding: "10px 12px",
+                  background: "var(--bg-elev-2)",
+                  color: "var(--text)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 500,
+                }}
+              >
+                Edit override
+              </button>
+              <button
+                onClick={openInGoogleMaps}
+                title="Open in Google Maps"
+                style={{
+                  padding: "10px 12px",
+                  background: "var(--bg-elev-2)",
+                  color: "var(--text-muted)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                }}
+              >
+                <Icons.Map size={13} />
+              </button>
+            </div>
+            {verifyError && (
+              <div style={{ fontSize: 11, color: "var(--red)" }}>
+                {verifyError}
+              </div>
+            )}
           </div>
         </div>
       </div>
