@@ -84,6 +84,7 @@ export type Charger = {
   source: ChargerSource;
   hours: string;
   workingHours: WorkingHours;
+  amenities: string[];
   ocmId: number | null;
   updatedAt: string;
 };
@@ -144,6 +145,7 @@ export const mapRawCharger = (r: RawChargerRow): Charger | null => {
     source: r.source,
     hours: summarizeHours(r.working_hours),
     workingHours: r.working_hours,
+    amenities: r.amenities ?? [],
     ocmId: r.ocm_id,
     updatedAt: r.updated_at,
   };

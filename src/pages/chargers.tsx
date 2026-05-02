@@ -784,6 +784,30 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
             </div>
           </div>
 
+          {charger.amenities.length > 0 && (
+            <div>
+              <div style={smallLbl}>Amenities</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                {charger.amenities.map((a) => (
+                  <span
+                    key={a}
+                    style={{
+                      fontSize: 11,
+                      padding: "4px 10px",
+                      borderRadius: 14,
+                      border: "1px solid var(--border)",
+                      background: "var(--bg-elev-2)",
+                      color: "var(--text-muted)",
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    {a.replace(/_/g, " ")}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <KV k="City" v={charger.city} />
             <KV k="Source" v={charger.source.toUpperCase()} />
