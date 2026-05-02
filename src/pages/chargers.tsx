@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
+import { AddChargerModal } from "../components/add-charger-modal";
 import { Card, EmptyState } from "../components/card";
 import { iconBtnStyle } from "../components/charts";
 import { Icons } from "../lib/icons";
@@ -137,6 +138,7 @@ export const ChargersPage = () => {
   const { data: chargers, loading, error, refetch } = useChargers();
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [selected, setSelected] = useState<Charger | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const filtered = useMemo(
     () =>
@@ -186,6 +188,9 @@ export const ChargersPage = () => {
           </div>
         </div>
         <button
+          onClick={() => setAdding(true)}
+          disabled={!ADMIN_API_CONFIGURED}
+          title={ADMIN_API_CONFIGURED ? undefined : "Admin API not configured"}
           style={{
             background: "var(--accent)",
             color: "#0a0a0b",
@@ -197,6 +202,8 @@ export const ChargersPage = () => {
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
+            cursor: ADMIN_API_CONFIGURED ? "pointer" : "not-allowed",
+            opacity: ADMIN_API_CONFIGURED ? 1 : 0.6,
           }}
         >
           <Icons.Plus size={12} stroke={2.4} /> Add charger
@@ -426,6 +433,15 @@ export const ChargersPage = () => {
             setSelected((prev) => (prev ? { ...prev, ...patch } : prev))
           }
           refetch={refetch}
+        />
+      )}
+
+      {adding && (
+        <AddChargerModal
+          onClose={() => setAdding(false)}
+          onCreated={() => {
+            void refetch();
+          }}
         />
       )}
     </div>
