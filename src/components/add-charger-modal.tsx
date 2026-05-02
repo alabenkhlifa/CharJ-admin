@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { iconBtnStyle } from "./charts";
+import { AMENITY_SLUGS, AmenityIcon, labelForAmenity } from "../lib/amenity-icons";
 import { Icons } from "../lib/icons";
 import type {
   AccessType,
@@ -27,23 +28,6 @@ const ACCESS_OPTIONS: { v: AccessType; l: string }[] = [
   { v: "customers_only", l: "Customers only" },
   { v: "brand_exclusive", l: "Brand exclusive" },
 ];
-
-// Allowlist enforced by `set_charger_override` — keep in sync with the
-// charger-adder agent doc and the migration's amenity validator.
-const AMENITY_SLUGS = [
-  "toilet",
-  "restaurant",
-  "cafe",
-  "shop",
-  "air_pump",
-  "wifi",
-  "atm",
-  "lounge",
-  "mosque",
-  "pharmacy",
-  "car_wash",
-  "kids_playground",
-] as const;
 
 type AddChargerPayload = {
   name: string;
@@ -551,6 +535,9 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
                     key={slug}
                     onClick={() => toggleAmenity(slug)}
                     style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
                       fontSize: 11,
                       padding: "5px 10px",
                       borderRadius: 14,
@@ -560,7 +547,8 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
                       cursor: "pointer",
                     }}
                   >
-                    {slug.replace(/_/g, " ")}
+                    <AmenityIcon slug={slug} size={12} />
+                    {labelForAmenity(slug)}
                   </button>
                 );
               })}

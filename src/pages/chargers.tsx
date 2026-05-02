@@ -5,6 +5,7 @@ import { AddChargerModal } from "../components/add-charger-modal";
 import { Card, EmptyState } from "../components/card";
 import { iconBtnStyle } from "../components/charts";
 import { Pagination, usePaginated } from "../components/pagination";
+import { AmenityIcon, labelForAmenity } from "../lib/amenity-icons";
 import { Icons } from "../lib/icons";
 import { darkMapStyle, lightMapStyle } from "../lib/map-styles";
 import { useCurrentTheme } from "../lib/use-theme";
@@ -810,16 +811,19 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
                   <span
                     key={a}
                     style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
                       fontSize: 11,
                       padding: "4px 10px",
                       borderRadius: 14,
                       border: "1px solid var(--border)",
                       background: "var(--bg-elev-2)",
                       color: "var(--text-muted)",
-                      textTransform: "capitalize",
                     }}
                   >
-                    {a.replace(/_/g, " ")}
+                    <AmenityIcon slug={a} size={12} />
+                    {labelForAmenity(a)}
                   </span>
                 ))}
               </div>
