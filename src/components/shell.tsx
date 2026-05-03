@@ -298,7 +298,7 @@ export const Sidebar = ({
                 fontWeight: 600,
               }}
             >
-              AD
+              AB
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
@@ -311,7 +311,7 @@ export const Sidebar = ({
                   whiteSpace: "nowrap",
                 }}
               >
-                Amine Dkhili
+                Ala BEN KHALIFA
               </div>
               <div style={{ fontSize: 10, color: "var(--text-dim)" }}>Super admin</div>
             </div>
