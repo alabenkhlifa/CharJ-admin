@@ -549,6 +549,35 @@ const verifyCharger = async (chargerId: string): Promise<AdminVerifyResponse> =>
   return body as AdminVerifyResponse;
 };
 
+type AdminStatusResponse = { id: string; status: ChargerStatus; name: string };
+type AdminStatusError = { error?: string };
+type SettableStatus = Extract<ChargerStatus, "operational" | "under_repair">;
+
+const setChargerStatus = async (
+  chargerId: string,
+  status: SettableStatus,
+): Promise<AdminStatusResponse> => {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-set-charger-status`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${ADMIN_API_SECRET}`,
+    },
+    body: JSON.stringify({ charger_id: chargerId, status }),
+  });
+  let body: AdminStatusResponse | AdminStatusError = {};
+  try {
+    body = (await res.json()) as AdminStatusResponse | AdminStatusError;
+  } catch {
+    // non-JSON response
+  }
+  if (!res.ok) {
+    const msg = (body as AdminStatusError)?.error ?? `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return body as AdminStatusResponse;
+};
+
 type DetailDrawerProps = {
   charger: Charger;
   onClose: () => void;
@@ -625,6 +654,8 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
   const theme = useCurrentTheme();
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [statusBusy, setStatusBusy] = useState<SettableStatus | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   const handleVerify = async () => {
     if (!ADMIN_API_CONFIGURED) return;
@@ -641,6 +672,22 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
       setVerifyError(err instanceof Error ? err.message : "Verification failed");
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleSetStatus = async (next: SettableStatus) => {
+    if (!ADMIN_API_CONFIGURED) return;
+    if (charger.status === next) return;
+    setStatusError(null);
+    setStatusBusy(next);
+    try {
+      const updated = await setChargerStatus(charger.id, next);
+      onLocalUpdate({ status: updated.status });
+      await refetch();
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : "Failed to update status");
+    } finally {
+      setStatusBusy(null);
     }
   };
 
@@ -857,7 +904,39 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+            <div style={smallLbl}>Status</div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 6,
+                padding: 3,
+                background: "var(--bg-elev-2)",
+                border: "1px solid var(--border)",
+                borderRadius: 7,
+              }}
+            >
+              <StatusToggleButton
+                label="Operational"
+                color="var(--green)"
+                active={charger.status === "operational"}
+                busy={statusBusy === "operational"}
+                disabled={statusBusy !== null || !ADMIN_API_CONFIGURED}
+                onClick={() => handleSetStatus("operational")}
+              />
+              <StatusToggleButton
+                label="Under repair"
+                color="var(--amber)"
+                active={charger.status === "under_repair"}
+                busy={statusBusy === "under_repair"}
+                disabled={statusBusy !== null || !ADMIN_API_CONFIGURED}
+                onClick={() => handleSetStatus("under_repair")}
+              />
+            </div>
+            {statusError && (
+              <div style={{ fontSize: 11, color: "var(--red)" }}>{statusError}</div>
+            )}
+            <div style={{ display: "flex", gap: 8, alignItems: "stretch", marginTop: 6 }}>
               {charger.verified ? (
                 <span
                   style={{
@@ -963,4 +1042,55 @@ const KV = ({ k, v }: { k: string; v: ReactNode }) => (
       {v}
     </div>
   </div>
+);
+
+type StatusToggleButtonProps = {
+  label: string;
+  color: string;
+  active: boolean;
+  busy: boolean;
+  disabled: boolean;
+  onClick: () => void;
+};
+
+const StatusToggleButton = ({
+  label,
+  color,
+  active,
+  busy,
+  disabled,
+  onClick,
+}: StatusToggleButtonProps) => (
+  <button
+    onClick={onClick}
+    disabled={disabled || active}
+    title={active ? `Already ${label.toLowerCase()}` : `Set status to ${label.toLowerCase()}`}
+    style={{
+      padding: "8px 10px",
+      borderRadius: 5,
+      fontSize: 12,
+      fontWeight: 500,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      cursor: disabled || active ? "default" : "pointer",
+      background: active ? `color-mix(in srgb, ${color} 18%, transparent)` : "transparent",
+      color: active ? color : "var(--text-muted)",
+      border: `1px solid ${active ? `color-mix(in srgb, ${color} 35%, transparent)` : "transparent"}`,
+      opacity: !active && disabled ? 0.5 : 1,
+      transition: "background .15s, color .15s, border-color .15s",
+    }}
+  >
+    <span
+      style={{
+        width: 6,
+        height: 6,
+        borderRadius: "50%",
+        background: color,
+        opacity: active ? 1 : 0.7,
+      }}
+    />
+    {busy ? "…" : label}
+  </button>
 );
