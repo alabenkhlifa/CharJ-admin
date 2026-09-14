@@ -221,7 +221,7 @@ export const ACTIVITY: ActivityEntry[] = [
 
 export type ConnectorKey = "t2" | "ccs" | "chademo" | "t1";
 export type ChargerStatus = "operational" | "under_repair" | "planned" | "unknown";
-export type AccessType = "public" | "customers_only" | "brand_exclusive";
+export type AccessType = "public" | "customers_only" | "employees_only" | "brand_exclusive";
 export type ChargerSource = "ocm" | "curated" | "community";
 
 export type Charger = {

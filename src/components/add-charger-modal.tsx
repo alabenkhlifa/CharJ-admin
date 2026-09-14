@@ -26,6 +26,7 @@ const STATUS_OPTIONS: { v: ChargerStatus; l: string }[] = [
 const ACCESS_OPTIONS: { v: AccessType; l: string }[] = [
   { v: "public", l: "Public" },
   { v: "customers_only", l: "Customers only" },
+  { v: "employees_only", l: "Employees only" },
   { v: "brand_exclusive", l: "Brand exclusive" },
 ];
 

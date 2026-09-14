@@ -4,7 +4,7 @@ import { SUPABASE_CONFIGURED, supabase } from "../lib/supabase";
 // ── Types matching the search_chargers RPC return shape ───────────────────
 
 export type ChargerStatus = "operational" | "under_repair" | "planned" | "unknown";
-export type AccessType = "public" | "customers_only" | "brand_exclusive";
+export type AccessType = "public" | "customers_only" | "employees_only" | "brand_exclusive";
 export type ChargerSource = "ocm" | "curated" | "community";
 export type ConnectorTypeRaw = "Type 2" | "CCS" | "CHAdeMO" | string;
 export type ConnectorKey = "t2" | "ccs" | "chademo" | "t1" | "other";
@@ -207,6 +207,7 @@ export const useChargers = (): UseChargersResult => {
       query: "",
       sort_by: "name",
       max_results: 1000,
+      include_employees_only: true,
     });
 
     if (signal?.cancelled) return;

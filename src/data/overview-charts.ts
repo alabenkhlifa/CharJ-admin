@@ -63,6 +63,7 @@ const STATUS_PALETTE: Record<string, { label: string; color: string }> = {
 const ACCESS_PALETTE: Record<string, { label: string; color: string }> = {
   public: { label: "Public", color: "var(--accent)" },
   customers_only: { label: "Customers only", color: "#6366F1" },
+  employees_only: { label: "Employees only", color: "var(--indigo)" },
   brand_exclusive: { label: "Brand exclusive", color: "#8B5CF6" },
 };
 

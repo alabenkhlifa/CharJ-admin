@@ -74,9 +74,10 @@ const accessChip = (a: AccessType) => {
   const map: Record<AccessType, [string, string]> = {
     public: ["Public", "var(--accent)"],
     customers_only: ["Customers", "var(--indigo)"],
+    employees_only: ["Employees only", "var(--indigo)"],
     brand_exclusive: ["Brand-only", "var(--violet)"],
   };
-  const [l, c] = map[a];
+  const [l, c] = map[a] ?? [a.replaceAll("_", " "), "var(--indigo)"];
   return (
     <span
       style={{

@@ -60,6 +60,7 @@ export const useGlobalSearch = (rawQuery: string): GlobalSearchState => {
         query: trimmed,
         sort_by: "name",
         max_results: CHARGER_LIMIT,
+        include_employees_only: true,
       });
 
       if (cancelled) return;
