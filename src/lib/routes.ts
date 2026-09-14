@@ -2,6 +2,7 @@ import type { IconKey } from "./icons";
 
 export type RouteKey =
   | "overview"
+  | "analytics"
   | "chargers"
   | "submissions"
   | "feedback"
@@ -24,6 +25,7 @@ export type NavItem = {
 
 export const NAV: NavItem[] = [
   { k: "overview", l: "Overview", ic: "Overview", shortcut: "g o" },
+  { k: "analytics", l: "App analytics", ic: "Overview" },
   { k: "chargers", l: "Chargers", ic: "Charger", shortcut: "g c" },
   { k: "submissions", l: "Submissions", ic: "Submission", accent: true },
   { k: "feedback", l: "Feedback", ic: "Feedback", shortcut: "g f" },

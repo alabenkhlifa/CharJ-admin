@@ -13,9 +13,11 @@ import { UsersPage } from "./pages/users";
 import { VehiclesPage } from "./pages/vehicles";
 import { MapPage } from "./pages/map";
 import { SettingsPage } from "./pages/settings";
+import { AnalyticsPage } from "./pages/analytics";
 
 const ROUTE_COMPONENTS: Record<RouteKey, () => React.ReactElement> = {
   overview: OverviewPage,
+  analytics: AnalyticsPage,
   chargers: ChargersPage,
   submissions: SubmissionsPage,
   feedback: FeedbackPage,
