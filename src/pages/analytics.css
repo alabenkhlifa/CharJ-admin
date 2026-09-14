@@ -5,9 +5,9 @@
 .analytics-page h2 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
 .analytics-page p { margin: 6px 0; font-size: 12px; line-height: 1.6; }
 .analytics-heading p, .analytics-muted, .analytics-footnote { color: var(--text-muted); }
-.analytics-controls, .analytics-unlock { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
-.analytics-controls label, .analytics-unlock label { display: grid; gap: 5px; color: var(--text-muted); font-size: 11px; }
-.analytics-page select, .analytics-page button, .analytics-page input { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elev); color: var(--text); font: inherit; font-size: 12px; }
+.analytics-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.analytics-controls label { display: grid; gap: 5px; color: var(--text-muted); font-size: 11px; }
+.analytics-page select, .analytics-page button { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elev); color: var(--text); font: inherit; font-size: 12px; }
 .analytics-page button:disabled { opacity: .5; cursor: default; }
 .analytics-page :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .analytics-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }

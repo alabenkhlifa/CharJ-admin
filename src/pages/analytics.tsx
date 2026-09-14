@@ -11,10 +11,7 @@ export function AnalyticsPage() {
   const [days, setDays] = useState<AnalyticsPeriod>(30);
   const [environment, setEnvironment] = useState<AnalyticsEnvironment>('production');
   const [revision, setRevision] = useState(0);
-  // Keep the reporting credential in memory only, never in the web bundle or storage.
-  const [accessKey, setAccessKey] = useState('');
-  const [keyInput, setKeyInput] = useState('');
-  const { data, loading, error } = useAnalytics(days, environment, revision, accessKey);
+  const { data, loading, error } = useAnalytics(days, environment, revision);
   const m = data?.metrics;
   const rate = data ? routeSuccessRate(data) : null;
   const cards = m ? [
@@ -47,17 +44,10 @@ export function AnalyticsPage() {
           <label>Environment<select value={environment} onChange={(event) => setEnvironment(event.target.value as AnalyticsEnvironment)}>
             <option value="production">Production</option><option value="preview">Preview</option><option value="development">Development</option>
           </select></label>
-          <button onClick={() => setRevision((value) => value + 1)} disabled={!accessKey || loading}>Refresh</button>
+          <button onClick={() => setRevision((value) => value + 1)} disabled={loading}>Refresh</button>
           <button onClick={exportCsv} disabled={!data || loading}>Export daily CSV</button>
-          {accessKey && <button onClick={() => setAccessKey('')}>Lock analytics</button>}
         </div>
       </div>
-      {!accessKey && <Card><h2>Unlock app analytics</h2><p className="analytics-muted">Enter your analytics access key to view reports. It is kept only while this page is open.</p>
-        <form className="analytics-unlock" onSubmit={(event) => { event.preventDefault(); setAccessKey(keyInput.trim()); setKeyInput(''); }}>
-          <label>Analytics access key<input type="password" required autoComplete="off" value={keyInput} onChange={(event) => setKeyInput(event.target.value)} /></label>
-          <button type="submit" disabled={!keyInput.trim()}>Unlock analytics</button>
-        </form>
-      </Card>}
       {loading && <Card><p role="status">Loading app analytics…</p></Card>}
       {error && <Card><p role="alert">{error}</p><button onClick={() => setRevision((value) => value + 1)}>Try again</button></Card>}
       {data && !loading && <>

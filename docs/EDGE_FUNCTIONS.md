@@ -7,8 +7,9 @@ Live in **`../charj/supabase/functions/`** (mobile-app repo). Deployed against t
 | `admin-users` | List `auth.users` + per-user vehicles / counts | Bearer `ADMIN_API_SECRET` |
 | `admin-verify-charger` | Set `is_verified=true` + stamp `verified_at`/`verified_by` | Bearer `ADMIN_API_SECRET` |
 | `admin-add-charger` | Insert a new `chargers` row from the dashboard's Add-charger modal | Bearer `ADMIN_API_SECRET` |
+| `admin-analytics` | Aggregate app usage report (`get_app_analytics` RPC) for the Analytics page | Bearer `ADMIN_API_SECRET` |
 
-All three follow the same pattern, all deploy with `--no-verify-jwt`, all answer CORS preflight before the auth check.
+All of them follow the same pattern, all deploy with `--no-verify-jwt`, all answer CORS preflight before the auth check.
 
 ## `admin-users`
 
@@ -163,6 +164,7 @@ cd ../charj
 npx supabase functions deploy admin-users --no-verify-jwt
 npx supabase functions deploy admin-verify-charger --no-verify-jwt
 npx supabase functions deploy admin-add-charger --no-verify-jwt
+npx supabase functions deploy admin-analytics --no-verify-jwt
 ```
 
 `--no-verify-jwt` is **required**. Without it the Supabase API gateway rejects requests whose `Authorization` header isn't a valid Supabase JWT — and our bearer secret is just a hex string, not a JWT. With the flag, the gateway passes the `Authorization` header through unmodified and the function does its own bearer comparison.
