@@ -7,6 +7,7 @@ export type RouteKey =
   | "submissions"
   | "feedback"
   | "reviews"
+  | "visits"
   | "users"
   | "vehicles"
   | "map"
@@ -30,6 +31,7 @@ export const NAV: NavItem[] = [
   { k: "submissions", l: "Submissions", ic: "Submission", accent: true },
   { k: "feedback", l: "Feedback", ic: "Feedback", shortcut: "g f" },
   { k: "reviews", l: "Reviews", ic: "Reviews" },
+  { k: "visits", l: "Driver visits", ic: "Visit" },
   { k: "users", l: "Users", ic: "Users" },
   { k: "vehicles", l: "Vehicles", ic: "Vehicle" },
   { k: "map", l: "Map", ic: "Map" },

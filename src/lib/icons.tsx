@@ -71,6 +71,18 @@ export const Icons = {
       <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.8 1-6.1L3.2 9.4l6.1-.9Z" />
     </RawIcon>
   ),
+  Visit: (p: IconProps) => (
+    <RawIcon {...p}>
+      <path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z" />
+      <path d="m9 10 2 2 4-4" />
+    </RawIcon>
+  ),
+  Phone: (p: IconProps) => (
+    <RawIcon {...p}>
+      <rect x="7" y="2" width="10" height="20" rx="2.5" />
+      <path d="M11 18h2" />
+    </RawIcon>
+  ),
   Users: (p: IconProps) => (
     <RawIcon {...p}>
       <circle cx="9" cy="8" r="3.5" />
