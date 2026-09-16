@@ -26,11 +26,16 @@ Both are service-role only. The Feedback page shows an EmptyState; review report
 
 **Fix path**: build `admin-feedback` and `admin-review-reports` Edge Functions mirroring `admin-users` (bearer auth, CORS preflight before auth, json helper). Wire `useFeedback` and `useReviewReports` hooks. ~1-2 hours per function.
 
-## 5. No mobile-app device info on users
+## 5. Device info on users is partial and opt-in
 
-Anonymous auth has no client-supplied device fingerprint. The most we have is `feedback.platform` / `feedback.app_version` / `feedback.device_id` (hashed) per submission — only for users who left feedback.
+**Mostly fixed.** The Users page shows platform, app version, language, OS version, device model and screen size, taken from the newest `app_analytics_events` row per user via the `admin-users` EF.
 
-**Fix path**: a "Last seen on" lookup that joins users → most recent feedback or submission and surfaces `last_platform`, `last_app_version`, `last_seen_at`. Service-role only — extend `admin-users` EF. ~30 min.
+What's still limited:
+
+- Only users who left usage analytics enabled appear at all — opting out means no device row, ever.
+- Model / OS / screen are `NULL` for every event sent before the device-context change (migration `20260916000001`, shipped as OTA `v1.2.1-ota.23`). The column fills in gradually as users open the updated app; it is not backfillable.
+- iOS model reads `Constants.platform.ios.model`, which is deprecated in expo-constants. It's the only OTA-safe source — `expo-device` is not installed and adding it forces a native rebuild. Switch to `Device.modelName` at the next native build.
+- Deliberately **not** collected: device name (it usually carries the owner's real name) and any hardware identifier that would re-identify a user across reinstalls.
 
 ## 6. Verify button can't be undone from the UI
 
@@ -62,19 +67,13 @@ UI exists but does nothing. Updating `community_submissions.status` is service-r
 
 **Fix path**: code-split via dynamic `import()` per page. Lowest-hanging: lazy-load `@vis.gl/react-google-maps` since it's only used on the Map page and the charger drawer. ~15 min.
 
-## 10. No real router / no deep-links
-
-Internal state-based routing means refreshing a page on `/CharJ-admin/users` lands you on Overview, not Users. Bookmarking a specific user is impossible.
-
-**Fix path**: install `react-router` + add `<HashRouter>` (avoids SPA-fallback complexity on GH Pages). Each `RouteKey` becomes a path. ~1 hour.
-
-## 11. No tests
+## 10. No tests
 
 There are no unit tests, integration tests, or E2E tests. We rely on TypeScript + manual Chrome DevTools sweeps.
 
 **Fix path**: vitest for unit tests on data mappers. Playwright for E2E. ~½ day to set up + ½ day to write meaningful coverage.
 
-## 12. Verify Edge Function uses a constant `verified_by`
+## 11. Verify Edge Function uses a constant `verified_by`
 
 Every manual verify writes `a2000000-0000-0000-0000-000000000000` as `verified_by`. There's no "who verified it" history.
 

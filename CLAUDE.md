@@ -32,6 +32,7 @@ Local `.env` should mirror `.env.example`. Without env vars the app still render
 - **Logical properties only** — `insetInlineStart`, `marginInlineEnd`. No `left` / `right` for layout positioning.
 - **Mobile breakpoint is 900px** — under that, the sidebar collapses to a slide-out drawer. Test layouts at 375 / 768 / 1440 — `main.scrollWidth` must equal `main.clientWidth` on every page.
 - **Don't fabricate data.** If a metric has no anon-readable source and no Edge Function, drop the card or show an honest empty state. Do not show mock numbers next to real ones.
+- **Routing is the URL hash** (`src/lib/use-route.ts`). Add a page by extending `RouteKey` + `NAV`; never reintroduce `useState` for the active page — a refresh has to land back on the same screen. Query params (`#/chargers?id=`, `#/users?user=`) carry cross-page deep links.
 
 ## Folder map
 
@@ -45,12 +46,15 @@ src/
     card.tsx                 # Card, CardHeader, EmptyState
     charts.tsx               # SVG charts: Donut, AreaChart, StackedBar, etc.
     tunisia-map.tsx          # Google Map embed for Overview "Tunisia coverage"
+    select-chip.tsx          # labelled <select> chip, generic over the value union
   pages/
     overview.tsx             # KPIs + status/connector/access charts + map
+    analytics.tsx            # app usage report via the admin-analytics EF
     chargers.tsx             # Table + filter chips + detail drawer (verify/map/hours)
     submissions.tsx          # community_submissions list, status tabs
     feedback.tsx             # EmptyState — needs Edge Function (service-role)
     reviews.tsx              # ratings stream + charger join
+    visits.tsx               # charging_confirmations + hide/unhide moderation
     users.tsx                # admin-users Edge Function consumer
     vehicles.tsx             # ev_models catalogue cards
     map.tsx                  # full-page Google Maps with all chargers
@@ -64,10 +68,12 @@ src/
     vehicles.ts              # useEvModels()
     sidebar-counts.ts        # useSidebarCounts() — badge numbers
     admin-users.ts           # useAdminUsers() — bearer-auth fetch to EF
+    visits.ts                # useVisits() + moderateVisit() — admin-confirmations EF
   lib/
     supabase.ts              # client factory + SUPABASE_CONFIGURED
     icons.tsx                # all SVG icons (lucide-style)
     routes.ts                # NAV definition
+    use-route.ts             # hash router (#/users, #/chargers?id=) — survives refresh
     theme.ts                 # useTweaks() — theme/density/accent/numStyle persistence
     use-is-mobile.ts         # matchMedia 900px hook
     use-theme.ts             # MutationObserver on html[data-theme]

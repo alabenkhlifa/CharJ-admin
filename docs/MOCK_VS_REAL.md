@@ -53,7 +53,7 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 | Pagination (table footer) | ✅ | client-side slice via `usePaginated`; default 25/page |
 | **Verify** button → mark verified | 🔐 | `admin-verify-charger` EF |
 | **Add charger** modal | 🔐 | `admin-add-charger` EF — same fields as the `charger-adder` agent's migration template |
-| Deep-link from topbar search | ✅ | `pendingChargerId` lifted in `App.tsx`; page opens drawer on mount |
+| Deep-link from topbar search | ✅ | `#/chargers?id=<uuid>`; `App.tsx` reads the hash param, page opens drawer on mount |
 | ~~Edit override~~ | ⚠️ | UI exists but no-op for now |
 | ~~Gouvernorat column~~ | ⚠️ | no column — replaced by `city` |
 
@@ -81,19 +81,52 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 | ~~Reported reviews queue~~ | ⚠️ `review_reports` service-role |
 | ~~Hide / Approve actions~~ | ⚠️ would need an EF |
 
+## Driver visits page
+
+Charging confirmations drivers submit after visiting a station. The
+`charging_confirmations` table has no client policies at all (REVOKEd from
+anon/authenticated), so every field here goes through the
+`admin-confirmations` EF — none of it is reachable with the anon key.
+
+| Field | Status | Source |
+|---|---|---|
+| Visit date, outcome, failure reason, connector | 🔐 | `charging_confirmations` |
+| Charger name + city | 🔐 | PostgREST embed on the `charger_id` FK |
+| Driver UID (click → `#/users?user=`) | 🔐 | `user_id` |
+| Reported (relative time) | 🔐 | `submitted_at` |
+| Summary: total / charged / failed / last 7d / drivers | 🔐 | whole-table counts, not the current filter |
+| Outcome + visibility filters | 🔐 | server-side query params |
+| **Hide / Unhide** | 🔐 | `moderate_charging_confirmation` RPC (service-role) |
+| Pagination | 🔐 | server-side `page` / `perPage` |
+
+Hiding takes effect in the app immediately — `get_charging_confirmations`
+filters on `hidden_at IS NULL`. The app shows only the last 5 visible reports
+from the past 30 days per charger; this page shows every report ever
+submitted.
+
 ## Users page
 
 | Field | Status |
 |---|---|
 | User ID (mono, copy on click) | 🔐 admin-users EF |
+| Device: platform, OS version, model, screen size | 🔐 newest `app_analytics_events` row per user |
+| App version + language | 🔐 same |
 | Vehicle (make + model + variant + +N chip) | 🔐 |
+| Visits count | 🔐 `charging_confirmations` per user |
+| Activity (sessions + last event) | 🔐 distinct `session_id` + latest `occurred_at` |
 | Joined / Last active | 🔐 |
 | Vehicles count | 🔐 |
+| "Engaged only" filter | 🔐 union of analytics / vehicles / visits, ranked by last trace |
+| Exact-UUID lookup (`#/users?user=`) | 🔐 `getUserById`; a prefix returns empty by design |
 | Pagination | 🔐 server-side via the EF's `page` / `perPage` query params |
 | ~~Email~~ | ⚠️ Charj uses anon auth, almost always empty |
 | ~~Reviews count~~ | ⚠️ all 0 due to anon-auth orphans (see SCHEMA_NOTES) |
 | ~~Submissions count~~ | ⚠️ same |
 | ~~Role / admin flag~~ | ⚠️ no roles table |
+
+Device model / OS / screen are null for events predating the device-context
+update (OTA `v1.2.1-ota.23`) and absent entirely for users who opted out of
+analytics. See KNOWN_ISSUES #5.
 
 ## Vehicles page
 
@@ -138,7 +171,7 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 | User avatar (`AB` / "Ala") | ✅ hardcoded — single admin today |
 | Theme toggle | ✅ `useTweaks` |
 | Global search (⌘K) | ✅ `useGlobalSearch` — `search_chargers` RPC + in-memory NAV match |
-| Search → page row click | ✅ navigates via `setActive` |
-| Search → charger row click | ✅ deep-links via `pendingChargerId` (App.tsx) → drawer opens on the chargers page |
+| Search → page row click | ✅ navigates via `useRoute().navigate` (updates the hash) |
+| Search → charger row click | ✅ deep-links to `#/chargers?id=<uuid>` → drawer opens on the chargers page |
 | ~~Search across users / vehicles / reviews~~ | ⚠️ would need EF query params or a cross-page state lift |
 | ~~Help / Notifications buttons~~ | ⚠️ removed — nothing to surface yet |
