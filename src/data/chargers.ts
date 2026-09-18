@@ -35,6 +35,7 @@ export type WorkingHoursWeekly = {
 };
 
 export type WorkingHours = {
+  always_open?: boolean;
   weekly?: WorkingHoursWeekly;
 } | null;
 
@@ -107,6 +108,7 @@ const summarizeRanges = (ranges: WorkingHoursRange[] | undefined): string | null
 };
 
 const summarizeHours = (wh: WorkingHours): string => {
+  if (wh?.always_open) return "24/7";
   if (!wh || !wh.weekly) return "—";
   const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
   const opens = days.map((d) => summarizeRanges(wh.weekly?.[d]));

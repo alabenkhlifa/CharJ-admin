@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { AddChargerModal } from "../components/add-charger-modal";
+import { EditChargerDrawer } from "../components/edit-charger-drawer";
 import { Card, EmptyState } from "../components/card";
 import { iconBtnStyle } from "../components/charts";
 import { Pagination, usePaginated } from "../components/pagination";
@@ -14,6 +15,8 @@ import {
   CONNECTOR_LABELS,
   STATUS_COLORS,
   useChargers,
+  mapRawCharger,
+  type RawChargerRow,
   type AccessType,
   type Charger,
   type ChargerSource,
@@ -493,14 +496,12 @@ const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 // Database shape: `{ weekly: { mon: [{from, to}], ..., sun: [] } }`.
 // Empty array → closed that day. Missing day entirely → unknown ("—").
 const dayCellLabel = (wh: WorkingHours, idx: number): string => {
+  if (wh?.always_open) return "24h";
   if (!wh || !wh.weekly) return "—";
   const ranges = wh.weekly[DAY_KEYS[idx]];
   if (ranges === undefined) return "—";
   if (ranges.length === 0) return "Closed";
-  const r = ranges[0];
-  if (!r?.from || !r?.to) return "—";
-  if (r.from === "00:00" && r.to === "24:00") return "24h";
-  return `${r.from.slice(0, 5)}–${r.to.slice(0, 5)}`;
+  return ranges.map(r => r.from === "00:00" && r.to === "24:00" ? "24h" : `${r.from.slice(0, 5)}–${r.to.slice(0, 5)}`).join(" / ");
 };
 
 const todayIndex = () => (new Date().getDay() + 6) % 7;
@@ -651,6 +652,8 @@ const MissingMapKeyHint = () => (
 );
 
 const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawerProps) => {
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(false);
   const today = todayIndex();
   const theme = useCurrentTheme();
   const [verifying, setVerifying] = useState(false);
@@ -699,6 +702,14 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
       "noopener",
     );
   };
+
+  if (editing) return <EditChargerDrawer chargerId={charger.id} onClose={() => setEditing(false)} onSaved={updated => {
+    const mapped = mapRawCharger(updated as RawChargerRow);
+    if (mapped) onLocalUpdate(mapped);
+    setEditing(false);
+    setSaved(true);
+    void refetch();
+  }} />;
 
   return (
     <>
@@ -764,6 +775,7 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
           }}
         >
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {saved && <span role="status" style={{ width: "100%", color: "var(--accent)", fontSize: 12 }}>Charger changes saved.</span>}
             {statusChip(charger.status)}
             {accessChip(charger.access)}
             {charger.verified && (
@@ -825,7 +837,7 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(7, 1fr)",
+                gridTemplateColumns: "repeat(auto-fit, minmax(85px, 1fr))",
                 gap: 4,
                 marginTop: 8,
               }}
@@ -989,6 +1001,8 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
                 </button>
               )}
               <button
+                onClick={() => setEditing(true)}
+                disabled={verifying || statusBusy !== null}
                 style={{
                   flex: 1,
                   padding: "10px 12px",
@@ -1000,7 +1014,7 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
                   fontWeight: 500,
                 }}
               >
-                Edit override
+                Edit charger
               </button>
               <button
                 onClick={openInGoogleMaps}
