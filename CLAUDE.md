@@ -33,6 +33,9 @@ Local `.env` should mirror `.env.example`. Without env vars the app still render
 - **Mobile breakpoint is 900px** — under that, the sidebar collapses to a slide-out drawer. Test layouts at 375 / 768 / 1440 — `main.scrollWidth` must equal `main.clientWidth` on every page.
 - **Don't fabricate data.** If a metric has no anon-readable source and no Edge Function, drop the card or show an honest empty state. Do not show mock numbers next to real ones.
 - **Routing is the URL hash** (`src/lib/use-route.ts`). Add a page by extending `RouteKey` + `NAV`; never reintroduce `useState` for the active page — a refresh has to land back on the same screen. Query params (`#/chargers?id=`, `#/users?user=`) carry cross-page deep links.
+- **Table state lives in the hash too.** Chargers keeps search / filters / sort / page in query params (`#/chargers?status=operational,planned&sort=power:desc&q=tunis`), so a narrowed table is a link you can paste to someone else and a refresh lands on the same rows. Never shadow a URL param with `useState`. When you `replace()` on that page, merge into the existing params (`patchParams` in `App.tsx`) — a bare `replace("chargers")` wipes the view out from under the user.
+- **No decorative controls.** A button that only moves its own highlight teaches the reader to distrust every other number on the page. `CardHeader` takes `range` and `onExport` as opt-in props and renders nothing when they're absent; do the same for anything new. If a control can't work yet, leave it out rather than stubbing it.
+- **A time range needs a real time axis.** Only put a range selector on a genuine series (something bucketed by `created_at`). Snapshot charts — "chargers by status", "power distribution" — describe the catalogue as it stands, and a 7-day window on them is meaningless. `lib/time-range.ts` owns the window *and* the bucket grain (7d/30d → daily, 90d → weekly, 1y → monthly) so charts stay legible; fetch the widest window once and slice in memory rather than re-fetching per range.
 
 ## Folder map
 
@@ -47,6 +50,9 @@ src/
     charts.tsx               # SVG charts: Donut, AreaChart, StackedBar, etc.
     tunisia-map.tsx          # Google Map embed for Overview "Tunisia coverage"
     select-chip.tsx          # labelled <select> chip, generic over the value union
+    multi-select-chip.tsx    # checkbox popover chip — filters that take several values at once
+    table.tsx                # Th / SortableTh (aria-sort, arrow indicator)
+    pagination.tsx           # Pagination footer + usePaginated client-side slicer
   pages/
     overview.tsx             # KPIs + status/connector/access charts + map
     analytics.tsx            # app usage report via the admin-analytics EF
@@ -78,6 +84,9 @@ src/
     use-is-mobile.ts         # matchMedia 900px hook
     use-theme.ts             # MutationObserver on html[data-theme]
     map-styles.ts            # darkMapStyle/lightMapStyle (mirrors mobile app)
+    table-sort.ts            # Sort<K>, collator, nextSort/parseSort/serializeSort
+    time-range.ts            # RangeKey (7d/30d/90d/1y) + bucket grain and labels
+    csv.ts                   # toCsv / downloadCsv / stampedFilename
     auth-gate.tsx            # client-side login gate (security theater)
 .github/workflows/deploy.yml # CI: build + deploy to Pages on push to main
 ```

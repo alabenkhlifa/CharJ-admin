@@ -17,11 +17,13 @@ What's wired to live data, what's behind an Edge Function, what's stripped becau
 | Pending submissions | ✅ | `count(*) from community_submissions where status='pending'` |
 | Avg rating | ✅ | `avg(rating)` from `ratings` |
 | Status donut | ✅ | `GROUP BY status` from chargers |
-| Connector type stack (8 months) | ✅ | client-side aggregation of JSONB connectors over `created_at` |
+| Connector type stack (range-aware) | ✅ | cumulative catalogue size per connector at each bucket end; 7d/30d/90d/1y selector, daily→weekly→monthly grain |
 | Power distribution histogram | ✅ | `max(power_kw)` per charger, bucketed |
 | Access type split | ✅ | `GROUP BY access_type` |
 | Submissions funnel + approval rate | ✅ | `GROUP BY status` from community_submissions |
-| Rating trend (12 weeks) | ✅ | weekly `avg(rating)` from `ratings` |
+| Rating trend (range-aware) | ✅ | bucketed `avg(rating)` from `ratings`; 7d/30d/90d/1y selector. A bucket with no ratings is `null` and the line breaks there rather than diving to zero stars |
+| Per-card CSV export | ✅ | `lib/csv.ts`; every chart card with tabular data, plus a page-level "Export" of all KPIs and slices |
+| Header "Add charger" | ✅ | navigates to `#/chargers?add=1`, which opens the modal on arrival |
 | Tunisia coverage map | ✅ | full chargers list + Google Maps |
 | ~~Avg uptime~~ | ⚠️ | no fleet-wide uptime metric |
 | ~~Unread feedback~~ | ⚠️ | feedback is service-role; needs EF |
@@ -50,7 +52,14 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 | Verified-by chip in drawer | ✅ | `verified_by` |
 | Map link button | ✅ | `window.open` to Google Maps |
 | Mini map in drawer | ✅ | Google Maps via `@vis.gl/react-google-maps` |
-| Pagination (table footer) | ✅ | client-side slice via `usePaginated`; default 25/page |
+| Pagination (table footer) | ✅ | client-side slice; `page` / `per` live in the hash, default 25/page |
+| Column sorting | ✅ | all columns except Connectors; `sort=<key>:<dir>` in the hash, `aria-sort` on the header, numbers/dates start descending |
+| In-table search | ✅ | name / city / id, 250 ms debounce into `q=` |
+| Multi-value filters | ✅ | status, access, connector, source, city (searchable, with counts) — each a comma list in the hash |
+| Single-value filters | ✅ | power bucket, verified, hours set/missing, updated within 7/30/90 days |
+| Updated column | ✅ | `updated_at`, relative, full timestamp on hover |
+| CSV export | ✅ | the rows currently shown, in the shown order, incl. lat/lng and id |
+| Keyboard | ✅ | rows are focusable, Enter/Space opens the drawer, Escape closes it |
 | **Verify** button → mark verified | 🔐 | `admin-verify-charger` EF |
 | **Add charger** modal | 🔐 | `admin-add-charger` EF — same fields as the `charger-adder` agent's migration template |
 | Deep-link from topbar search | ✅ | `#/chargers?id=<uuid>`; `App.tsx` reads the hash param, page opens drawer on mount |

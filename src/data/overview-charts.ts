@@ -1,5 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SUPABASE_CONFIGURED, supabase } from "../lib/supabase";
+import {
+  bucketKey,
+  bucketsFor,
+  GRAIN_FOR,
+  rangeStart,
+  WIDEST_RANGE,
+  type RangeKey,
+} from "../lib/time-range";
 
 // All anon-readable from `chargers` / `ratings` / `community_submissions`.
 // Pull raw rows once, aggregate client-side. Catalogue is in the low thousands
@@ -24,7 +32,9 @@ export type ConnectorKeyDef = {
 
 export type HistBar = { label: string; value: number; color?: string };
 export type FunnelStage = { stage: string; value: number; color: string };
-export type RatingPoint = { w: string; v: number };
+// `v` is null for a bucket with no ratings — the chart draws a gap there
+// rather than a dive to zero stars.
+export type RatingPoint = { w: string; v: number | null };
 
 export type OverviewCharts = {
   statusDonut: DonutSlice[];
@@ -87,45 +97,6 @@ const CONNECTOR_KEYS: ConnectorKeyDef[] = [
 
 type RawConnector = { type?: string; power_kw?: number; count?: number };
 
-const monthKey = (d: Date) =>
-  `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-const monthLabel = (d: Date) =>
-  d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
-
-// Returns the last N months as [{key: 'YYYY-MM', label: 'Mmm'}], oldest first.
-const lastMonths = (n: number): { key: string; label: string }[] => {
-  const out: { key: string; label: string }[] = [];
-  const now = new Date();
-  const cursor = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(cursor);
-    d.setUTCMonth(cursor.getUTCMonth() - i);
-    out.push({ key: monthKey(d), label: monthLabel(d) });
-  }
-  return out;
-};
-
-// ISO-like week: Monday-anchored bucket. Returns YYYY-MM-DD of the Monday.
-const weekStart = (d: Date): Date => {
-  const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  const dow = dt.getUTCDay(); // 0=Sun..6=Sat
-  const offset = (dow + 6) % 7; // days since Monday
-  dt.setUTCDate(dt.getUTCDate() - offset);
-  return dt;
-};
-const weekKey = (d: Date) => weekStart(d).toISOString().slice(0, 10);
-
-const lastWeeks = (n: number): { key: string; label: string }[] => {
-  const out: { key: string; label: string }[] = [];
-  const monday = weekStart(new Date());
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(monday);
-    d.setUTCDate(monday.getUTCDate() - i * 7);
-    out.push({ key: weekKey(d), label: `W${n - i}` });
-  }
-  return out;
-};
-
 const connectorKeyForType = (t: string | undefined): ConnectorKeyDef["key"] | null => {
   if (!t) return null;
   const norm = t.trim().toLowerCase();
@@ -164,163 +135,57 @@ type ChargerRow = {
 type SubmissionRow = { status: string | null };
 type RatingRow = { rating: number | null; created_at: string };
 
-export const useOverviewCharts = (): State => {
-  const [state, setState] = useState<State>({
-    data: EMPTY,
-    loading: true,
-    error: null,
-  });
+// ── Raw fetch (once) ──────────────────────────────────────────────────────
+// Ranges are applied in memory, not re-fetched: the widest window is pulled
+// up front so flipping 7d ↔ 1y is instant and costs no round-trip.
+
+type RawState = {
+  chargers: ChargerRow[];
+  submissions: SubmissionRow[];
+  ratings: RatingRow[];
+  loading: boolean;
+  error: string | null;
+};
+
+const EMPTY_RAW: RawState = {
+  chargers: [],
+  submissions: [],
+  ratings: [],
+  loading: true,
+  error: null,
+};
+
+const useOverviewRaw = (): RawState => {
+  const [raw, setRaw] = useState<RawState>(EMPTY_RAW);
 
   useEffect(() => {
     if (!SUPABASE_CONFIGURED) {
-      setState({ data: EMPTY, loading: false, error: "Supabase not configured" });
+      setRaw({ ...EMPTY_RAW, loading: false, error: "Supabase not configured" });
       return;
     }
 
     let cancelled = false;
     (async () => {
-      const twelveWeeksAgo = new Date();
-      twelveWeeksAgo.setUTCDate(twelveWeeksAgo.getUTCDate() - 12 * 7);
+      const oldest = rangeStart(WIDEST_RANGE).toISOString();
 
       const [chargersRes, submissionsRes, ratingsRes] = await Promise.all([
-        supabase
-          .from("chargers")
-          .select("id, status, access_type, connectors, created_at"),
+        supabase.from("chargers").select("id, status, access_type, connectors, created_at"),
         supabase.from("community_submissions").select("status"),
-        supabase
-          .from("ratings")
-          .select("rating, created_at")
-          .gte("created_at", twelveWeeksAgo.toISOString()),
+        supabase.from("ratings").select("rating, created_at").gte("created_at", oldest),
       ]);
 
       if (cancelled) return;
 
-      const firstError =
-        chargersRes.error ?? submissionsRes.error ?? ratingsRes.error;
+      const firstError = chargersRes.error ?? submissionsRes.error ?? ratingsRes.error;
       if (firstError) {
-        setState({ data: EMPTY, loading: false, error: firstError.message });
+        setRaw({ ...EMPTY_RAW, loading: false, error: firstError.message });
         return;
       }
 
-      const chargers = (chargersRes.data ?? []) as ChargerRow[];
-      const submissions = (submissionsRes.data ?? []) as SubmissionRow[];
-      const ratings = (ratingsRes.data ?? []) as RatingRow[];
-
-      // ── Status donut ───────────────────────────────────────────────────
-      const statusCounts = new Map<string, number>();
-      for (const c of chargers) {
-        const s = c.status ?? "unknown";
-        statusCounts.set(s, (statusCounts.get(s) ?? 0) + 1);
-      }
-      const statusDonut: DonutSlice[] = Array.from(statusCounts.entries())
-        .map(([key, value]) => {
-          const meta = STATUS_PALETTE[key] ?? { label: key, color: "#71717A" };
-          return { key, label: meta.label, value, color: meta.color };
-        })
-        .sort((a, b) => b.value - a.value);
-
-      // ── Connector stack (last 8 months) ────────────────────────────────
-      const months = lastMonths(8);
-      const monthIndex = new Map(months.map((m, i) => [m.key, i]));
-      const connectorStack: ConnectorPoint[] = months.map((m) => ({
-        m: m.label,
-        t2: 0,
-        ccs: 0,
-        chademo: 0,
-        t1: 0,
-      }));
-      for (const c of chargers) {
-        const created = new Date(c.created_at);
-        const idx = monthIndex.get(monthKey(created));
-        if (idx === undefined) continue;
-        const conns = Array.isArray(c.connectors) ? c.connectors : [];
-        // Aggregate connector counts per charger; use `count` if present, else 1.
-        for (const conn of conns) {
-          const k = connectorKeyForType(conn.type);
-          if (!k) continue;
-          const n = typeof conn.count === "number" && conn.count > 0 ? conn.count : 1;
-          connectorStack[idx][k] += n;
-        }
-      }
-
-      // ── Power histogram ────────────────────────────────────────────────
-      const powerCounts = new Map<string, number>(POWER_BUCKETS.map((b) => [b, 0]));
-      for (const c of chargers) {
-        const conns = Array.isArray(c.connectors) ? c.connectors : [];
-        if (conns.length === 0) continue;
-        const maxKw = conns.reduce(
-          (mx, conn) => Math.max(mx, typeof conn.power_kw === "number" ? conn.power_kw : 0),
-          0,
-        );
-        if (maxKw <= 0) continue;
-        const bucket = powerBucket(maxKw);
-        powerCounts.set(bucket, (powerCounts.get(bucket) ?? 0) + 1);
-      }
-      const powerHist: HistBar[] = POWER_BUCKETS.map((label) => ({
-        label,
-        value: powerCounts.get(label) ?? 0,
-        color: "var(--accent)",
-      }));
-
-      // ── Access split ───────────────────────────────────────────────────
-      const accessCounts = new Map<string, number>();
-      for (const c of chargers) {
-        const a = c.access_type ?? "public";
-        accessCounts.set(a, (accessCounts.get(a) ?? 0) + 1);
-      }
-      const accessSplit: DonutSlice[] = Array.from(accessCounts.entries())
-        .map(([key, value]) => {
-          const meta = ACCESS_PALETTE[key] ?? { label: key, color: "#71717A" };
-          return { key, label: meta.label, value, color: meta.color };
-        })
-        .sort((a, b) => b.value - a.value);
-
-      // ── Submissions funnel ─────────────────────────────────────────────
-      const submissionCounts = new Map<string, number>();
-      for (const s of submissions) {
-        const k = s.status ?? "pending";
-        submissionCounts.set(k, (submissionCounts.get(k) ?? 0) + 1);
-      }
-      const funnel: FunnelStage[] = SUBMISSION_ORDER.filter((k) =>
-        submissionCounts.has(k),
-      ).map((k) => {
-        const meta = SUBMISSION_PALETTE[k];
-        return {
-          stage: meta.label,
-          value: submissionCounts.get(k) ?? 0,
-          color: meta.color,
-        };
-      });
-
-      // ── Rating trend (12 weeks) ────────────────────────────────────────
-      const weeks = lastWeeks(12);
-      const weekIndex = new Map(weeks.map((w, i) => [w.key, i]));
-      const weekSums = weeks.map(() => ({ sum: 0, count: 0 }));
-      for (const r of ratings) {
-        if (typeof r.rating !== "number") continue;
-        const idx = weekIndex.get(weekKey(new Date(r.created_at)));
-        if (idx === undefined) continue;
-        weekSums[idx].sum += r.rating;
-        weekSums[idx].count += 1;
-      }
-      const ratingTrend: RatingPoint[] = weeks.map((w, i) => {
-        const { sum, count } = weekSums[i];
-        return {
-          w: w.label,
-          v: count === 0 ? 0 : parseFloat((sum / count).toFixed(2)),
-        };
-      });
-
-      setState({
-        data: {
-          statusDonut,
-          connectorStack,
-          connectorKeys: CONNECTOR_KEYS,
-          powerHist,
-          accessSplit,
-          funnel,
-          ratingTrend,
-        },
+      setRaw({
+        chargers: (chargersRes.data ?? []) as ChargerRow[],
+        submissions: (submissionsRes.data ?? []) as SubmissionRow[],
+        ratings: (ratingsRes.data ?? []) as RatingRow[],
         loading: false,
         error: null,
       });
@@ -331,5 +196,154 @@ export const useOverviewCharts = (): State => {
     };
   }, []);
 
-  return state;
+  return raw;
+};
+
+// ── Derivations ───────────────────────────────────────────────────────────
+
+const buildStatusDonut = (chargers: ChargerRow[]): DonutSlice[] => {
+  const counts = new Map<string, number>();
+  for (const c of chargers) {
+    const s = c.status ?? "unknown";
+    counts.set(s, (counts.get(s) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .map(([key, value]) => {
+      const meta = STATUS_PALETTE[key] ?? { label: key, color: "#71717A" };
+      return { key, label: meta.label, value, color: meta.color };
+    })
+    .sort((a, b) => b.value - a.value);
+};
+
+// Cumulative catalogue size by connector at the end of each bucket — i.e.
+// "how many Type 2 plugs existed on this date". Deliberately not
+// per-bucket additions: on a 7-day window almost nothing is added, and a
+// chart that is empty at every short range reads as broken rather than calm.
+const buildConnectorStack = (chargers: ChargerRow[], range: RangeKey): ConnectorPoint[] => {
+  const buckets = bucketsFor(range);
+  const dated = chargers
+    .map((c) => ({ at: new Date(c.created_at).getTime(), conns: Array.isArray(c.connectors) ? c.connectors : [] }))
+    .filter((c) => Number.isFinite(c.at))
+    .sort((a, b) => a.at - b.at);
+
+  const running: Record<ConnectorKeyDef["key"], number> = { t2: 0, ccs: 0, chademo: 0, t1: 0 };
+  let cursor = 0;
+  return buckets.map((b) => {
+    const cutoff = b.end.getTime();
+    while (cursor < dated.length && dated[cursor].at < cutoff) {
+      for (const conn of dated[cursor].conns) {
+        const k = connectorKeyForType(conn.type);
+        if (!k) continue;
+        running[k] += typeof conn.count === "number" && conn.count > 0 ? conn.count : 1;
+      }
+      cursor += 1;
+    }
+    return { m: b.label, t2: running.t2, ccs: running.ccs, chademo: running.chademo, t1: running.t1 };
+  });
+};
+
+const buildPowerHist = (chargers: ChargerRow[]): HistBar[] => {
+  const counts = new Map<string, number>(POWER_BUCKETS.map((b) => [b, 0]));
+  for (const c of chargers) {
+    const conns = Array.isArray(c.connectors) ? c.connectors : [];
+    if (conns.length === 0) continue;
+    const maxKw = conns.reduce(
+      (mx, conn) => Math.max(mx, typeof conn.power_kw === "number" ? conn.power_kw : 0),
+      0,
+    );
+    if (maxKw <= 0) continue;
+    const bucket = powerBucket(maxKw);
+    counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+  }
+  return POWER_BUCKETS.map((label) => ({
+    label,
+    value: counts.get(label) ?? 0,
+    color: "var(--accent)",
+  }));
+};
+
+const buildAccessSplit = (chargers: ChargerRow[]): DonutSlice[] => {
+  const counts = new Map<string, number>();
+  for (const c of chargers) {
+    const a = c.access_type ?? "public";
+    counts.set(a, (counts.get(a) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .map(([key, value]) => {
+      const meta = ACCESS_PALETTE[key] ?? { label: key, color: "#71717A" };
+      return { key, label: meta.label, value, color: meta.color };
+    })
+    .sort((a, b) => b.value - a.value);
+};
+
+const buildFunnel = (submissions: SubmissionRow[]): FunnelStage[] => {
+  const counts = new Map<string, number>();
+  for (const s of submissions) {
+    const k = s.status ?? "pending";
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return SUBMISSION_ORDER.filter((k) => counts.has(k)).map((k) => {
+    const meta = SUBMISSION_PALETTE[k];
+    return { stage: meta.label, value: counts.get(k) ?? 0, color: meta.color };
+  });
+};
+
+const buildRatingTrend = (ratings: RatingRow[], range: RangeKey): RatingPoint[] => {
+  const grain = GRAIN_FOR[range];
+  const buckets = bucketsFor(range);
+  const index = new Map(buckets.map((b, i) => [b.key, i]));
+  const sums = buckets.map(() => ({ sum: 0, count: 0 }));
+  for (const r of ratings) {
+    if (typeof r.rating !== "number") continue;
+    const at = new Date(r.created_at);
+    if (Number.isNaN(at.getTime())) continue;
+    const idx = index.get(bucketKey(at, grain));
+    if (idx === undefined) continue;
+    sums[idx].sum += r.rating;
+    sums[idx].count += 1;
+  }
+  return buckets.map((b, i) => {
+    const { sum, count } = sums[i];
+    return { w: b.label, v: count === 0 ? null : parseFloat((sum / count).toFixed(2)) };
+  });
+};
+
+// ── Hook ──────────────────────────────────────────────────────────────────
+// The snapshot charts (status, power, access, funnel) describe the catalogue
+// as it stands and take no range. Only the two genuine time series do.
+
+export const useOverviewCharts = (
+  connectorRange: RangeKey,
+  ratingRange: RangeKey,
+): State => {
+  const raw = useOverviewRaw();
+  const { chargers, submissions, ratings, loading, error } = raw;
+
+  const statusDonut = useMemo(() => buildStatusDonut(chargers), [chargers]);
+  const powerHist = useMemo(() => buildPowerHist(chargers), [chargers]);
+  const accessSplit = useMemo(() => buildAccessSplit(chargers), [chargers]);
+  const funnel = useMemo(() => buildFunnel(submissions), [submissions]);
+  const connectorStack = useMemo(
+    () => buildConnectorStack(chargers, connectorRange),
+    [chargers, connectorRange],
+  );
+  const ratingTrend = useMemo(
+    () => buildRatingTrend(ratings, ratingRange),
+    [ratings, ratingRange],
+  );
+
+  const data = useMemo<OverviewCharts>(
+    () => ({
+      statusDonut,
+      connectorStack,
+      connectorKeys: CONNECTOR_KEYS,
+      powerHist,
+      accessSplit,
+      funnel,
+      ratingTrend,
+    }),
+    [statusDonut, connectorStack, powerHist, accessSplit, funnel, ratingTrend],
+  );
+
+  return { data: error ? EMPTY : data, loading, error };
 };

@@ -1,7 +1,7 @@
-import { useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Icons } from "../lib/icons";
 import { iconBtnStyle } from "./charts";
+import { RANGE_KEYS, type RangeKey } from "../lib/time-range";
 
 type CardProps = {
   children: ReactNode;
@@ -23,14 +23,36 @@ export const Card = ({ children, style, padding = 16 }: CardProps) => (
   </div>
 );
 
-type CardHeaderProps = {
-  title: string;
-  subtitle?: string;
-  periodSelector?: boolean;
+// Every control here is opt-in and controlled by the parent. There is
+// deliberately no local state: a header button that only moves its own
+// highlight teaches you to distrust the whole dashboard. If a card doesn't
+// pass `range`, no range selector renders; same for `onExport`.
+type CardRange = {
+  value: RangeKey;
+  onChange: (next: RangeKey) => void;
+  // Narrow the offered windows when shorter ones would be meaningless.
+  options?: readonly RangeKey[];
 };
 
-export const CardHeader = ({ title, subtitle, periodSelector = true }: CardHeaderProps) => {
-  const [period, setPeriod] = useState("30d");
+type CardHeaderProps = {
+  title: string;
+  subtitle?: ReactNode;
+  range?: CardRange;
+  // Renders a Download button wired to this handler.
+  onExport?: () => void;
+  exportLabel?: string;
+  // Extra controls appended after the built-ins.
+  actions?: ReactNode;
+};
+
+export const CardHeader = ({
+  title,
+  subtitle,
+  range,
+  onExport,
+  exportLabel = "Export CSV",
+  actions,
+}: CardHeaderProps) => {
   return (
     <div
       style={{
@@ -57,8 +79,10 @@ export const CardHeader = ({ title, subtitle, periodSelector = true }: CardHeade
         )}
       </div>
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        {periodSelector && (
+        {range && (
           <div
+            role="group"
+            aria-label={`${title} time range`}
             style={{
               display: "flex",
               border: "1px solid var(--border)",
@@ -66,30 +90,37 @@ export const CardHeader = ({ title, subtitle, periodSelector = true }: CardHeade
               overflow: "hidden",
             }}
           >
-            {(["7d", "30d", "90d", "1y"] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                style={{
-                  padding: "4px 8px",
-                  fontSize: 11,
-                  background: period === p ? "var(--surface-hover)" : "transparent",
-                  color: period === p ? "var(--text)" : "var(--text-dim)",
-                  border: "none",
-                  borderInlineEnd: "1px solid var(--border)",
-                }}
-              >
-                {p}
-              </button>
-            ))}
+            {(range.options ?? RANGE_KEYS).map((p) => {
+              const on = range.value === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => range.onChange(p)}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: 11,
+                    background: on ? "var(--surface-hover)" : "transparent",
+                    color: on ? "var(--text)" : "var(--text-dim)",
+                    border: "none",
+                    borderInlineEnd: "1px solid var(--border)",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  {p}
+                </button>
+              );
+            })}
           </div>
         )}
-        <button title="Export CSV" style={iconBtnStyle}>
-          <Icons.Download size={13} />
-        </button>
-        <button title="Fullscreen" style={iconBtnStyle}>
-          <Icons.Expand size={13} />
-        </button>
+        {onExport && (
+          <button type="button" title={exportLabel} aria-label={exportLabel} onClick={onExport} style={iconBtnStyle}>
+            <Icons.Download size={13} />
+          </button>
+        )}
+        {actions}
       </div>
     </div>
   );

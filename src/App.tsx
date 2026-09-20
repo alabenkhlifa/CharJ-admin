@@ -3,6 +3,7 @@ import { useTweaks } from "./lib/theme";
 import { useIsMobile } from "./lib/use-is-mobile";
 import { useRoute } from "./lib/use-route";
 import type { RouteKey } from "./lib/routes";
+import type { RouteParams } from "./lib/use-route";
 import { useSidebarCounts } from "./data/sidebar-counts";
 import { useState } from "react";
 import { OverviewPage } from "./pages/overview";
@@ -52,6 +53,18 @@ const App = () => {
   const pendingChargerId = route === "chargers" ? params.get("id") : null;
   const userLookup = route === "users" ? (params.get("user") ?? "") : "";
 
+  // Merge a patch into the current query string instead of replacing it. The
+  // Chargers page keeps its search / filters / sort / page there too, so a
+  // blind `replace("chargers")` would wipe the view out from under the user.
+  const patchParams = (patch: RouteParams) => {
+    const next: RouteParams = {};
+    params.forEach((value, key) => {
+      next[key] = value;
+    });
+    Object.assign(next, patch);
+    replace(route, next);
+  };
+
   const Page = ROUTE_COMPONENTS[route];
   const padding = isMobile
     ? "16px 14px"
@@ -61,13 +74,17 @@ const App = () => {
 
   const renderPage = () => {
     switch (route) {
+      case "overview":
+        return <OverviewPage onAddCharger={() => navigate("chargers", { add: "1" })} />;
       case "chargers":
         return (
           <ChargersPage
+            params={params}
+            onParamsChange={patchParams}
             pendingChargerId={pendingChargerId}
             // Drop the id once consumed so closing the drawer and navigating
-            // back doesn't silently reopen it.
-            onChargerOpened={() => replace("chargers")}
+            // back doesn't silently reopen it — but keep every other param.
+            onChargerOpened={() => patchParams({ id: null })}
           />
         );
       case "visits":

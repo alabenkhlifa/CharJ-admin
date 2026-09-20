@@ -1,7 +1,8 @@
+import { useState } from "react";
 import type { CSSProperties } from "react";
 import {
   AreaChart,
-  StackedBarChart,
+  StackedAreaChart,
   Histogram,
   Donut,
   Funnel,
@@ -11,7 +12,9 @@ import { Card, CardHeader } from "../components/card";
 import { TunisiaMap } from "../components/tunisia-map";
 import { Icons } from "../lib/icons";
 import { fmt } from "../data/mock";
-import { useOverviewStats } from "../data/overview-stats";
+import { downloadCsv, stampedFilename } from "../lib/csv";
+import { RANGE_LABELS, type RangeKey } from "../lib/time-range";
+import { useOverviewStats, type OverviewStats } from "../data/overview-stats";
 import { useOverviewCharts } from "../data/overview-charts";
 
 type LiveKpi = {
@@ -92,9 +95,7 @@ const LiveKpiCard = ({ k, loading }: { k: LiveKpi; loading: boolean }) => {
   );
 };
 
-const LiveKpiGrid = ({ stats }: { stats: ReturnType<typeof useOverviewStats> }) => {
-  const { data, loading } = stats;
-  const cards: LiveKpi[] = [
+const buildKpis = (data: OverviewStats): LiveKpi[] => [
     {
       id: "total",
       label: "Total chargers",
@@ -142,19 +143,18 @@ const LiveKpiGrid = ({ stats }: { stats: ReturnType<typeof useOverviewStats> }) 
           : "No reviews yet",
       accent: "amber",
     },
-  ];
+];
 
-  return (
-    <div
-      className="kpi-grid"
-      style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}
-    >
-      {cards.map((k) => (
-        <LiveKpiCard key={k.id} k={k} loading={loading} />
-      ))}
-    </div>
-  );
-};
+const LiveKpiGrid = ({ stats }: { stats: ReturnType<typeof useOverviewStats> }) => (
+  <div
+    className="kpi-grid"
+    style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}
+  >
+    {buildKpis(stats.data).map((k) => (
+      <LiveKpiCard key={k.id} k={k} loading={stats.loading} />
+    ))}
+  </div>
+);
 
 const kvLbl: CSSProperties = {
   fontSize: 10,
@@ -174,11 +174,54 @@ const todayLabel = () =>
     month: "long",
   });
 
-export const OverviewPage = () => {
+type OverviewPageProps = {
+  // Lets the header's primary action land on the Chargers page with the
+  // "Add charger" modal already open.
+  onAddCharger?: () => void;
+};
+
+export const OverviewPage = ({ onAddCharger }: OverviewPageProps = {}) => {
   const stats = useOverviewStats();
-  const charts = useOverviewCharts();
+  // Only the two real time series take a range. The snapshot cards below
+  // describe the catalogue as it stands right now and offer no selector.
+  const [connectorRange, setConnectorRange] = useState<RangeKey>("1y");
+  const [ratingRange, setRatingRange] = useState<RangeKey>("90d");
+  const charts = useOverviewCharts(connectorRange, ratingRange);
   const c = charts.data;
   const chartsLoading = charts.loading;
+
+  const exportSummary = () => {
+    const kpiRows = buildKpis(stats.data).map((k) => ["KPI", k.label, k.value, k.hint ?? ""]);
+    const statusRows = c.statusDonut.map((d) => ["Status", d.label, String(d.value), ""]);
+    const powerRows = c.powerHist.map((d) => ["Power", d.label, String(d.value), ""]);
+    const accessRows = c.accessSplit.map((d) => ["Access", d.label, String(d.value), ""]);
+    const funnelRows = c.funnel.map((d) => ["Submissions", d.stage, String(d.value), ""]);
+    downloadCsv(stampedFilename("overview"), [
+      ["Section", "Metric", "Value", "Note"],
+      ...kpiRows,
+      ...statusRows,
+      ...powerRows,
+      ...accessRows,
+      ...funnelRows,
+    ]);
+  };
+
+  const exportConnectorSeries = () =>
+    downloadCsv(stampedFilename(`connectors-${connectorRange}`), [
+      ["Bucket", ...c.connectorKeys.map((k) => k.label)],
+      ...c.connectorStack.map((p) => [p.m, ...c.connectorKeys.map((k) => p[k.key])]),
+    ]);
+
+  // Every chart card with tabular data gets the same affordance; the ones
+  // that don't (the map) simply don't pass `onExport`.
+  const exportSlices = (stem: string, rows: { label: string; value: number }[]) => () =>
+    downloadCsv(stampedFilename(stem), [["Label", "Count"], ...rows.map((r) => [r.label, r.value])]);
+
+  const exportRatingSeries = () =>
+    downloadCsv(stampedFilename(`rating-trend-${ratingRange}`), [
+      ["Bucket", "Average rating"],
+      ...c.ratingTrend.map((p) => [p.w, p.v ?? ""]),
+    ]);
 
   // Approval rate from the live submissions funnel (approved / (approved + rejected)).
   const approved = c.funnel.find((f) => f.stage === "Approved")?.value ?? 0;
@@ -240,6 +283,10 @@ export const OverviewPage = () => {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
+            type="button"
+            onClick={exportSummary}
+            disabled={stats.loading || chartsLoading}
+            title="Download every number on this page as CSV"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -251,11 +298,17 @@ export const OverviewPage = () => {
               border: "1px solid var(--border)",
               color: "var(--text-muted)",
               borderRadius: 8,
+              cursor: stats.loading || chartsLoading ? "not-allowed" : "pointer",
+              opacity: stats.loading || chartsLoading ? 0.6 : 1,
+              fontFamily: "inherit",
             }}
           >
             <Icons.Download size={12} /> Export
           </button>
           <button
+            type="button"
+            onClick={onAddCharger}
+            disabled={!onAddCharger}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -267,6 +320,9 @@ export const OverviewPage = () => {
               border: "1px solid var(--accent)",
               color: "#0a0a0b",
               borderRadius: 8,
+              cursor: onAddCharger ? "pointer" : "not-allowed",
+              opacity: onAddCharger ? 1 : 0.6,
+              fontFamily: "inherit",
             }}
           >
             <Icons.Plus size={12} stroke={2.4} /> Add charger
@@ -318,7 +374,7 @@ export const OverviewPage = () => {
                 ? "Loading…"
                 : `Snapshot · ${fmt(totalForStatusSubtitle)} total`
             }
-            periodSelector={false}
+            onExport={chartsLoading ? undefined : exportSlices("chargers-by-status", c.statusDonut)}
           />
           {chartsLoading ? (
             <ChartSkeleton height={180} />
@@ -331,12 +387,17 @@ export const OverviewPage = () => {
           )}
         </Card>
         <Card>
-          <CardHeader title="Chargers by connector type" subtitle="Stacked, last 8 months" />
+          <CardHeader
+            title="Chargers by connector type"
+            subtitle={`Cumulative catalogue · ${RANGE_LABELS[connectorRange]}`}
+            range={{ value: connectorRange, onChange: setConnectorRange }}
+            onExport={chartsLoading ? undefined : exportConnectorSeries}
+          />
           {chartsLoading ? (
             <ChartSkeleton height={210} />
           ) : (
             <>
-              <StackedBarChart
+              <StackedAreaChart
                 data={c.connectorStack}
                 xKey="m"
                 keys={c.connectorKeys}
@@ -371,7 +432,19 @@ export const OverviewPage = () => {
         style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 12 }}
       >
         <Card>
-          <CardHeader title="Power distribution" subtitle="Across all chargers" />
+          <CardHeader
+            title="Power distribution"
+            subtitle="Snapshot · across all chargers"
+            onExport={
+              chartsLoading
+                ? undefined
+                : () =>
+                    downloadCsv(stampedFilename("power-distribution"), [
+                      ["Bucket", "Chargers"],
+                      ...c.powerHist.map((b) => [b.label, b.value]),
+                    ])
+            }
+          />
           {chartsLoading ? (
             <ChartSkeleton height={210} />
           ) : (
@@ -381,8 +454,8 @@ export const OverviewPage = () => {
         <Card>
           <CardHeader
             title="Access type"
-            subtitle="Split across catalogue"
-            periodSelector={false}
+            subtitle="Snapshot · split across catalogue"
+            onExport={chartsLoading ? undefined : exportSlices("access-split", c.accessSplit)}
           />
           {chartsLoading ? (
             <ChartSkeleton height={120} />
@@ -397,11 +470,7 @@ export const OverviewPage = () => {
       </div>
 
       <Card style={{ minHeight: 460 }}>
-        <CardHeader
-          title="Tunisia coverage"
-          subtitle="Live charger map · 24 gouvernorats"
-          periodSelector={false}
-        />
+        <CardHeader title="Tunisia coverage" subtitle="Live charger map · 24 gouvernorats" />
         <TunisiaMap height={400} />
       </Card>
 
@@ -413,7 +482,14 @@ export const OverviewPage = () => {
           <CardHeader
             title="Submissions funnel"
             subtitle="Community queue"
-            periodSelector={false}
+            onExport={
+              chartsLoading
+                ? undefined
+                : exportSlices(
+                    "submissions-funnel",
+                    c.funnel.map((f) => ({ label: f.stage, value: f.value })),
+                  )
+            }
           />
           {chartsLoading ? (
             <ChartSkeleton height={160} />
@@ -448,12 +524,17 @@ export const OverviewPage = () => {
           </div>
         </Card>
         <Card>
-          <CardHeader title="Rating trend" subtitle="Weekly avg · 12 weeks" />
+          <CardHeader
+            title="Rating trend"
+            subtitle={`Average stars · ${RANGE_LABELS[ratingRange]}`}
+            range={{ value: ratingRange, onChange: setRatingRange }}
+            onExport={chartsLoading ? undefined : exportRatingSeries}
+          />
           {chartsLoading ? (
             <ChartSkeleton height={200} />
-          ) : c.ratingTrend.every((r) => r.v === 0) ? (
+          ) : c.ratingTrend.every((r) => r.v === null) ? (
             <div style={{ fontSize: 12, color: "var(--text-dim)", padding: 24 }}>
-              No ratings in the last 12 weeks.
+              No ratings in the {RANGE_LABELS[ratingRange]}.
             </div>
           ) : (
             <AreaChart

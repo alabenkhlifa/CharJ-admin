@@ -17,6 +17,24 @@ function useSize(ref: React.RefObject<HTMLElement | null>, fallbackW = 600, fall
   return size;
 }
 
+// Render every Nth x-axis label so a 30-bucket range doesn't overlap itself.
+// Anchored on the last point, which is the one you actually read ("where are
+// we now"), so the newest bucket always keeps its tick.
+const tickStride = (count: number, w: number, labelPx = 44) => {
+  const fits = Math.max(2, Math.floor(w / labelPx));
+  return Math.max(1, Math.ceil(count / fits));
+};
+const showTick = (i: number, count: number, stride: number) =>
+  (count - 1 - i) % stride === 0;
+
+// Charts treat null / undefined / NaN as a gap rather than a zero — an empty
+// week is "no ratings", not "everyone rated 0 stars".
+const numOrNull = (v: unknown): number | null => {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
 // ── Sparkline ──────────────────────────────────────────────────────────────
 type SparklineProps = {
   data: number[];
@@ -90,22 +108,37 @@ export function AreaChart<T extends Record<string, unknown>>({
     padB = 28;
   const innerW = w - padL - padR;
   const innerH = height - padT - padB;
-  const ys = data.map((d) => Number(d[yKey]));
-  const ymin = Math.min(...ys);
-  const ymax = Math.max(...ys);
+  const ys = data.map((d) => numOrNull(d[yKey]));
+  const present = ys.filter((v): v is number => v !== null);
+  const ymin = present.length ? Math.min(...present) : 0;
+  const ymax = present.length ? Math.max(...present) : 1;
   const yPad = (ymax - ymin) * 0.2 || 1;
   const yLo = Math.max(0, ymin - yPad);
   const yHi = ymax + yPad;
   const stepX = innerW / (data.length - 1 || 1);
-  const pts = data.map((d, i): [number, number] => [
-    padL + i * stepX,
-    padT + innerH - ((Number(d[yKey]) - yLo) / (yHi - yLo)) * innerH,
-  ]);
-  const path = pts
-    .map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`))
-    .join(" ");
-  const area = `${path} L${pts[pts.length - 1][0]},${padT + innerH} L${pts[0][0]},${padT + innerH} Z`;
+  const pts = ys.map((v, i): [number, number] | null =>
+    v === null ? null : [padL + i * stepX, padT + innerH - ((v - yLo) / (yHi - yLo)) * innerH],
+  );
+  // Split into contiguous runs so a gap breaks the line instead of drawing a
+  // straight segment across weeks that have no data at all.
+  const segments: [number, number][][] = [];
+  let run: [number, number][] = [];
+  for (const p of pts) {
+    if (p === null) {
+      if (run.length) segments.push(run);
+      run = [];
+    } else {
+      run.push(p);
+    }
+  }
+  if (run.length) segments.push(run);
+  const linePath = (seg: [number, number][]) =>
+    seg.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(" ");
+  const areaPath = (seg: [number, number][]) =>
+    `${linePath(seg)} L${seg[seg.length - 1][0]},${padT + innerH} L${seg[0][0]},${padT + innerH} Z`;
   const yTicks = 4;
+  const stride = tickStride(data.length, innerW);
+  const showDots = present.length <= 16;
   return (
     <div ref={ref} style={{ width: "100%", height }}>
       <svg width={w} height={height} style={{ display: "block" }}>
@@ -128,30 +161,50 @@ export function AreaChart<T extends Record<string, unknown>>({
             </g>
           );
         })}
-        <path d={area} fill={color} fillOpacity={0.14} />
-        <path
-          d={path}
-          fill="none"
-          stroke={color}
-          strokeWidth={1.6}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-        {data.map((d, i) => (
-          <text
-            key={i}
-            x={pts[i][0]}
-            y={height - 8}
-            fill="var(--text-dim)"
-            fontSize="10"
-            textAnchor="middle"
-          >
-            {String(d[xKey])}
-          </text>
+        {segments.map((seg, i) =>
+          seg.length > 1 ? (
+            <path key={`a${i}`} d={areaPath(seg)} fill={color} fillOpacity={0.14} />
+          ) : null,
+        )}
+        {segments.map((seg, i) => (
+          <path
+            key={`l${i}`}
+            d={linePath(seg)}
+            fill="none"
+            stroke={color}
+            strokeWidth={1.6}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
         ))}
-        {pts.map((p, i) => (
-          <circle key={i} cx={p[0]} cy={p[1]} r={2} fill="var(--bg)" stroke={color} strokeWidth={1.4} />
-        ))}
+        {data.map((d, i) =>
+          showTick(i, data.length, stride) ? (
+            <text
+              key={i}
+              x={padL + i * stepX}
+              y={height - 8}
+              fill="var(--text-dim)"
+              fontSize="10"
+              textAnchor="middle"
+            >
+              {String(d[xKey])}
+            </text>
+          ) : null,
+        )}
+        {showDots &&
+          pts.map((p, i) =>
+            p === null ? null : (
+              <circle
+                key={i}
+                cx={p[0]}
+                cy={p[1]}
+                r={2}
+                fill="var(--bg)"
+                stroke={color}
+                strokeWidth={1.4}
+              />
+            ),
+          )}
       </svg>
     </div>
   );
@@ -220,18 +273,20 @@ export function StackedAreaChart<T extends Record<string, unknown>>({
               .join(" ") + " Z";
           return <path key={String(k.key)} d={path} fill={k.color} fillOpacity={0.85} stroke={k.color} strokeWidth={0.5} />;
         })}
-        {data.map((d, i) => (
-          <text
-            key={i}
-            x={padL + i * stepX}
-            y={height - 8}
-            fill="var(--text-dim)"
-            fontSize="10"
-            textAnchor="middle"
-          >
-            {String(d[xKey])}
-          </text>
-        ))}
+        {data.map((d, i) =>
+          showTick(i, data.length, tickStride(data.length, innerW)) ? (
+            <text
+              key={i}
+              x={padL + i * stepX}
+              y={height - 8}
+              fill="var(--text-dim)"
+              fontSize="10"
+              textAnchor="middle"
+            >
+              {String(d[xKey])}
+            </text>
+          ) : null,
+        )}
       </svg>
     </div>
   );
@@ -296,9 +351,11 @@ export function StackedBarChart<T extends Record<string, unknown>>({
                   />
                 );
               })}
-              <text x={cx} y={height - 8} fill="var(--text-dim)" fontSize="10" textAnchor="middle">
-                {String(d[xKey])}
-              </text>
+              {showTick(i, data.length, tickStride(data.length, innerW)) && (
+                <text x={cx} y={height - 8} fill="var(--text-dim)" fontSize="10" textAnchor="middle">
+                  {String(d[xKey])}
+                </text>
+              )}
             </g>
           );
         })}

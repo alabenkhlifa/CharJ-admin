@@ -61,19 +61,29 @@ UI exists but does nothing. Updating `community_submissions.status` is service-r
 
 **Fix path**: build an `admin-update-submission-status` EF. ~1 hour including UI optimistic update.
 
-## 9. Bundle size warning at build time
+## 9. Overview page scrolls horizontally by 15px at 375px
+
+`main.scrollWidth` is 390 against a 375 client width on `#/overview` only.
+Pre-existing — it reproduces on a clean checkout, and the Chargers page is
+clean at 375 / 768 / 1440. Something in the KPI grid or a chart card has a
+fixed minimum that survives the mobile breakpoint.
+
+**Fix path**: bisect the Overview cards at 375px with the offender query in
+`docs/RESPONSIVENESS.md`; likely a `minmax(0, 1fr)` missing on one grid. ~30 min.
+
+## 10. Bundle size warning at build time
 
 `dist/assets/index-*.js` exceeds 500 KB. Build still succeeds but Vite warns.
 
 **Fix path**: code-split via dynamic `import()` per page. Lowest-hanging: lazy-load `@vis.gl/react-google-maps` since it's only used on the Map page and the charger drawer. ~15 min.
 
-## 10. No tests
+## 11. No tests
 
 There are no unit tests, integration tests, or E2E tests. We rely on TypeScript + manual Chrome DevTools sweeps.
 
 **Fix path**: vitest for unit tests on data mappers. Playwright for E2E. ~½ day to set up + ½ day to write meaningful coverage.
 
-## 11. Verify Edge Function uses a constant `verified_by`
+## 12. Verify Edge Function uses a constant `verified_by`
 
 Every manual verify writes `a2000000-0000-0000-0000-000000000000` as `verified_by`. There's no "who verified it" history.
 

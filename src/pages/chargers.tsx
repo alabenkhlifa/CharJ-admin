@@ -5,8 +5,19 @@ import { AddChargerModal } from "../components/add-charger-modal";
 import { EditChargerDrawer } from "../components/edit-charger-drawer";
 import { Card, EmptyState } from "../components/card";
 import { iconBtnStyle } from "../components/charts";
-import { Pagination, usePaginated } from "../components/pagination";
+import { MultiSelectChip, type MultiOption } from "../components/multi-select-chip";
+import { Pagination, DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "../components/pagination";
+import { SelectChip } from "../components/select-chip";
+import { SortableTh, Th } from "../components/table";
+import {
+  collator,
+  nextSort,
+  parseSort,
+  serializeSort,
+  type Sort,
+} from "../lib/table-sort";
 import { AmenityIcon, labelForAmenity } from "../lib/amenity-icons";
+import { downloadCsv, stampedFilename } from "../lib/csv";
 import { Icons } from "../lib/icons";
 import { darkMapStyle, lightMapStyle } from "../lib/map-styles";
 import { useCurrentTheme } from "../lib/use-theme";
@@ -30,30 +41,121 @@ const ADMIN_API_SECRET = import.meta.env.VITE_ADMIN_API_SECRET ?? "";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "";
 const ADMIN_API_CONFIGURED = Boolean(ADMIN_API_SECRET && SUPABASE_URL);
 
-type Filters = {
-  status: string;
-  access: string;
-  verified: string;
-  source: string;
-  connector: string;
+// ── Labels ────────────────────────────────────────────────────────────────
+
+const STATUS_LABELS: Record<ChargerStatus, string> = {
+  operational: "Operational",
+  under_repair: "Under repair",
+  planned: "Planned",
+  unknown: "Unknown",
 };
 
-const DEFAULT_FILTERS: Filters = {
-  status: "all",
-  access: "all",
-  verified: "all",
-  source: "all",
-  connector: "all",
+const STATUS_CHIP_COLORS: Record<ChargerStatus, string> = {
+  operational: "var(--green)",
+  under_repair: "var(--amber)",
+  planned: "var(--indigo)",
+  unknown: "var(--slate)",
 };
+
+const ACCESS_LABELS: Record<AccessType, string> = {
+  public: "Public",
+  customers_only: "Customers",
+  employees_only: "Employees only",
+  brand_exclusive: "Brand-only",
+};
+
+const ACCESS_CHIP_COLORS: Record<AccessType, string> = {
+  public: "var(--accent)",
+  customers_only: "var(--indigo)",
+  employees_only: "var(--indigo)",
+  brand_exclusive: "var(--violet)",
+};
+
+// ── Filter vocabulary ─────────────────────────────────────────────────────
+// Every filter is a URL param, so a narrowed table is a link you can paste to
+// someone else and a refresh lands on the same rows.
+
+type PowerFilter = "all" | "ac" | "dc50" | "dc100" | "dc150";
+type TriFilter = "all" | "yes" | "no";
+type HoursFilter = "all" | "set" | "missing";
+type UpdatedFilter = "all" | "7" | "30" | "90";
+
+// Thresholds mirror the Overview power histogram so both pages bucket the
+// same charger the same way.
+const POWER_PREDICATES: Record<Exclude<PowerFilter, "all">, (kw: number) => boolean> = {
+  ac: (kw) => kw > 0 && kw <= 22,
+  dc50: (kw) => kw > 22 && kw < 100,
+  dc100: (kw) => kw >= 100 && kw < 150,
+  dc150: (kw) => kw >= 150,
+};
+
+const POWER_OPTIONS: { v: PowerFilter; l: string }[] = [
+  { v: "all", l: "Any" },
+  { v: "ac", l: "AC ≤22 kW" },
+  { v: "dc50", l: "DC 50 kW" },
+  { v: "dc100", l: "DC 100–150 kW" },
+  { v: "dc150", l: "DC 150 kW+" },
+];
+
+const STATUS_OPTIONS: MultiOption[] = (
+  ["operational", "under_repair", "planned", "unknown"] as ChargerStatus[]
+).map((v) => ({ v, l: STATUS_LABELS[v] }));
+
+const ACCESS_OPTIONS: MultiOption[] = (
+  ["public", "customers_only", "employees_only", "brand_exclusive"] as AccessType[]
+).map((v) => ({ v, l: ACCESS_LABELS[v] }));
+
+const CONNECTOR_OPTIONS: MultiOption[] = (
+  ["t2", "ccs", "chademo", "t1", "other"] as ConnectorKey[]
+).map((v) => ({ v, l: CONNECTOR_LABELS[v] }));
+
+const SOURCE_OPTIONS: MultiOption[] = [
+  { v: "ocm", l: "OCM" },
+  { v: "curated", l: "Curated" },
+  { v: "community", l: "Community" },
+];
+
+// ── Sorting ───────────────────────────────────────────────────────────────
+
+type SortKey = "name" | "city" | "power" | "status" | "access" | "hours" | "source" | "updated";
+
+const SORT_KEYS = new Set<string>([
+  "name",
+  "city",
+  "power",
+  "status",
+  "access",
+  "hours",
+  "source",
+  "updated",
+]);
+
+// Clicking a text column starts A→Z; clicking a number or a date starts with
+// the biggest / newest, which is what you're looking for when you click it.
+const DESC_FIRST = new Set<SortKey>(["power", "updated"]);
+
+const DEFAULT_SORT: Sort<SortKey> = { key: "name", dir: "asc" };
+
+const ts = (iso: string) => {
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? 0 : t;
+};
+
+const COMPARATORS: Record<SortKey, (a: Charger, b: Charger) => number> = {
+  name: (a, b) => collator.compare(a.name, b.name),
+  city: (a, b) => collator.compare(a.city, b.city),
+  power: (a, b) => a.power - b.power,
+  status: (a, b) => collator.compare(STATUS_LABELS[a.status], STATUS_LABELS[b.status]),
+  access: (a, b) => collator.compare(ACCESS_LABELS[a.access], ACCESS_LABELS[b.access]),
+  hours: (a, b) => collator.compare(a.hours, b.hours),
+  source: (a, b) => collator.compare(a.source, b.source),
+  updated: (a, b) => ts(a.updatedAt) - ts(b.updatedAt),
+};
+
+// ── Chips ─────────────────────────────────────────────────────────────────
 
 const statusChip = (s: ChargerStatus) => {
-  const map: Record<ChargerStatus, [string, string]> = {
-    operational: ["Operational", "var(--green)"],
-    under_repair: ["Under repair", "var(--amber)"],
-    planned: ["Planned", "var(--indigo)"],
-    unknown: ["Unknown", "var(--slate)"],
-  };
-  const [l, c] = map[s];
+  const c = STATUS_CHIP_COLORS[s];
   return (
     <span
       style={{
@@ -65,22 +167,18 @@ const statusChip = (s: ChargerStatus) => {
         padding: "2px 8px",
         borderRadius: 4,
         background: `color-mix(in srgb, ${c} 14%, transparent)`,
+        whiteSpace: "nowrap",
       }}
     >
       <span style={{ width: 6, height: 6, borderRadius: "50%", background: c }} />
-      {l}
+      {STATUS_LABELS[s]}
     </span>
   );
 };
 
 const accessChip = (a: AccessType) => {
-  const map: Record<AccessType, [string, string]> = {
-    public: ["Public", "var(--accent)"],
-    customers_only: ["Customers", "var(--indigo)"],
-    employees_only: ["Employees only", "var(--indigo)"],
-    brand_exclusive: ["Brand-only", "var(--violet)"],
-  };
-  const [l, c] = map[a] ?? [a.replaceAll("_", " "), "var(--indigo)"];
+  const c = ACCESS_CHIP_COLORS[a] ?? "var(--indigo)";
+  const l = ACCESS_LABELS[a] ?? a.replaceAll("_", " ");
   return (
     <span
       style={{
@@ -90,6 +188,7 @@ const accessChip = (a: AccessType) => {
         borderRadius: 4,
         background: `color-mix(in srgb, ${c} 12%, transparent)`,
         border: `1px solid color-mix(in srgb, ${c} 25%, transparent)`,
+        whiteSpace: "nowrap",
       }}
     >
       {l}
@@ -97,59 +196,104 @@ const accessChip = (a: AccessType) => {
   );
 };
 
-type FilterChipProps = {
-  label: string;
-  value: string;
-  options: { v: string; l: string }[];
-  onChange: (v: string) => void;
-};
-
-const FilterChip = ({ label, value, options, onChange }: FilterChipProps) => (
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 6,
-      padding: "6px 10px",
-      background: "var(--bg-elev)",
-      border: `1px solid ${value !== "all" ? "var(--accent)" : "var(--border)"}`,
-      borderRadius: 6,
-      fontSize: 12,
-    }}
-  >
-    <span style={{ color: "var(--text-dim)" }}>{label}</span>
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      style={{
-        background: "transparent",
-        border: "none",
-        color: value !== "all" ? "var(--accent)" : "var(--text)",
-        fontSize: 12,
-        fontFamily: "inherit",
-        outline: "none",
-        cursor: "pointer",
-      }}
-    >
-      {options.map((o) => (
-        <option key={o.v} value={o.v}>
-          {o.l}
-        </option>
-      ))}
-    </select>
-  </div>
-);
+// ── Page ──────────────────────────────────────────────────────────────────
 
 type ChargersPageProps = {
+  // The hash query string is the single source of truth for search, filters,
+  // sort and page — no shadow useState to drift out of sync with the URL.
+  params?: URLSearchParams;
+  onParamsChange?: (patch: Record<string, string | null>) => void;
   pendingChargerId?: string | null;
   onChargerOpened?: () => void;
 };
 
-export const ChargersPage = ({ pendingChargerId, onChargerOpened }: ChargersPageProps = {}) => {
+const EMPTY_PARAMS = new URLSearchParams();
+
+export const ChargersPage = ({
+  params = EMPTY_PARAMS,
+  onParamsChange,
+  pendingChargerId,
+  onChargerOpened,
+}: ChargersPageProps = {}) => {
   const { data: chargers, loading, error, refetch } = useChargers();
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [selected, setSelected] = useState<Charger | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [addingLocal, setAddingLocal] = useState(false);
+
+  // ── URL-backed state ────────────────────────────────────────────────────
+  const setParams = onParamsChange ?? (() => {});
+  // Any change to the result set sends you back to page 1 — staying on page 7
+  // of a list that just shrank to 12 rows looks like a broken filter.
+  const setFilter = (patch: Record<string, string | null>) =>
+    setParams({ ...patch, page: null });
+
+  const listParam = (key: string): string[] =>
+    (params.get(key) ?? "").split(",").filter(Boolean);
+  const oneOf = <T extends string>(key: string, allowed: readonly T[], fallback: T): T => {
+    const raw = params.get(key);
+    return allowed.includes(raw as T) ? (raw as T) : fallback;
+  };
+
+  const statusSel = listParam("status");
+  const accessSel = listParam("access");
+  const connSel = listParam("conn");
+  const sourceSel = listParam("src");
+  const citySel = listParam("city");
+  const verified = oneOf<TriFilter>("ver", ["all", "yes", "no"], "all");
+  const power = oneOf<PowerFilter>("power", ["all", "ac", "dc50", "dc100", "dc150"], "all");
+  const hoursFilter = oneOf<HoursFilter>("hours", ["all", "set", "missing"], "all");
+  const updated = oneOf<UpdatedFilter>("upd", ["all", "7", "30", "90"], "all");
+  const sort = parseSort<SortKey>(params.get("sort"), SORT_KEYS, DEFAULT_SORT);
+  const urlQuery = params.get("q") ?? "";
+
+  const filterCount =
+    statusSel.length +
+    accessSel.length +
+    connSel.length +
+    sourceSel.length +
+    citySel.length +
+    (verified === "all" ? 0 : 1) +
+    (power === "all" ? 0 : 1) +
+    (hoursFilter === "all" ? 0 : 1) +
+    (updated === "all" ? 0 : 1);
+  const narrowed = filterCount > 0 || urlQuery.length > 0;
+
+  const clearAll = () =>
+    setParams({
+      q: null,
+      status: null,
+      access: null,
+      conn: null,
+      src: null,
+      city: null,
+      ver: null,
+      power: null,
+      hours: null,
+      upd: null,
+      page: null,
+    });
+
+  // Deep-link from the Overview header's "Add charger": `#/chargers?add=1`
+  // opens the modal on arrival. Derived rather than copied into state so
+  // there's no effect racing the URL, and a refresh keeps the modal open.
+  const adding = addingLocal || (params.get("add") === "1" && ADMIN_API_CONFIGURED);
+  const closeAdd = () => {
+    setAddingLocal(false);
+    if (params.get("add")) setParams({ add: null });
+  };
+
+  // ── Search box: responsive while typing, debounced into the URL ─────────
+  // `typed.from` records the URL value the keystrokes were made against, so
+  // when the debounce lands (or something else rewrites `q`) the input falls
+  // back to the URL without an effect copying state around.
+  const [typed, setTyped] = useState<{ value: string; from: string } | null>(null);
+  const queryInput = typed && typed.from === urlQuery ? typed.value : urlQuery;
+  const setQueryInput = (value: string) => setTyped({ value, from: urlQuery });
+  useEffect(() => {
+    if (queryInput === urlQuery) return;
+    const timer = setTimeout(() => setFilter({ q: queryInput.trim() || null }), 250);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryInput, urlQuery]);
 
   // Deep-link from the global search: when the parent passes a pending id,
   // find that charger in the local list and open its drawer. Clear the
@@ -163,33 +307,126 @@ export const ChargersPage = ({ pendingChargerId, onChargerOpened }: ChargersPage
     }
   }, [pendingChargerId, chargers, onChargerOpened]);
 
-  const filtered = useMemo(
-    () =>
-      chargers.filter((c) => {
-        if (filters.status !== "all" && c.status !== filters.status) return false;
-        if (filters.access !== "all" && c.access !== filters.access) return false;
-        if (filters.verified === "yes" && !c.verified) return false;
-        if (filters.verified === "no" && c.verified) return false;
-        if (filters.source !== "all" && c.source !== filters.source) return false;
-        if (
-          filters.connector !== "all" &&
-          !c.connectors.includes(filters.connector as ConnectorKey)
-        )
-          return false;
-        return true;
-      }),
-    [chargers, filters],
+  // ── Derived data ────────────────────────────────────────────────────────
+
+  // NB: plain object, not `new Map` — `Map` in this module is the Google Maps
+  // component imported from @vis.gl/react-google-maps.
+  const cityOptions = useMemo<MultiOption[]>(() => {
+    const counts: Record<string, number> = {};
+    for (const c of chargers) {
+      if (!c.city || c.city === "—") continue;
+      counts[c.city] = (counts[c.city] ?? 0) + 1;
+    }
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1] || collator.compare(a[0], b[0]))
+      .map(([v, count]) => ({ v, l: v, count }));
+  }, [chargers]);
+
+  // Snapshot once per mount: recomputing Date.now() on every render would let
+  // the "last 7 days" boundary creep while you page through the table.
+  const [mountedAt] = useState(() => Date.now());
+
+  const filtered = useMemo(() => {
+    const needle = urlQuery.trim().toLowerCase();
+    const cutoff = updated === "all" ? 0 : mountedAt - Number(updated) * 86_400_000;
+    const powerOk = power === "all" ? null : POWER_PREDICATES[power];
+
+    return chargers.filter((c) => {
+      if (statusSel.length && !statusSel.includes(c.status)) return false;
+      if (accessSel.length && !accessSel.includes(c.access)) return false;
+      if (sourceSel.length && !sourceSel.includes(c.source)) return false;
+      if (citySel.length && !citySel.includes(c.city)) return false;
+      if (connSel.length && !connSel.some((k) => c.connectors.includes(k as ConnectorKey)))
+        return false;
+      if (verified === "yes" && !c.verified) return false;
+      if (verified === "no" && c.verified) return false;
+      if (powerOk && !powerOk(c.power)) return false;
+      if (hoursFilter === "set" && c.hours === "—") return false;
+      if (hoursFilter === "missing" && c.hours !== "—") return false;
+      if (cutoff && ts(c.updatedAt) < cutoff) return false;
+      if (needle) {
+        const hay = `${c.name} ${c.city} ${c.id}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+  }, [
+    chargers,
+    statusSel,
+    accessSel,
+    connSel,
+    sourceSel,
+    citySel,
+    verified,
+    power,
+    hoursFilter,
+    updated,
+    urlQuery,
+    mountedAt,
+  ]);
+
+  const sorted = useMemo(() => {
+    const cmp = COMPARATORS[sort.key];
+    const sign = sort.dir === "asc" ? 1 : -1;
+    // Stable tie-break on name so equal statuses don't reshuffle between
+    // renders — a list that reorders under the cursor is unusable.
+    return [...filtered].sort(
+      (a, b) => sign * cmp(a, b) || collator.compare(a.name, b.name),
+    );
+  }, [filtered, sort]);
+
+  // ── Pagination (URL-backed, client-side slice) ──────────────────────────
+  const perPageRaw = Number(params.get("per"));
+  const perPage = (PAGE_SIZE_OPTIONS as readonly number[]).includes(perPageRaw)
+    ? perPageRaw
+    : DEFAULT_PAGE_SIZE;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / perPage));
+  const page = Math.min(Math.max(1, Number(params.get("page")) || 1), totalPages);
+  const pageChargers = useMemo(
+    () => sorted.slice((page - 1) * perPage, page * perPage),
+    [sorted, page, perPage],
   );
 
   const verifiedCount = chargers.filter((c) => c.verified).length;
-  const {
-    pageItems: pageChargers,
-    page,
-    perPage,
-    setPage,
-    setPerPage,
-    total: pageTotal,
-  } = usePaginated(filtered, filters);
+
+  const exportCsv = () =>
+    downloadCsv(stampedFilename("chargers"), [
+      [
+        "Name",
+        "City",
+        "Connectors",
+        "Max power (kW)",
+        "Status",
+        "Access",
+        "Hours",
+        "Source",
+        "Verified",
+        "Updated",
+        "Latitude",
+        "Longitude",
+        "ID",
+      ],
+      ...sorted.map((c) => [
+        c.name,
+        c.city,
+        c.connectors.map((k) => CONNECTOR_LABELS[k]).join(" / "),
+        c.power,
+        STATUS_LABELS[c.status],
+        ACCESS_LABELS[c.access] ?? c.access,
+        c.hours,
+        c.source,
+        c.verified ? "yes" : "no",
+        c.updatedAt,
+        c.lat,
+        c.lng,
+        c.id,
+      ]),
+    ]);
+
+  const onSort = (key: SortKey) =>
+    setParams({ sort: serializeSort(nextSort(sort, key, DESC_FIRST)), page: null });
+
+  const openCharger = (c: Charger) => setSelected(c);
 
   return (
     <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -211,94 +448,199 @@ export const ChargersPage = ({ pendingChargerId, onChargerOpened }: ChargersPage
               <span style={{ color: "var(--text-dim)" }}>Loading…</span>
             ) : (
               <>
-                <span className="num">{filtered.length}</span> of{" "}
+                <span className="num">{sorted.length}</span> of{" "}
                 <span className="num">{chargers.length}</span> shown ·{" "}
                 <span className="num">{verifiedCount}</span> verified
               </>
             )}
           </div>
         </div>
-        <button
-          onClick={() => setAdding(true)}
-          disabled={!ADMIN_API_CONFIGURED}
-          title={ADMIN_API_CONFIGURED ? undefined : "Admin API not configured"}
-          style={{
-            background: "var(--accent)",
-            color: "#0a0a0b",
-            padding: "8px 12px",
-            border: "none",
-            borderRadius: 8,
-            fontSize: 12,
-            fontWeight: 500,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            cursor: ADMIN_API_CONFIGURED ? "pointer" : "not-allowed",
-            opacity: ADMIN_API_CONFIGURED ? 1 : 0.6,
-          }}
-        >
-          <Icons.Plus size={12} stroke={2.4} /> Add charger
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={loading || sorted.length === 0}
+            title="Download the rows currently shown, in this order"
+            style={{
+              background: "var(--bg-elev)",
+              color: "var(--text-muted)",
+              padding: "8px 12px",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 500,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontFamily: "inherit",
+              cursor: loading || sorted.length === 0 ? "not-allowed" : "pointer",
+              opacity: loading || sorted.length === 0 ? 0.6 : 1,
+            }}
+          >
+            <Icons.Download size={12} /> Export
+          </button>
+          <button
+              onClick={() => setAddingLocal(true)}
+            disabled={!ADMIN_API_CONFIGURED}
+            title={ADMIN_API_CONFIGURED ? undefined : "Admin API not configured"}
+            style={{
+              background: "var(--accent)",
+              color: "#0a0a0b",
+              padding: "8px 12px",
+              border: "none",
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 500,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontFamily: "inherit",
+              cursor: ADMIN_API_CONFIGURED ? "pointer" : "not-allowed",
+              opacity: ADMIN_API_CONFIGURED ? 1 : 0.6,
+            }}
+          >
+            <Icons.Plus size={12} stroke={2.4} /> Add charger
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <FilterChip
+        <div style={{ position: "relative", flex: "1 1 240px", maxWidth: 340 }}>
+          <span
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              insetInlineStart: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              display: "inline-flex",
+              color: "var(--text-dim)",
+              pointerEvents: "none",
+            }}
+          >
+            <Icons.Search size={13} />
+          </span>
+          <input
+            value={queryInput}
+            onChange={(e) => setQueryInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setQueryInput("");
+            }}
+            placeholder="Search name, city or id…"
+            aria-label="Search chargers"
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              padding: "7px 28px 7px 30px",
+              background: "var(--bg-elev)",
+              border: `1px solid ${queryInput ? "var(--accent)" : "var(--border)"}`,
+              borderRadius: 6,
+              color: "var(--text)",
+              fontFamily: "inherit",
+              fontSize: 12,
+              outline: "none",
+            }}
+          />
+          {queryInput && (
+            <button
+              type="button"
+              onClick={() => setQueryInput("")}
+              aria-label="Clear search"
+              style={{
+                position: "absolute",
+                insetInlineEnd: 6,
+                top: "50%",
+                transform: "translateY(-50%)",
+                display: "inline-flex",
+                background: "transparent",
+                border: "none",
+                color: "var(--text-dim)",
+                cursor: "pointer",
+                padding: 2,
+              }}
+            >
+              <Icons.X size={12} />
+            </button>
+          )}
+        </div>
+
+        <MultiSelectChip
           label="Status"
-          value={filters.status}
-          onChange={(v) => setFilters({ ...filters, status: v })}
-          options={[
-            { v: "all", l: "All" },
-            { v: "operational", l: "Operational" },
-            { v: "under_repair", l: "Under repair" },
-            { v: "planned", l: "Planned" },
-          ]}
+          values={statusSel}
+          options={STATUS_OPTIONS}
+          onChange={(v) => setFilter({ status: v.join(",") || null })}
         />
-        <FilterChip
+        <MultiSelectChip
           label="Access"
-          value={filters.access}
-          onChange={(v) => setFilters({ ...filters, access: v })}
-          options={[
-            { v: "all", l: "All" },
-            { v: "public", l: "Public" },
-            { v: "customers_only", l: "Customers only" },
-            { v: "brand_exclusive", l: "Brand exclusive" },
-          ]}
+          values={accessSel}
+          options={ACCESS_OPTIONS}
+          onChange={(v) => setFilter({ access: v.join(",") || null })}
         />
-        <FilterChip
+        <MultiSelectChip
           label="Connector"
-          value={filters.connector}
-          onChange={(v) => setFilters({ ...filters, connector: v })}
-          options={[
-            { v: "all", l: "All" },
-            { v: "t2", l: "Type 2" },
-            { v: "ccs", l: "CCS" },
-            { v: "chademo", l: "CHAdeMO" },
-          ]}
+          values={connSel}
+          options={CONNECTOR_OPTIONS}
+          onChange={(v) => setFilter({ conn: v.join(",") || null })}
         />
-        <FilterChip
+        <MultiSelectChip
+          label="Source"
+          values={sourceSel}
+          options={SOURCE_OPTIONS}
+          onChange={(v) => setFilter({ src: v.join(",") || null })}
+        />
+        <MultiSelectChip
+          label="City"
+          values={citySel}
+          options={cityOptions}
+          searchable
+          onChange={(v) => setFilter({ city: v.join(",") || null })}
+        />
+        <SelectChip<PowerFilter>
+          label="Power"
+          value={power}
+          active={power !== "all"}
+          options={POWER_OPTIONS}
+          onChange={(v) => setFilter({ power: v === "all" ? null : v })}
+        />
+        <SelectChip<TriFilter>
           label="Verified"
-          value={filters.verified}
-          onChange={(v) => setFilters({ ...filters, verified: v })}
+          value={verified}
+          active={verified !== "all"}
           options={[
-            { v: "all", l: "All" },
+            { v: "all", l: "Any" },
             { v: "yes", l: "Yes" },
             { v: "no", l: "No" },
           ]}
+          onChange={(v) => setFilter({ ver: v === "all" ? null : v })}
         />
-        <FilterChip
-          label="Source"
-          value={filters.source}
-          onChange={(v) => setFilters({ ...filters, source: v })}
+        <SelectChip<HoursFilter>
+          label="Hours"
+          value={hoursFilter}
+          active={hoursFilter !== "all"}
           options={[
-            { v: "all", l: "All" },
-            { v: "ocm", l: "OCM" },
-            { v: "curated", l: "Curated" },
-            { v: "community", l: "Community" },
+            { v: "all", l: "Any" },
+            { v: "set", l: "Set" },
+            { v: "missing", l: "Missing" },
           ]}
+          onChange={(v) => setFilter({ hours: v === "all" ? null : v })}
         />
-        {Object.values(filters).some((v) => v !== "all") && (
+        <SelectChip<UpdatedFilter>
+          label="Updated"
+          value={updated}
+          active={updated !== "all"}
+          options={[
+            { v: "all", l: "Any time" },
+            { v: "7", l: "Last 7 days" },
+            { v: "30", l: "Last 30 days" },
+            { v: "90", l: "Last 90 days" },
+          ]}
+          onChange={(v) => setFilter({ upd: v === "all" ? null : v })}
+        />
+
+        {narrowed && (
           <button
-            onClick={() => setFilters(DEFAULT_FILTERS)}
+            type="button"
+            onClick={clearAll}
             style={{
               fontSize: 11,
               color: "var(--text-dim)",
@@ -306,9 +648,11 @@ export const ChargersPage = ({ pendingChargerId, onChargerOpened }: ChargersPage
               border: "none",
               padding: "6px 8px",
               textDecoration: "underline",
+              fontFamily: "inherit",
+              cursor: "pointer",
             }}
           >
-            Clear filters
+            Clear {filterCount > 0 ? `${filterCount} filter${filterCount === 1 ? "" : "s"}` : "search"}
           </button>
         )}
       </div>
@@ -333,39 +677,23 @@ export const ChargersPage = ({ pendingChargerId, onChargerOpened }: ChargersPage
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                {[
-                  "Name",
-                  "City",
-                  "Connectors",
-                  "Power",
-                  "Status",
-                  "Access",
-                  "Hours",
-                  "Source",
-                  "",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      textAlign: "start",
-                      padding: "12px 16px",
-                      fontSize: 10,
-                      color: "var(--text-dim)",
-                      fontWeight: 500,
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
+                <SortableTh label="Name" sortKey="name" sort={sort} onSort={onSort} />
+                <SortableTh label="City" sortKey="city" sort={sort} onSort={onSort} />
+                <Th>Connectors</Th>
+                <SortableTh label="Power" sortKey="power" sort={sort} onSort={onSort} />
+                <SortableTh label="Status" sortKey="status" sort={sort} onSort={onSort} />
+                <SortableTh label="Access" sortKey="access" sort={sort} onSort={onSort} />
+                <SortableTh label="Hours" sortKey="hours" sort={sort} onSort={onSort} />
+                <SortableTh label="Source" sortKey="source" sort={sort} onSort={onSort} />
+                <SortableTh label="Updated" sortKey="updated" sort={sort} onSort={onSort} />
+                <Th />
               </tr>
             </thead>
             <tbody>
               {loading &&
                 Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
-                    {Array.from({ length: 9 }).map((__, j) => (
+                    {Array.from({ length: 10 }).map((__, j) => (
                       <td key={j} style={{ padding: "12px 16px" }}>
                         <div
                           className="skeleton"
@@ -379,12 +707,25 @@ export const ChargersPage = ({ pendingChargerId, onChargerOpened }: ChargersPage
                 pageChargers.map((c) => (
                   <tr
                     key={c.id}
-                    onClick={() => setSelected(c)}
+                    // Rows are the primary affordance on this page, so they
+                    // have to be reachable without a mouse.
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Open ${c.name}`}
+                    onClick={() => openCharger(c)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openCharger(c);
+                      }
+                    }}
                     style={{ borderBottom: "1px solid var(--border)", cursor: "pointer" }}
                     onMouseEnter={(e) =>
                       (e.currentTarget.style.background = "var(--surface-hover)")
                     }
                     onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    onFocus={(e) => (e.currentTarget.style.background = "var(--surface-hover)")}
+                    onBlur={(e) => (e.currentTarget.style.background = "transparent")}
                   >
                     <td style={{ padding: "12px 16px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -436,31 +777,59 @@ export const ChargersPage = ({ pendingChargerId, onChargerOpened }: ChargersPage
                     >
                       {sourceLabel(c.source)}
                     </td>
+                    <td
+                      style={{ padding: "12px 16px", color: "var(--text-muted)", whiteSpace: "nowrap" }}
+                      className="num"
+                      title={new Date(c.updatedAt).toLocaleString()}
+                    >
+                      {fmtAgo(c.updatedAt)}
+                    </td>
                     <td style={{ padding: "12px 16px", textAlign: "end" }}>
-                      <Icons.More size={14} style={{ color: "var(--text-dim)" }} />
+                      <Icons.ChevronRight size={14} style={{ color: "var(--text-dim)" }} />
                     </td>
                   </tr>
                 ))}
             </tbody>
           </table>
-          {!loading && !error && filtered.length === 0 && (
+          {!loading && !error && sorted.length === 0 && (
             <EmptyState
               title={chargers.length === 0 ? "No chargers in the database yet" : "No chargers match"}
               subtitle={
                 chargers.length === 0
                   ? "Run the OCM sync or add a charger to see rows here."
-                  : "Try clearing some filters."
+                  : "Nothing matches this search and filter combination."
               }
-            />
+            >
+              {chargers.length > 0 && narrowed && (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  style={{
+                    padding: "7px 12px",
+                    background: "var(--bg-elev-2)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 6,
+                    color: "var(--text)",
+                    fontFamily: "inherit",
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  Clear search and filters
+                </button>
+              )}
+            </EmptyState>
           )}
         </div>
-        {!loading && !error && pageTotal > 0 && (
+        {!loading && !error && sorted.length > 0 && (
           <Pagination
             page={page}
             perPage={perPage}
-            total={pageTotal}
-            onPageChange={setPage}
-            onPerPageChange={setPerPage}
+            total={sorted.length}
+            onPageChange={(p) => setParams({ page: p === 1 ? null : String(p) })}
+            onPerPageChange={(n) =>
+              setParams({ per: n === DEFAULT_PAGE_SIZE ? null : String(n), page: null })
+            }
           />
         )}
       </Card>
@@ -478,7 +847,7 @@ export const ChargersPage = ({ pendingChargerId, onChargerOpened }: ChargersPage
 
       {adding && (
         <AddChargerModal
-          onClose={() => setAdding(false)}
+          onClose={closeAdd}
           onCreated={() => {
             void refetch();
           }}
@@ -660,6 +1029,17 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [statusBusy, setStatusBusy] = useState<SettableStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+
+  // Rows open on Enter, so the drawer has to close on Escape — otherwise a
+  // keyboard user is stuck behind the overlay with no way back to the table.
+  useEffect(() => {
+    if (editing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [editing, onClose]);
 
   const handleVerify = async () => {
     if (!ADMIN_API_CONFIGURED) return;

@@ -127,7 +127,6 @@ export const ReviewsPage = () => {
               ? "Loading…"
               : `Latest ${total} · all chargers`
           }
-          periodSelector={false}
         />
 
         {loading && (
