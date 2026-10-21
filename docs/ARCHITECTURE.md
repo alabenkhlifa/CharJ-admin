@@ -13,7 +13,7 @@ The mobile app (`../charj/`) is React Native + Expo. The admin is a static web S
 | Styling | **CSS variables + inline styles** | One-to-one port from the original design-tool mockup. No Tailwind, no shadcn. Easier to keep the dashboard visually faithful and lets us drop a custom design without owning a build pipeline. Theme is one var swap. |
 | Charts | **Hand-rolled SVG** (`src/components/charts.tsx`) | Donut, Area, StackedBar, Histogram, HBarList, Funnel — no chart-lib dependency. Tiny bundle, total control. |
 | Maps | **`@vis.gl/react-google-maps`** | Modern hooks-based wrapper. We need Maps JavaScript API (the mobile app uses Maps SDK for Android — same key, different APIs). |
-| Data | **`@supabase/supabase-js`** + raw `fetch` for admin Edge Functions | RPC-call pattern matches the mobile app. EFs use bearer-secret over plain fetch. |
+| Data | **`@supabase/supabase-js`** + `adminFetch` for admin Edge Functions | RPC-call pattern matches the mobile app. EFs get the signed-in admin's session token over plain fetch. |
 | Routing | **In-memory state** | `useState<RouteKey>` in `App.tsx`. No URL changes, no router lib, no SSR. Simplest thing that works for an internal tool. If we ever need shareable deep-links, swap in `react-router`. |
 
 ## Module boundaries
@@ -32,12 +32,10 @@ Pages don't import from `src/lib/supabase.ts` directly — they go through a `da
 
 ## Auth model
 
-Two layers, both intentionally lightweight:
+1. **Sign-in** (`src/lib/auth-gate.tsx`) — Supabase Auth email + password; the session persists in localStorage and refreshes itself. Decides what to render, nothing more.
+2. **Admin Edge Functions** — the actual access control for admin-only data (auth.users, set_charger_override, etc). `adminFetch` (`src/lib/admin-fetch.ts`) sends the session's access token; each function validates it, refuses anonymous users, and requires a row in `public.admins` (`_shared/admin-auth.ts` in the mobile-app repo).
 
-1. **Login gate** (`src/lib/auth-gate.tsx`) — checks `VITE_ADMIN_USER` / `VITE_ADMIN_PASS` from the bundle against what the user typed. Stores success in sessionStorage. Pure UX deterrent for drive-by traffic.
-2. **Edge Function bearer** (`VITE_ADMIN_API_SECRET`) — the actual access control for admin-only data (auth.users, set_charger_override, etc). Secret is sent as `Authorization: Bearer …` to functions in the mobile-app repo's `supabase/functions/`.
-
-Both secrets live in the public bundle. They prevent casual access; they don't prevent a determined attacker. See `docs/AUTH.md`.
+No secret lives in the bundle. See `docs/AUTH.md`.
 
 ## Route enum
 

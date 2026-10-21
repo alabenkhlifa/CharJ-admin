@@ -44,9 +44,31 @@ try {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
   });
+  // A stored, far-from-expiry Supabase session gets past the sign-in gate
+  // without any Auth round trip (supabase-js reads it from localStorage).
   await context.addInitScript(() =>
-    sessionStorage.setItem("charj-admin:auth", "1"),
+    localStorage.setItem(
+      "charj-admin-auth",
+      JSON.stringify({
+        access_token: "test.admin.session",
+        refresh_token: "test-refresh",
+        token_type: "bearer",
+        expires_in: 3600,
+        expires_at: 4102444800,
+        user: {
+          id: "a0000000-0000-4000-8000-000000000001",
+          email: "admin@charj.test",
+          aud: "authenticated",
+          role: "authenticated",
+          app_metadata: {},
+          user_metadata: {},
+          created_at: "2026-01-01T00:00:00Z",
+        },
+      }),
+    ),
   );
+  // Never let the suite reach the real Auth server.
+  await context.route("**/auth/v1/**", (route) => route.abort());
   let writes = [],
     conflict = false;
   await context.route("**/rest/v1/**", (route) =>
@@ -58,6 +80,12 @@ try {
   await context.route("**/functions/v1/**", async (route) => {
     if (!route.request().url().includes("admin-update-charger"))
       return route.fulfill({ json: {} });
+    if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204 });
+    // adminFetch sends the signed-in session, never a bundled secret.
+    assert.equal(
+      route.request().headers().authorization,
+      "Bearer test.admin.session",
+    );
     if (route.request().method() === "GET")
       return route.fulfill({ json: charger });
     const body = route.request().postDataJSON();

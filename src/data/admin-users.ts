@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { adminFetch } from "../lib/admin-fetch";
+import { SUPABASE_CONFIGURED } from "../lib/supabase";
 
 // ── Types matching the admin-users Edge Function response ─────────────────
 // Function lives at: ${VITE_SUPABASE_URL}/functions/v1/admin-users
-// Auth: bearer with VITE_ADMIN_API_SECRET (NOT the anon key — this calls
-// the Supabase Admin SDK to read auth.users which is not exposed via PostgREST).
+// Auth: the signed-in admin's session via adminFetch (NOT the anon key alone —
+// this calls the Supabase Admin SDK to read auth.users which is not exposed
+// via PostgREST).
 
 export type AdminUserVehicle = {
   make: string;
@@ -134,10 +137,6 @@ type UseAdminUsersState = {
   error: string | null;
 };
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "";
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET ?? "";
-const ADMIN_CONFIGURED = Boolean(SUPABASE_URL && ADMIN_SECRET);
-
 export const useAdminUsers = (
   page = 1,
   perPage = 25,
@@ -155,13 +154,13 @@ export const useAdminUsers = (
   const refresh = useCallback(() => setRevision((n) => n + 1), []);
 
   useEffect(() => {
-    if (!ADMIN_CONFIGURED) {
+    if (!SUPABASE_CONFIGURED) {
       setState({
         data: [],
         total: 0,
         loading: false,
         error:
-          "Admin API not configured. Set VITE_SUPABASE_URL + VITE_ADMIN_API_SECRET.",
+          "Admin API not configured. Set VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY.",
       });
       return;
     }
@@ -179,11 +178,8 @@ export const useAdminUsers = (
           filter,
         });
         if (lookup) params.set("user", lookup);
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-users?${params}`, {
-          headers: {
-            Authorization: `Bearer ${ADMIN_SECRET}`,
-            "Content-Type": "application/json",
-          },
+        const res = await adminFetch(`admin-users?${params}`, {
+          headers: { "Content-Type": "application/json" },
           signal: controller.signal,
         });
 

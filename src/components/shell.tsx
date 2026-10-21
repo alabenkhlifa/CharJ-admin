@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { SearchPanel } from "./search-panel";
+import { useAdminSession } from "../lib/admin-session";
 import { Icons } from "../lib/icons";
 import { NAV, type RouteKey } from "../lib/routes";
 import { useGlobalSearch } from "../lib/use-global-search";
@@ -57,6 +58,30 @@ export const Sidebar = ({
   // doesn't make sense in a slide-out panel). Desktop respects the user's
   // collapse toggle.
   const showCollapsed = !isMobile && collapsed;
+  const session = useAdminSession();
+  const email = session?.email ?? "";
+  const initials = (email.split("@")[0] || "?").slice(0, 2).toUpperCase();
+  const signOutButton = session && (
+    <button
+      onClick={() => void session.signOut()}
+      title="Sign out"
+      aria-label="Sign out"
+      style={{
+        width: 26,
+        height: 26,
+        display: "grid",
+        placeItems: "center",
+        flexShrink: 0,
+        background: "transparent",
+        border: "1px solid var(--border)",
+        borderRadius: 6,
+        color: "var(--text-dim)",
+        cursor: "pointer",
+      }}
+    >
+      <Icons.SignOut size={13} />
+    </button>
+  );
   const w = isMobile ? 240 : showCollapsed ? 64 : density === "compact" ? 200 : 240;
   const padY = density === "compact" ? 6 : 8;
 
@@ -282,6 +307,18 @@ export const Sidebar = ({
         })}
       </nav>
 
+      {showCollapsed && signOutButton && (
+        <div
+          style={{
+            padding: "14px 0",
+            borderTop: "1px solid var(--border)",
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
+          {signOutButton}
+        </div>
+      )}
       {!showCollapsed && (
         <div style={{ padding: 14, borderTop: "1px solid var(--border)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -298,7 +335,7 @@ export const Sidebar = ({
                 fontWeight: 600,
               }}
             >
-              AB
+              {initials}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
@@ -311,11 +348,11 @@ export const Sidebar = ({
                   whiteSpace: "nowrap",
                 }}
               >
-                Ala BEN KHALIFA
+                {email || "Signed in"}
               </div>
-              <div style={{ fontSize: 10, color: "var(--text-dim)" }}>Super admin</div>
+              <div style={{ fontSize: 10, color: "var(--text-dim)" }}>Admin</div>
             </div>
-            <Icons.More size={14} style={{ color: "var(--text-dim)" }} />
+            {signOutButton}
           </div>
         </div>
       )}

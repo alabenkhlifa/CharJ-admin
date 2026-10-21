@@ -27,15 +27,13 @@ Go to https://github.com/alabenkhlifa/CharJ-admin/settings/secrets/actions and c
 | `VITE_GOOGLE_MAPS_API_KEY` | mobile app's `GOOGLE_MAPS_API_KEY` | yes (HTTP-referrer-restricted) |
 | `VITE_SUPABASE_URL` | mobile app's `EXPO_PUBLIC_SUPABASE_URL` | yes |
 | `VITE_SUPABASE_ANON_KEY` | mobile app's `EXPO_PUBLIC_SUPABASE_ANON_KEY` | yes (RLS-gated) |
-| `VITE_ADMIN_USER` | the admin login username | yes |
-| `VITE_ADMIN_PASS` | the admin login password | yes |
-| `VITE_ADMIN_API_SECRET` | the Supabase function `ADMIN_API_SECRET` | yes |
 
 If any are missing, the deploy still succeeds but the corresponding feature degrades:
 - No Maps key → fallback hint card on map pages
 - No Supabase URL → "Supabase not configured" banner
-- No Admin user/pass → gate disabled (fail-open)
-- No `VITE_ADMIN_API_SECRET` → Users page + Verify button surface "Admin API not configured"
+- No Supabase URL / anon key → the sign-in card can't sign anyone in
+
+Admin access is not a build secret any more: admins sign in with Supabase Auth and must be listed in `public.admins` (see `docs/AUTH.md`). The old `VITE_ADMIN_USER` / `VITE_ADMIN_PASS` / `VITE_ADMIN_API_SECRET` repo secrets are unused — delete them once the legacy secret is off.
 
 ## Vite base path
 
@@ -72,16 +70,13 @@ cd ../charj
 npx supabase functions deploy admin-users --no-verify-jwt
 npx supabase functions deploy admin-verify-charger --no-verify-jwt
 npx supabase functions deploy admin-add-charger --no-verify-jwt
+npx supabase functions deploy admin-analytics --no-verify-jwt
+npx supabase functions deploy admin-confirmations --no-verify-jwt
+npx supabase functions deploy admin-set-charger-status --no-verify-jwt
+npx supabase functions deploy admin-update-charger --no-verify-jwt
 ```
 
-`--no-verify-jwt` is required — see `docs/EDGE_FUNCTIONS.md`.
-
-`ADMIN_API_SECRET` env var must match the `VITE_ADMIN_API_SECRET` set in admin-repo GH secrets:
-
-```bash
-cd ../charj
-npx supabase secrets set ADMIN_API_SECRET=<value>
-```
+`--no-verify-jwt` is required — see `docs/EDGE_FUNCTIONS.md`. Deploy the functions **before** pushing a dashboard that depends on a change in them (see the rollout order in `docs/AUTH.md`).
 
 ## Watching a deploy
 

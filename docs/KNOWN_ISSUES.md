@@ -2,11 +2,11 @@
 
 Outstanding limitations and what'd take to fix each. Not bugs — known constraints.
 
-## 1. Login gate and admin EF bearer are public
+## 1. Legacy admin secret still accepted (transition)
 
-Anyone who reads the JS bundle sees both. Mitigated by HTTPS + obscurity-by-default URL, but not real auth.
+Admins now sign in with Supabase Auth + the `admins` allowlist, but the Edge Functions still accept the old `ADMIN_API_SECRET` bearer (which older bundles carry in public) until `ADMIN_LEGACY_SECRET_ENABLED=false` is set.
 
-**Fix path**: replace with Supabase Auth (email/password or magic link) + an `admins` allowlist table. Drop both env vars. See `docs/AUTH.md` for the migration plan. ~½ day.
+**Fix path**: once the new dashboard is deployed and verified, set `ADMIN_LEGACY_SECRET_ENABLED=false` and unset `ADMIN_API_SECRET`. See the rollout order in `docs/AUTH.md`.
 
 ## 2. Anonymous-auth orphan rows
 
@@ -24,7 +24,7 @@ Only `city` (freeform TEXT). Several Overview charts and filters that would key 
 
 Both are service-role only. The Feedback page shows an EmptyState; review reports are not surfaced anywhere.
 
-**Fix path**: build `admin-feedback` and `admin-review-reports` Edge Functions mirroring `admin-users` (bearer auth, CORS preflight before auth, json helper). Wire `useFeedback` and `useReviewReports` hooks. ~1-2 hours per function.
+**Fix path**: build `admin-feedback` and `admin-review-reports` Edge Functions mirroring `admin-users` (`authorizeAdmin`, CORS preflight before auth, json helper). Wire `useFeedback` and `useReviewReports` hooks. ~1-2 hours per function.
 
 ## 5. Device info on users is partial and opt-in
 

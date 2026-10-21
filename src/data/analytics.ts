@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
+import { adminFetch } from '../lib/admin-fetch';
+import { SUPABASE_CONFIGURED } from '../lib/supabase';
 import { parseAnalyticsReport, type AnalyticsReport, type AnalyticsEnvironment, type AnalyticsPeriod } from './analytics-report';
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? '';
-const ADMIN_API_SECRET = import.meta.env.VITE_ADMIN_API_SECRET ?? '';
 
 export function useAnalytics(days: AnalyticsPeriod, environment: AnalyticsEnvironment, revision: number) {
   const requestKey = JSON.stringify([days, environment, revision]);
@@ -17,10 +16,8 @@ export function useAnalytics(days: AnalyticsPeriod, environment: AnalyticsEnviro
       if (!active) return;
       setState({ data: null, loading: true, error: null, requestKey });
       try {
-        if (!SUPABASE_URL || !ADMIN_API_SECRET) throw new Error('Admin API not configured. Set VITE_SUPABASE_URL + VITE_ADMIN_API_SECRET.');
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/admin-analytics?days=${days}&environment=${environment}`, {
-          headers: { Authorization: `Bearer ${ADMIN_API_SECRET}` }, signal: controller.signal,
-        });
+        if (!SUPABASE_CONFIGURED) throw new Error('Admin API not configured. Set VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY.');
+        const response = await adminFetch(`admin-analytics?days=${days}&environment=${environment}`, { signal: controller.signal });
         if (!response.ok) throw new Error(response.status === 401 ? 'Your admin credentials could not be verified.' : 'Analytics reporting is unavailable.');
         const data = parseAnalyticsReport(await response.json());
         if (data.days !== days || data.environment !== environment) throw new Error('Invalid analytics response');

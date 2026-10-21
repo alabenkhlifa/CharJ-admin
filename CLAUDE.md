@@ -15,19 +15,20 @@ npm run build        # production build into dist/
 npx tsc -b --noEmit  # type check
 ```
 
-Local `.env` should mirror `.env.example`. Without env vars the app still renders — Supabase queries return "not configured" errors and the auth gate is bypassed (fail-open).
+Local `.env` should mirror `.env.example`. There is no auth bypass: local dev signs in with a Supabase Auth admin account (see [AUTH.md](docs/AUTH.md)). Without the Supabase vars the sign-in card reports "not configured".
 
 ## Stack
 
 - **Vite + React 19 + TypeScript strict**
 - **CSS variables + inline styles** — no Tailwind, no shadcn. Theme tokens in `src/index.css`. Logical properties (`insetInlineStart`, `paddingStart`) so RTL would flip cleanly.
-- **`@supabase/supabase-js`** for anon-readable tables, **`fetch` + bearer secret** for admin Edge Functions
+- **`@supabase/supabase-js`** for anon-readable tables + Supabase Auth sign-in, **`adminFetch`** (session token) for admin Edge Functions
 - **`@vis.gl/react-google-maps`** for Google Maps (Tunisia map, charger pins, mini-map in detail drawer)
 
 ## Must-do rules
 
 - **Anon key only from the browser.** Never bundle the service-role key. Anything that needs service role goes through an admin Edge Function in the mobile-app repo (`../charj/supabase/functions/`).
-- **All `VITE_*` env vars are public** — they get inlined into the JS bundle at build time. Treat them as visible to anyone who reads the bundle. Use bearer-secret + Supabase RLS as the actual gate, not secrecy of the var.
+- **All `VITE_*` env vars are public** — they get inlined into the JS bundle at build time. Treat them as visible to anyone who reads the bundle. The admin session (checked server-side against `public.admins`) + Supabase RLS are the actual gate, never secrecy of a var.
+- **Admin Edge Function calls go through `adminFetch`** (`src/lib/admin-fetch.ts`). Never hand-build an `Authorization` header or bundle a shared secret.
 - **Match existing inline-style + CSS-var conventions.** Every status / connector color comes from `src/data/chargers.ts` palettes or CSS vars, never hardcoded.
 - **Logical properties only** — `insetInlineStart`, `marginInlineEnd`. No `left` / `right` for layout positioning.
 - **Mobile breakpoint is 900px** — under that, the sidebar collapses to a slide-out drawer. Test layouts at 375 / 768 / 1440 — `main.scrollWidth` must equal `main.clientWidth` on every page.
@@ -73,7 +74,7 @@ src/
     reviews.ts               # useReviews() — ratings + chargers join
     vehicles.ts              # useEvModels()
     sidebar-counts.ts        # useSidebarCounts() — badge numbers
-    admin-users.ts           # useAdminUsers() — bearer-auth fetch to EF
+    admin-users.ts           # useAdminUsers() — adminFetch to EF
     visits.ts                # useVisits() + moderateVisit() — admin-confirmations EF
   lib/
     supabase.ts              # client factory + SUPABASE_CONFIGURED
@@ -87,7 +88,9 @@ src/
     table-sort.ts            # Sort<K>, collator, nextSort/parseSort/serializeSort
     time-range.ts            # RangeKey (7d/30d/90d/1y) + bucket grain and labels
     csv.ts                   # toCsv / downloadCsv / stampedFilename
-    auth-gate.tsx            # client-side login gate (security theater)
+    auth-gate.tsx            # Supabase Auth email+password sign-in card
+    admin-session.ts         # session context (email, signOut) + forced sign-out notices
+    admin-fetch.ts           # adminFetch(path, init) — session bearer to admin EFs, signs out on 401/403
 .github/workflows/deploy.yml # CI: build + deploy to Pages on push to main
 ```
 
@@ -96,7 +99,7 @@ src/
 Read these before touching the related area. Each is short and gotcha-focused.
 
 - **[Architecture](docs/ARCHITECTURE.md)** — stack choices, why no Tailwind, module boundaries
-- **[Auth + access control](docs/AUTH.md)** — the gate (security theater) + bearer-secret pattern for admin Edge Functions, when to migrate to real Supabase Auth
+- **[Auth + access control](docs/AUTH.md)** — Supabase Auth sign-in, the `admins` allowlist, how to add an admin, turning off the legacy secret
 - **[Edge Functions](docs/EDGE_FUNCTIONS.md)** — `admin-users`, `admin-verify-charger`, `admin-add-charger`: contract, deployment, CORS gotcha
 - **[Data layer](docs/DATA_LAYER.md)** — hooks pattern, JSONB shapes, what's anon-readable vs needs an EF
 - **[Deployment](docs/DEPLOYMENT.md)** — GH Pages + GH Actions, required secrets, Vite `base` path
@@ -112,16 +115,10 @@ Read these before touching the related area. Each is short and gotcha-focused.
 | `VITE_GOOGLE_MAPS_API_KEY` | Google Maps JS SDK | yes — restrict by HTTP referrer in GCP |
 | `VITE_SUPABASE_URL` | Supabase project URL | yes |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon key (RLS-gated) | yes by design |
-| `VITE_ADMIN_USER` / `VITE_ADMIN_PASS` | Login gate | yes — see [AUTH.md](docs/AUTH.md) |
-| `VITE_ADMIN_API_SECRET` | Bearer for admin Edge Functions | yes — same trust as gate password |
 
 For CI, mirror all of these as repo secrets at https://github.com/alabenkhlifa/CharJ-admin/settings/secrets/actions.
 
-For Supabase functions, set:
-
-```bash
-cd ../charj && npx supabase secrets set ADMIN_API_SECRET=<same-value-as-VITE_ADMIN_API_SECRET>
-```
+Admin access is not an env var: admins are Supabase Auth users listed in `public.admins` — see [AUTH.md](docs/AUTH.md). During the transition the Edge Functions also accept the legacy `ADMIN_API_SECRET` until `ADMIN_LEGACY_SECRET_ENABLED=false` is set on them.
 
 ## Commands cheat sheet
 
@@ -137,6 +134,10 @@ cd ../charj
 npx supabase functions deploy admin-users --no-verify-jwt
 npx supabase functions deploy admin-verify-charger --no-verify-jwt
 npx supabase functions deploy admin-add-charger --no-verify-jwt
+npx supabase functions deploy admin-analytics --no-verify-jwt
+npx supabase functions deploy admin-confirmations --no-verify-jwt
+npx supabase functions deploy admin-set-charger-status --no-verify-jwt
+npx supabase functions deploy admin-update-charger --no-verify-jwt
 # --no-verify-jwt is REQUIRED — see docs/EDGE_FUNCTIONS.md
 
 # Verify CORS preflight on a deployed function

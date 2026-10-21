@@ -29,9 +29,9 @@ If `SUPABASE_CONFIGURED` is false, the hook short-circuits to `{ data: [], loadi
 | `useSubmissions()` | `community_submissions` ordered by created_at desc | anon |
 | `useReviews()` | `ratings` (latest 200) joined client-side with `chargers(id, name)` | anon |
 | `useEvModels()` | `ev_models` ordered by make, model | anon |
-| `useAdminUsers(page, perPage)` | `${SUPABASE_URL}/functions/v1/admin-users` | bearer secret |
+| `useAdminUsers(page, perPage)` | `admin-users` Edge Function via `adminFetch` | admin session |
 | `useGlobalSearch(query)` | Debounced `search_chargers` RPC + in-memory NAV match (powers the topbar spotlight) | anon |
-| `addCharger` (modal submit) | `${SUPABASE_URL}/functions/v1/admin-add-charger` | bearer secret |
+| `addCharger` (modal submit) | `admin-add-charger` Edge Function via `adminFetch` | admin session |
 
 ## Mappers
 
@@ -122,8 +122,8 @@ These were dropped from the dashboard. See `docs/MOCK_VS_REAL.md`.
 If the new data needs service-role:
 
 1. Add an Edge Function in `../charj/supabase/functions/` (see `docs/EDGE_FUNCTIONS.md`).
-2. The hook uses raw `fetch` against the function URL with the `VITE_ADMIN_API_SECRET` bearer.
-3. Defensive: short-circuit when the env vars are missing, surface as `error: "Admin API not configured"`.
+2. The hook calls `adminFetch("<function>?…", init)` (`src/lib/admin-fetch.ts`) — it adds the signed-in admin's token + `apikey` and signs out on 401/403.
+3. Defensive: short-circuit on `!SUPABASE_CONFIGURED`, surface as `error: "Admin API not configured"`.
 
 ## Cross-cutting UI helpers
 

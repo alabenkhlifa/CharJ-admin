@@ -2,14 +2,32 @@
 
 Live in **`../charj/supabase/functions/`** (mobile-app repo). Deployed against the same Supabase project as the mobile app.
 
-| Function | Purpose | Auth |
-|---|---|---|
-| `admin-users` | List `auth.users` + per-user vehicles / counts | Bearer `ADMIN_API_SECRET` |
-| `admin-verify-charger` | Set `is_verified=true` + stamp `verified_at`/`verified_by` | Bearer `ADMIN_API_SECRET` |
-| `admin-add-charger` | Insert a new `chargers` row from the dashboard's Add-charger modal | Bearer `ADMIN_API_SECRET` |
-| `admin-analytics` | Aggregate app usage report (`get_app_analytics` RPC) for the Analytics page | Bearer `ADMIN_API_SECRET` |
+| Function | Purpose |
+|---|---|
+| `admin-users` | List `auth.users` + per-user vehicles / counts |
+| `admin-verify-charger` | Set `is_verified=true` + stamp `verified_at`/`verified_by` |
+| `admin-add-charger` | Insert a new `chargers` row from the dashboard's Add-charger modal |
+| `admin-analytics` | Aggregate app usage report (`get_app_analytics` RPC) for the Analytics page |
+| `admin-confirmations` | List + hide/unhide driver visit reports (`charging_confirmations`) |
+| `admin-set-charger-status` | Pin a charger's status via `set_charger_override` |
+| `admin-update-charger` | Read + atomically edit one charger for the structured editor |
 
 All of them follow the same pattern, all deploy with `--no-verify-jwt`, all answer CORS preflight before the auth check.
+
+## Auth (all functions)
+
+Every function calls `authorizeAdmin` from `../charj/supabase/functions/_shared/admin-auth.ts` right after the preflight (and, where it already existed, the 405 method check):
+
+```http
+Authorization: Bearer <signed-in admin's access token>
+apikey: <anon key>
+```
+
+- **401** — missing / invalid / expired token.
+- **403** — valid token, but an anonymous user (every mobile-app install is one) or a user with no row in `public.admins`.
+- Transition: the legacy `ADMIN_API_SECRET` bearer is still accepted while `ADMIN_LEGACY_SECRET_ENABLED` isn't `false`. See [AUTH.md](AUTH.md).
+
+The dashboard never builds these headers by hand — it calls `adminFetch(path, init)` (`src/lib/admin-fetch.ts`), which also signs out on 401/403. Error bodies keep each function's existing shape (`{ error: "Unauthorized" | "Forbidden" }` or the lower-case `unauthorized` / `forbidden`).
 
 ## `admin-users`
 
@@ -20,7 +38,7 @@ All of them follow the same pattern, all deploy with `--no-verify-jwt`, all answ
 
 ```http
 GET /functions/v1/admin-users?page=1&perPage=100
-Authorization: Bearer <ADMIN_API_SECRET>
+Authorization: Bearer <admin access token>
 ```
 
 ### Response
@@ -64,7 +82,7 @@ Authorization: Bearer <ADMIN_API_SECRET>
 
 ```http
 POST /functions/v1/admin-verify-charger
-Authorization: Bearer <ADMIN_API_SECRET>
+Authorization: Bearer <admin access token>
 Content-Type: application/json
 
 { "charger_id": "<uuid>" }
@@ -83,7 +101,8 @@ Content-Type: application/json
 }
 
 // 400 — missing/malformed charger_id
-// 401 — bad/missing bearer
+// 401 — bad/missing token
+// 403 — signed in, not an admin
 // 404 — charger not found
 ```
 
@@ -91,7 +110,7 @@ Content-Type: application/json
 
 `a2000000-0000-0000-0000-000000000000` is the conventional UID for "manually verified via admin dashboard" in the `a2000000-…` admin space (the mobile-app repo's `charger-adder` agent owns this convention). The UI labels this as "Manual / Admin dashboard".
 
-If we ever add real Supabase Auth, replace this constant with `auth.uid()` so individual admins are credited.
+Now that admins sign in, `authorizeAdmin` returns the admin's `userId` — swap this constant for it if individual admins should be credited (`null` for legacy-secret calls).
 
 ### Why a function, not a direct UPDATE via the admin SPA
 
@@ -108,7 +127,7 @@ Server-side equivalent of the migrations the mobile-app `charger-adder` agent wr
 
 ```http
 POST /functions/v1/admin-add-charger
-Authorization: Bearer <ADMIN_API_SECRET>
+Authorization: Bearer <admin access token>
 Content-Type: application/json
 
 {
@@ -136,13 +155,14 @@ Content-Type: application/json
 { id: "<uuid>", name: "Hotel Le Corail" }
 
 // 400 — validation failure (the response `error` describes which field)
-// 401 — bad/missing bearer
+// 401 — bad/missing token
+// 403 — signed in, not an admin
 // 500 — Supabase insert error (rare; usually FK or check-constraint trip)
 ```
 
 ### Validation enforced server-side
 
-Even though the modal validates client-side, the EF re-validates everything since the bearer + bundle are public:
+Even though the modal validates client-side, the EF re-validates everything — never trust the browser:
 
 - `name`, `name_ar`, `name_fr`, `city` non-empty strings.
 - `latitude` ∈ [-90, 90], `longitude` ∈ [-180, 180].
@@ -165,21 +185,26 @@ npx supabase functions deploy admin-users --no-verify-jwt
 npx supabase functions deploy admin-verify-charger --no-verify-jwt
 npx supabase functions deploy admin-add-charger --no-verify-jwt
 npx supabase functions deploy admin-analytics --no-verify-jwt
+npx supabase functions deploy admin-confirmations --no-verify-jwt
+npx supabase functions deploy admin-set-charger-status --no-verify-jwt
+npx supabase functions deploy admin-update-charger --no-verify-jwt
 ```
 
-`--no-verify-jwt` is **required**. Without it the Supabase API gateway rejects requests whose `Authorization` header isn't a valid Supabase JWT — and our bearer secret is just a hex string, not a JWT. With the flag, the gateway passes the `Authorization` header through unmodified and the function does its own bearer comparison.
+Each deploy bundles `_shared/admin-auth.ts` — a change there means redeploying all seven.
 
-Set the secret once per project:
+`--no-verify-jwt` stays **required**. During the transition the legacy secret (a hex string, not a JWT) has to reach the function; and even afterwards the gateway check only proves a token is signed — an anonymous mobile user passes it. `authorizeAdmin` validates the token against Supabase Auth and the `admins` table itself.
 
-```bash
-npx supabase secrets set ADMIN_API_SECRET=<value>
-```
+Function env (read on every request, so no redeploy when it changes):
 
-(The function reads `Deno.env.get('ADMIN_API_SECRET')` at every request, so no function redeploy is needed when rotating the value — just set the secret again.)
+| Var | Purpose |
+|---|---|
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Auto-injected. Used to validate the token and read `admins`. |
+| `ADMIN_LEGACY_SECRET_ENABLED` | `false` turns the legacy secret off. Unset = on (transition default). |
+| `ADMIN_API_SECRET` | Legacy shared secret. Unset it once the legacy path is off. |
 
 ## CORS gotcha (real bug we shipped + fixed)
 
-Browsers fire an `OPTIONS` preflight before any cross-origin request that has custom headers (we send `Authorization`). The preflight does NOT carry our bearer header — so an auth check that runs first will return 401, and the browser will block the actual request, surfacing as `"Failed to fetch"` in the console.
+Browsers fire an `OPTIONS` preflight before any cross-origin request that has custom headers (we send `Authorization` + `apikey`). The preflight does NOT carry our bearer header — so an auth check that runs first will return 401, and the browser will block the actual request, surfacing as `"Failed to fetch"` in the console.
 
 **Always answer OPTIONS first**, BEFORE the auth check, with 204 + CORS headers:
 
@@ -187,7 +212,8 @@ Browsers fire an `OPTIONS` preflight before any cross-origin request that has cu
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  // supabase-js and adminFetch may send any of these.
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -195,7 +221,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
-  // ...auth check, then real handler
+  const auth = await authorizeAdmin(req, { createClient });
+  if (!auth.ok) {
+    return json({ error: auth.status === 403 ? 'Forbidden' : 'Unauthorized' }, { status: auth.status });
+  }
+  // ...real handler
 });
 ```
 
@@ -204,7 +234,11 @@ Every JSON response also needs `Access-Control-Allow-Origin: *` — including th
 ## Smoke tests
 
 ```bash
-SECRET=<your-ADMIN_API_SECRET>
+# An admin access token: sign in on the dashboard, then in the console
+#   JSON.parse(localStorage["charj-admin-auth"]).access_token
+# (expires after an hour). The legacy ADMIN_API_SECRET also works while
+# ADMIN_LEGACY_SECRET_ENABLED is on.
+SECRET=<admin access token>
 URL=https://<project>.supabase.co/functions/v1
 
 # 1. CORS preflight (no auth header)
@@ -224,9 +258,13 @@ curl -i -H "Authorization: Bearer $SECRET" \
 curl -i $URL/admin-users
 # Expect: 401
 
-# 4. Wrong secret
+# 4. Wrong token
 curl -i -H "Authorization: Bearer wrong" $URL/admin-users
 # Expect: 401
+
+# 4b. Anonymous / non-admin session (e.g. a mobile-app user's access token)
+curl -i -H "Authorization: Bearer <non-admin access token>" $URL/admin-users
+# Expect: 403
 
 # 5. Verify charger (PICK A NON-VERIFIED CHARGER FIRST!)
 curl -i -X POST $URL/admin-verify-charger \
@@ -262,8 +300,11 @@ DELETE FROM chargers WHERE id = '<smoke-test-id>' AND source = 'community';
 
 ## Adding a new admin Edge Function
 
-1. Copy `admin-users/index.ts` as a starting template — it has the CORS preflight + auth check + json helper already wired.
-2. Implement the handler.
-3. Deploy with `--no-verify-jwt`.
-4. If the SPA needs to call it, expose a hook in `src/data/` that uses `fetch` with the bearer header.
-5. Document the wire format in this file.
+1. Copy `admin-users/index.ts` as a starting template — CORS preflight + json helper + `authorizeAdmin` already wired.
+2. Answer `OPTIONS` first, then `await authorizeAdmin(req, { createClient })`, before reading the body or touching the database. Return `auth.status` (401 / 403) with CORS headers.
+3. `Access-Control-Allow-Headers` must include `authorization, x-client-info, apikey, content-type`.
+4. Never log the `Authorization` header, the token, or any part of a secret.
+5. Add the function to `FUNCTIONS` in `../charj/__tests__/supabase/admin-auth.test.js` (a request that passes auth and stops before the database) so it gets the shared auth contract tests.
+6. Deploy with `--no-verify-jwt`.
+7. If the SPA needs to call it, expose a hook in `src/data/` that calls `adminFetch("<function>?…", init)` — never `fetch` with hand-built auth headers.
+8. Document the wire format in this file.

@@ -1,17 +1,14 @@
+import { adminFetch } from "../lib/admin-fetch";
+import { SUPABASE_CONFIGURED } from "../lib/supabase";
 import type { AdminCharger, Json } from "./charger-editor-model";
 
-const secret = import.meta.env.VITE_ADMIN_API_SECRET ?? "";
-const url = import.meta.env.VITE_SUPABASE_URL ?? "";
-export const CHARGER_EDITOR_CONFIGURED = Boolean(secret && url);
+export const CHARGER_EDITOR_CONFIGURED = SUPABASE_CONFIGURED;
 
 async function request(path: string, init: RequestInit): Promise<AdminCharger> {
   if (!CHARGER_EDITOR_CONFIGURED) throw new Error("Admin API not configured");
-  const res = await fetch(`${url}/functions/v1/admin-update-charger${path}`, {
+  const res = await adminFetch(`admin-update-charger${path}`, {
     ...init,
-    headers: {
-      Authorization: `Bearer ${secret}`,
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
   });
   const body: unknown = await res.json().catch(() => null);
   if (!res.ok) {

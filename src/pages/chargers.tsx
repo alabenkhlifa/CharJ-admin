@@ -16,10 +16,12 @@ import {
   serializeSort,
   type Sort,
 } from "../lib/table-sort";
+import { adminFetch } from "../lib/admin-fetch";
 import { AmenityIcon, labelForAmenity } from "../lib/amenity-icons";
 import { downloadCsv, stampedFilename } from "../lib/csv";
 import { Icons } from "../lib/icons";
 import { darkMapStyle, lightMapStyle } from "../lib/map-styles";
+import { SUPABASE_CONFIGURED } from "../lib/supabase";
 import { useCurrentTheme } from "../lib/use-theme";
 import {
   CONNECTOR_COLORS,
@@ -37,9 +39,6 @@ import {
 } from "../data/chargers";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
-const ADMIN_API_SECRET = import.meta.env.VITE_ADMIN_API_SECRET ?? "";
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "";
-const ADMIN_API_CONFIGURED = Boolean(ADMIN_API_SECRET && SUPABASE_URL);
 
 // ── Labels ────────────────────────────────────────────────────────────────
 
@@ -275,7 +274,7 @@ export const ChargersPage = ({
   // Deep-link from the Overview header's "Add charger": `#/chargers?add=1`
   // opens the modal on arrival. Derived rather than copied into state so
   // there's no effect racing the URL, and a refresh keeps the modal open.
-  const adding = addingLocal || (params.get("add") === "1" && ADMIN_API_CONFIGURED);
+  const adding = addingLocal || (params.get("add") === "1" && SUPABASE_CONFIGURED);
   const closeAdd = () => {
     setAddingLocal(false);
     if (params.get("add")) setParams({ add: null });
@@ -481,8 +480,8 @@ export const ChargersPage = ({
           </button>
           <button
               onClick={() => setAddingLocal(true)}
-            disabled={!ADMIN_API_CONFIGURED}
-            title={ADMIN_API_CONFIGURED ? undefined : "Admin API not configured"}
+            disabled={!SUPABASE_CONFIGURED}
+            title={SUPABASE_CONFIGURED ? undefined : "Admin API not configured"}
             style={{
               background: "var(--accent)",
               color: "#0a0a0b",
@@ -495,8 +494,8 @@ export const ChargersPage = ({
               alignItems: "center",
               gap: 6,
               fontFamily: "inherit",
-              cursor: ADMIN_API_CONFIGURED ? "pointer" : "not-allowed",
-              opacity: ADMIN_API_CONFIGURED ? 1 : 0.6,
+              cursor: SUPABASE_CONFIGURED ? "pointer" : "not-allowed",
+              opacity: SUPABASE_CONFIGURED ? 1 : 0.6,
             }}
           >
             <Icons.Plus size={12} stroke={2.4} /> Add charger
@@ -899,12 +898,9 @@ type AdminVerifyResponse = {
 type AdminVerifyError = { error?: string };
 
 const verifyCharger = async (chargerId: string): Promise<AdminVerifyResponse> => {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-verify-charger`, {
+  const res = await adminFetch("admin-verify-charger", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${ADMIN_API_SECRET}`,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ charger_id: chargerId }),
   });
   let body: AdminVerifyResponse | AdminVerifyError = {};
@@ -928,12 +924,9 @@ const setChargerStatus = async (
   chargerId: string,
   status: SettableStatus,
 ): Promise<AdminStatusResponse> => {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-set-charger-status`, {
+  const res = await adminFetch("admin-set-charger-status", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${ADMIN_API_SECRET}`,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ charger_id: chargerId, status }),
   });
   let body: AdminStatusResponse | AdminStatusError = {};
@@ -1042,7 +1035,7 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
   }, [editing, onClose]);
 
   const handleVerify = async () => {
-    if (!ADMIN_API_CONFIGURED) return;
+    if (!SUPABASE_CONFIGURED) return;
     setVerifyError(null);
     setVerifying(true);
     try {
@@ -1060,7 +1053,7 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
   };
 
   const handleSetStatus = async (next: SettableStatus) => {
-    if (!ADMIN_API_CONFIGURED) return;
+    if (!SUPABASE_CONFIGURED) return;
     if (charger.status === next) return;
     setStatusError(null);
     setStatusBusy(next);
@@ -1314,7 +1307,7 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
                 color="var(--green)"
                 active={charger.status === "operational"}
                 busy={statusBusy === "operational"}
-                disabled={statusBusy !== null || !ADMIN_API_CONFIGURED}
+                disabled={statusBusy !== null || !SUPABASE_CONFIGURED}
                 onClick={() => handleSetStatus("operational")}
               />
               <StatusToggleButton
@@ -1322,7 +1315,7 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
                 color="var(--amber)"
                 active={charger.status === "under_repair"}
                 busy={statusBusy === "under_repair"}
-                disabled={statusBusy !== null || !ADMIN_API_CONFIGURED}
+                disabled={statusBusy !== null || !SUPABASE_CONFIGURED}
                 onClick={() => handleSetStatus("under_repair")}
               />
             </div>
@@ -1353,9 +1346,9 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
               ) : (
                 <button
                   onClick={handleVerify}
-                  disabled={verifying || !ADMIN_API_CONFIGURED}
+                  disabled={verifying || !SUPABASE_CONFIGURED}
                   title={
-                    ADMIN_API_CONFIGURED
+                    SUPABASE_CONFIGURED
                       ? undefined
                       : "Admin API not configured"
                   }
@@ -1372,9 +1365,9 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
                     alignItems: "center",
                     justifyContent: "center",
                     gap: 6,
-                    opacity: verifying || !ADMIN_API_CONFIGURED ? 0.6 : 1,
+                    opacity: verifying || !SUPABASE_CONFIGURED ? 0.6 : 1,
                     cursor:
-                      verifying || !ADMIN_API_CONFIGURED ? "not-allowed" : "pointer",
+                      verifying || !SUPABASE_CONFIGURED ? "not-allowed" : "pointer",
                   }}
                 >
                   <Icons.Verify size={13} /> {verifying ? "Verifying…" : "Verify"}

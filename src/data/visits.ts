@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { adminFetch } from "../lib/admin-fetch";
+import { SUPABASE_CONFIGURED } from "../lib/supabase";
 
 // ── Driver visit reports (`charging_confirmations`) ───────────────────────
 // Source: the admin-confirmations Edge Function. The table is service-role
@@ -71,10 +73,7 @@ type RawResponse = {
   };
 };
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "";
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET ?? "";
-const ADMIN_CONFIGURED = Boolean(SUPABASE_URL && ADMIN_SECRET);
-const ENDPOINT = `${SUPABASE_URL}/functions/v1/admin-confirmations`;
+const ENDPOINT = "admin-confirmations";
 
 const EMPTY_SUMMARY: VisitSummary = {
   total: 0,
@@ -147,13 +146,13 @@ export const useVisits = (
   const refresh = useCallback(() => setRevision((n) => n + 1), []);
 
   useEffect(() => {
-    if (!ADMIN_CONFIGURED) {
+    if (!SUPABASE_CONFIGURED) {
       setState({
         data: [],
         summary: EMPTY_SUMMARY,
         total: 0,
         loading: false,
-        error: "Admin API not configured. Set VITE_SUPABASE_URL + VITE_ADMIN_API_SECRET.",
+        error: "Admin API not configured. Set VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY.",
       });
       return;
     }
@@ -166,10 +165,7 @@ export const useVisits = (
       setState((prev) => ({ ...prev, loading: true, error: null }));
       try {
         const url = `${ENDPOINT}?page=${page}&perPage=${perPage}&outcome=${outcome}&visibility=${visibility}`;
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${ADMIN_SECRET}` },
-          signal: controller.signal,
-        });
+        const res = await adminFetch(url, { signal: controller.signal });
         if (!res.ok) {
           const text = await res.text().catch(() => "");
           throw new Error(
@@ -224,14 +220,11 @@ export const moderateVisit = async (
   hidden: boolean,
   reason?: string,
 ): Promise<string | null> => {
-  if (!ADMIN_CONFIGURED) return "Admin API not configured.";
+  if (!SUPABASE_CONFIGURED) return "Admin API not configured.";
   try {
-    const res = await fetch(ENDPOINT, {
+    const res = await adminFetch(ENDPOINT, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${ADMIN_SECRET}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, hidden, reason: hidden ? reason : undefined }),
     });
     if (!res.ok) {

@@ -2,7 +2,9 @@ import { useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { iconBtnStyle } from "./charts";
 import { AMENITY_SLUGS, AmenityIcon, labelForAmenity } from "../lib/amenity-icons";
+import { adminFetch } from "../lib/admin-fetch";
 import { Icons } from "../lib/icons";
+import { SUPABASE_CONFIGURED } from "../lib/supabase";
 import type {
   AccessType,
   ChargerStatus,
@@ -10,9 +12,6 @@ import type {
   RawConnector,
 } from "../data/chargers";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "";
-const ADMIN_API_SECRET = import.meta.env.VITE_ADMIN_API_SECRET ?? "";
-const ADMIN_API_CONFIGURED = Boolean(ADMIN_API_SECRET && SUPABASE_URL);
 
 const CONNECTOR_TYPES: ConnectorTypeRaw[] = ["Type 2", "CCS", "CHAdeMO"];
 
@@ -174,12 +173,9 @@ const validate = (s: FormState): { ok: true; payload: AddChargerPayload } | { ok
 };
 
 const submit = async (payload: AddChargerPayload): Promise<{ id: string; name: string }> => {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-add-charger`, {
+  const res = await adminFetch("admin-add-charger", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${ADMIN_API_SECRET}`,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   let body: { id?: string; name?: string; error?: string } = {};
@@ -237,7 +233,7 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
       setError(v.error);
       return;
     }
-    if (!ADMIN_API_CONFIGURED) {
+    if (!SUPABASE_CONFIGURED) {
       setError("Admin API not configured");
       return;
     }
@@ -619,8 +615,8 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
             </button>
             <button
               onClick={handleSubmit}
-              disabled={submitting || !ADMIN_API_CONFIGURED}
-              title={ADMIN_API_CONFIGURED ? undefined : "Admin API not configured"}
+              disabled={submitting || !SUPABASE_CONFIGURED}
+              title={SUPABASE_CONFIGURED ? undefined : "Admin API not configured"}
               style={{
                 padding: "8px 14px",
                 background: "var(--accent)",
@@ -632,8 +628,8 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 6,
-                cursor: submitting || !ADMIN_API_CONFIGURED ? "not-allowed" : "pointer",
-                opacity: submitting || !ADMIN_API_CONFIGURED ? 0.6 : 1,
+                cursor: submitting || !SUPABASE_CONFIGURED ? "not-allowed" : "pointer",
+                opacity: submitting || !SUPABASE_CONFIGURED ? 0.6 : 1,
               }}
             >
               <Icons.Plus size={12} stroke={2.4} />

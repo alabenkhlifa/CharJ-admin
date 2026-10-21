@@ -1,38 +1,89 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { adminFetch } from "./admin-fetch";
+import { AdminSessionContext, onAuthNotice, type AdminSession } from "./admin-session";
+import { SUPABASE_CONFIGURED, supabase } from "./supabase";
 
-const STORAGE_KEY = "charj-admin:auth";
-const ADMIN_USER = import.meta.env.VITE_ADMIN_USER ?? "";
-const ADMIN_PASS = import.meta.env.VITE_ADMIN_PASS ?? "";
+// Real sign-in: Supabase Auth email + password. Who counts as an admin is
+// decided server-side by the `admins` table, checked by every admin Edge
+// Function (see docs/AUTH.md). This gate only decides what to render.
 
-// If neither env var is set, skip the gate entirely. Lets dev work
-// without forcing every contributor to set fake credentials, and lets
-// the deploy fail-open visibly if someone forgets the GH secrets.
-const GATE_DISABLED = !ADMIN_USER && !ADMIN_PASS;
-
-const isAuthed = () => {
-  if (typeof window === "undefined") return false;
-  return window.sessionStorage.getItem(STORAGE_KEY) === "1";
-};
+// Cheapest call that runs the full admin check: a lookup by an id that can
+// never be a UUID returns an empty list without touching the database.
+const ACCESS_CHECK_PATH = "admin-users?perPage=1&user=access-check";
 
 export const AuthGate = ({ children }: { children: ReactNode }) => {
-  const [authed, setAuthed] = useState(GATE_DISABLED || isAuthed());
-  const [user, setUser] = useState("");
+  // undefined = still restoring the stored session.
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
-  const [err, setErr] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(0);
 
-  if (authed) return <>{children}</>;
+  useEffect(() => {
+    // Fires INITIAL_SESSION right away, then every sign-in / refresh / sign-out.
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
+    const offNotice = onAuthNotice((notice) => {
+      setErr(notice);
+      setShake((n) => n + 1);
+    });
+    return () => {
+      data.subscription.unsubscribe();
+      offNotice();
+    };
+  }, []);
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    if (user === ADMIN_USER && pass === ADMIN_PASS) {
-      window.sessionStorage.setItem(STORAGE_KEY, "1");
-      setAuthed(true);
-      return;
-    }
-    setErr(true);
+  const admin = useMemo<AdminSession | null>(
+    () =>
+      session
+        ? {
+            email: session.user.email ?? "",
+            signOut: async () => {
+              await supabase.auth.signOut();
+            },
+          }
+        : null,
+    [session],
+  );
+
+  if (session === undefined) {
+    return <div style={{ minHeight: "100vh", background: "var(--bg)" }} />;
+  }
+
+  // While a fresh sign-in is being checked, keep the card up so a non-admin
+  // never sees the dashboard flash.
+  if (admin && !busy) {
+    return <AdminSessionContext.Provider value={admin}>{children}</AdminSessionContext.Provider>;
+  }
+
+  const fail = (message: string) => {
+    setErr(message);
     setShake((n) => n + 1);
     setPass("");
+  };
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    if (!SUPABASE_CONFIGURED) {
+      fail("Supabase is not configured. Set VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY.");
+      return;
+    }
+    setErr(null);
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pass });
+      if (error) {
+        fail(/invalid login credentials/i.test(error.message) ? "Invalid credentials." : error.message);
+        return;
+      }
+      // 401/403 here signs the account straight back out with a notice.
+      await adminFetch(ACCESS_CHECK_PATH).catch(() => null);
+      setPass("");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -47,7 +98,7 @@ export const AuthGate = ({ children }: { children: ReactNode }) => {
       }}
     >
       <form
-        onSubmit={submit}
+        onSubmit={(e) => void submit(e)}
         key={shake}
         style={{
           width: "min(360px, 100%)",
@@ -116,19 +167,19 @@ export const AuthGate = ({ children }: { children: ReactNode }) => {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <Field
-            label="Username"
-            value={user}
-            onChange={setUser}
-            type="text"
+            label="Email"
+            value={email}
+            onChange={setEmail}
+            type="email"
             autoFocus
-            invalid={err}
+            invalid={err !== null}
           />
           <Field
             label="Password"
             value={pass}
             onChange={setPass}
             type="password"
-            invalid={err}
+            invalid={err !== null}
           />
         </div>
 
@@ -143,12 +194,13 @@ export const AuthGate = ({ children }: { children: ReactNode }) => {
               borderRadius: 6,
             }}
           >
-            Invalid credentials.
+            {err}
           </div>
         )}
 
         <button
           type="submit"
+          disabled={busy}
           style={{
             background: "var(--accent)",
             color: "#0a0a0b",
@@ -157,10 +209,11 @@ export const AuthGate = ({ children }: { children: ReactNode }) => {
             padding: "10px 14px",
             fontSize: 13,
             fontWeight: 600,
-            cursor: "pointer",
+            cursor: busy ? "progress" : "pointer",
+            opacity: busy ? 0.7 : 1,
           }}
         >
-          Sign in
+          {busy ? "Signing in…" : "Sign in"}
         </button>
 
         <div
@@ -182,7 +235,7 @@ type FieldProps = {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  type: "text" | "password";
+  type: "email" | "password";
   autoFocus?: boolean;
   invalid?: boolean;
 };
@@ -205,7 +258,7 @@ const Field = ({ label, value, onChange, type, autoFocus, invalid }: FieldProps)
       value={value}
       autoFocus={autoFocus}
       onChange={(e) => onChange(e.target.value)}
-      autoComplete={type === "password" ? "current-password" : "username"}
+      autoComplete={type === "password" ? "current-password" : "email"}
       style={{
         height: 38,
         padding: "0 12px",

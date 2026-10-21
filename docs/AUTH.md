@@ -1,112 +1,95 @@
 # Auth + access control
 
-> TL;DR: There is no real auth. There's a login gate (security theater) and a bearer secret for admin Edge Functions. Both live in the public bundle. Migrate to Supabase Auth + an admins allowlist before exposing anything more sensitive than what's already here.
+> TL;DR: Admins sign in with Supabase Auth (email + password). Every admin Edge Function validates the session token and checks the `public.admins` allowlist. Nothing secret lives in the bundle. A legacy shared secret is still accepted by the functions during the transition; turn it off once the new dashboard is live.
 
-## The login gate
+## The model
 
-`src/lib/auth-gate.tsx` wraps the entire app. On first load it shows a centered card asking for username + password. On submit it compares against:
+| Piece | Where | What it does |
+|---|---|---|
+| Sign-in card | `src/lib/auth-gate.tsx` | `supabase.auth.signInWithPassword`. Shows the dashboard once signed in. UX only — not the security boundary. |
+| Session | `src/lib/supabase.ts` | `persistSession: true`, `autoRefreshToken: true`, `localStorage` under `charj-admin-auth`, `detectSessionInUrl: false` (the hash belongs to the router). Survives reloads and new tabs. |
+| `adminFetch` | `src/lib/admin-fetch.ts` | Calls `${VITE_SUPABASE_URL}/functions/v1/<path>` with `Authorization: Bearer <session access token>` + `apikey: <anon key>`. 401 → sign out ("session expired"). 403 → sign out ("This account is not an admin."). |
+| Admin gate | `../charj/supabase/functions/_shared/admin-auth.ts` | `authorizeAdmin(req)`: validates the JWT with a service-role client (`auth.getUser(token)`), refuses anonymous users, requires a row in `public.admins`. |
+| Allowlist | `public.admins (user_id uuid primary key references auth.users on delete cascade, created_at timestamptz default now())` | Service-role only (RLS on, no policies). Only the Edge Functions read it. |
 
-```ts
-import.meta.env.VITE_ADMIN_USER
-import.meta.env.VITE_ADMIN_PASS
-```
+### Why a valid JWT is not enough
 
-Both are inlined at build time. Anyone who opens DevTools can read them.
+Every mobile-app install signs in **anonymously** — those are real Supabase users with valid JWTs and the `authenticated` role. So the gate checks three things, in order:
 
-Behavior:
+1. `auth.getUser(token)` succeeds → else **401**
+2. `user.is_anonymous` is false → else **403**
+3. `admins` has a row for `user.id` → else **403**
 
-- Both env vars empty → **gate disabled** (fail-open). Used for local dev.
-- Either one set → gate enforced. Match writes a success flag to `sessionStorage`. Closing the tab clears it.
-- Mismatch → red error chip + a small shake animation. Password field is cleared on every wrong attempt.
+401 means "no or bad credentials" (expired, forged, missing). 403 means "a real signed-in user who is not an admin".
 
-This keeps:
+### Sign-in flow
 
-- Drive-by traffic and search engines off the dashboard
-- Casual onlookers from poking around (most users won't open DevTools)
+1. Admin submits email + password → `signInWithPassword`.
+2. While the card still shows "Signing in…", the gate calls `adminFetch("admin-users?perPage=1&user=access-check")` — the full admin check with no database work (a non-UUID lookup returns an empty list). 403 signs the account straight back out with "This account is not an admin.", so a non-admin never sees the dashboard.
+3. `onAuthStateChange` drives everything after that: token refresh, sign-out from the sidebar, forced sign-out from `adminFetch`.
 
-It does NOT keep:
+Sign-out lives in the sidebar footer (next to the signed-in email; a lone icon when the sidebar is collapsed).
 
-- Determined attackers out
-- Anyone who reads the JS bundle out (browser cache, Sourcemaps, CDN)
-- Bots from credential-stuffing the bundled value
+Once signed in, the dashboard's direct `supabase-js` reads (`chargers`, `ratings`, `community_submissions`, `search_chargers`…) run as `authenticated` instead of `anon`. Every one of those grants both roles, so nothing changes.
 
-Acceptable as long as everything behind it is also gated by something else (anon-key + RLS, or Edge Function bearer).
+## Adding an admin
 
-## Bearer secret for admin Edge Functions
+1. Supabase dashboard → **Authentication → Users → Add user → Create new user**. Email + password, tick **Auto Confirm User**.
+2. Copy the new user's UID, then in the SQL editor (or `npx supabase db query --linked` from `../charj`):
 
-Some data isn't anon-readable — `auth.users`, the `feedback` table, `review_reports`, and admin write operations like verifying chargers. Anything that needs service-role goes through an Edge Function in `../charj/supabase/functions/`. The function is gated by a shared bearer secret:
+   ```sql
+   INSERT INTO public.admins (user_id) VALUES ('<user uuid>');
+   ```
 
-```
-Authorization: Bearer <VITE_ADMIN_API_SECRET>
-```
+3. Sign in on the dashboard.
 
-The same value is set on the Supabase function as `ADMIN_API_SECRET` (one env var, two namespaces). The function compares incoming bearer to its env var; mismatch → 401.
+Remove an admin: `DELETE FROM public.admins WHERE user_id = '<uuid>';` — their next admin call returns 403 and the dashboard signs them out. Deleting the auth user also removes the row (`on delete cascade`).
 
-The secret is in the bundle, same as the gate password. Trust model: identical to the gate.
+**Keep sign-ups enabled** in Authentication → Providers. The mobile app depends on anonymous sign-in; turning sign-ups off breaks every new install. Being able to create a Supabase user gives nobody admin access — only a row in `admins` does, and only the service role can write it.
 
-**Why bearer-secret, not Supabase Auth?**
+## Legacy secret (transition only)
 
-The dashboard is a static SPA on GitHub Pages. We don't have an admin user table, no email/password sign-up, no magic-link flow. Adding Supabase Auth means:
+Dashboards built before this change send `Authorization: Bearer <ADMIN_API_SECRET>`. The functions still accept that while:
 
-1. Add an `admins` allowlist table with RLS allowing only listed UIDs to read/write protected resources
-2. Pick a sign-in method (email/password / magic link / OAuth)
-3. Wire `supabase.auth.getSession()` into every protected hook + EF
-4. Edge Functions check `auth.uid()` against the allowlist instead of comparing a bearer
+- `ADMIN_API_SECRET` is set on the functions, **and**
+- `ADMIN_LEGACY_SECRET_ENABLED` is anything but `false` (unset = on).
 
-Doable, ~half a day of work. Worth it before exposing PII (real emails, payment data, etc.). Until then, the bearer pattern is the smallest thing that works.
+A legacy call has no user (`userId: null`). The comparison is constant-time and the functions never log the token or any part of the secret.
 
-## Migration path: when bearer-secret stops being enough
+### Rollout order
 
-Triggers to switch to real auth:
+1. Create `public.admins` (migration in `../charj`) and add yourself (see above).
+2. Deploy all seven admin functions from `../charj` (`--no-verify-jwt`, see [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md)). The old dashboard keeps working via the legacy secret.
+3. Push this repo → CI deploys the new dashboard. Sign in and check Users, Analytics, Driver visits, Verify, Status and Add/Edit charger.
+4. Turn the legacy path off:
 
-- Adding any UI that reads PII from `auth.users` (real emails, names, phone)
-- Adding any "delete user" / "ban user" action
-- Adding moderation actions on `review_reports` (the reporter UID is meaningful and should only be visible to a real admin)
-- The dashboard URL becomes broadly known (we're @ obscurity-by-default right now)
+   ```bash
+   cd ../charj
+   npx supabase secrets set ADMIN_LEGACY_SECRET_ENABLED=false
+   # optional, once you're sure nothing else uses it:
+   npx supabase secrets unset ADMIN_API_SECRET
+   ```
 
-Migration steps (rough):
+   The functions read env on every request — no redeploy needed. Old cached bundles now get 401.
 
-1. Create `public.admins (id uuid primary key references auth.users)` table
-2. Sign in admins with email/password via Supabase Auth → drops the existing `VITE_ADMIN_USER/PASS` gate
-3. Edge Functions: replace `if (bearer != ADMIN_API_SECRET) return 401` with `const { data: { user } } = await sb.auth.getUser(req.headers.get('Authorization')); if (!user || !inAdminsTable(user.id)) return 401`
-4. Drop `--no-verify-jwt` from EF deploys (we'll want the gateway to validate JWTs)
-5. Drop `VITE_ADMIN_API_SECRET` from `.env` + GH secrets
-6. Drop the SPA's bearer headers; pass the user's session JWT instead
+5. Delete the `VITE_ADMIN_USER`, `VITE_ADMIN_PASS` and `VITE_ADMIN_API_SECRET` repo secrets at https://github.com/alabenkhlifa/CharJ-admin/settings/secrets/actions. CI no longer reads them.
 
-The bearer-secret commit landed in `../charj` repo's main; reverting auth is a coordinated change across both repos.
+Rollback while the legacy path is on: redeploy an older dashboard commit. After step 4, set `ADMIN_LEGACY_SECRET_ENABLED=true` again first.
+
+## Why `--no-verify-jwt` stays
+
+The gateway's JWT check would reject the legacy secret (not a JWT) during the transition, and it only proves the token is signed — an anonymous mobile user passes it. `authorizeAdmin` validates the token against Supabase Auth itself, so the gateway check adds nothing.
 
 ## Local dev
 
-Empty `VITE_ADMIN_USER` + `VITE_ADMIN_PASS` to skip the gate. Set `VITE_ADMIN_API_SECRET` to the live value to test admin EF calls (Users page, Verify charger button) against the live Supabase project.
-
-`.env`:
+There is no bypass — local dev signs in like production. `.env` needs:
 
 ```
-VITE_ADMIN_USER=
-VITE_ADMIN_PASS=
-VITE_ADMIN_API_SECRET=<same as Supabase ADMIN_API_SECRET>
 VITE_SUPABASE_URL=https://sblkoeronfuhqklvnhtn.supabase.co
 VITE_SUPABASE_ANON_KEY=<anon key>
 VITE_GOOGLE_MAPS_API_KEY=<maps key>
 ```
 
-## Rotating the bearer secret
+Without the two Supabase vars the sign-in card says Supabase isn't configured.
 
-If you suspect leakage:
-
-```bash
-NEW_SECRET=$(openssl rand -hex 32)
-
-# 1. Set on Supabase
-cd ../charj
-npx supabase secrets set ADMIN_API_SECRET=$NEW_SECRET
-
-# 2. Update GH repo secret VITE_ADMIN_API_SECRET to the same value
-#    (https://github.com/alabenkhlifa/CharJ-admin/settings/secrets/actions)
-
-# 3. Update local .env
-
-# 4. Push any commit to charj-admin to rebuild + redeploy with the new value
-```
-
-EFs read the env at every request — no function redeploy needed for rotation. Old bundles serving the old secret return 401.
+Browser tests that need to get past the card plant a far-from-expiry session in `localStorage["charj-admin-auth"]` and route every `**/auth/v1/**`, `**/rest/v1/**` and `**/functions/v1/**` call (see `tests/charger-editor.browser.mjs`).
