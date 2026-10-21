@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { SUPABASE_CONFIGURED, supabase } from "../lib/supabase";
+import { mapChargerLocation } from "./locations-model";
 
 // ── Types matching the search_chargers RPC return shape ───────────────────
 
 export type ChargerStatus = "operational" | "under_repair" | "planned" | "unknown";
 export type AccessType = "public" | "customers_only" | "employees_only" | "brand_exclusive";
 export type ChargerSource = "ocm" | "curated" | "community";
+export type HighwayDirection = "north" | "east" | "south" | "west";
 export type ConnectorTypeRaw = "Type 2" | "CCS" | "CHAdeMO" | string;
 export type ConnectorKey = "t2" | "ccs" | "chademo" | "t1" | "other";
 
@@ -63,6 +65,18 @@ export type RawChargerRow = {
   contact_phone: string | null;
   created_at: string;
   updated_at: string;
+  // Trailing columns added later. Optional: the editor's admin_get_charger
+  // read only carries city_id / address_ar, and older rows carry none.
+  highway_direction?: HighwayDirection | null;
+  city_id?: string | null;
+  city_fr?: string | null;
+  city_ar?: string | null;
+  city_en?: string | null;
+  governorate_code?: string | null;
+  governorate_fr?: string | null;
+  governorate_ar?: string | null;
+  governorate_en?: string | null;
+  address_ar?: string | null;
 };
 
 // ── UI-shaped charger ─────────────────────────────────────────────────────
@@ -72,7 +86,20 @@ export type RawChargerRow = {
 export type Charger = {
   id: string;
   name: string;
+  // Legacy `chargers.city` text (old app versions read it).
   city: string;
+  // Structured location; null until the charger is linked to a city.
+  cityId: string | null;
+  cityName: string | null;
+  cityNameAr: string | null;
+  governorateCode: string | null;
+  governorateName: string | null;
+  governorateNameAr: string | null;
+  // "Hammamet, Nabeul", falling back to the legacy text.
+  place: string;
+  address: string;
+  addressAr: string;
+  highwayDirection: HighwayDirection | null;
   lat: number;
   lng: number;
   connectors: ConnectorKey[];
@@ -134,7 +161,8 @@ export const mapRawCharger = (r: RawChargerRow): Charger | null => {
   return {
     id: r.id,
     name: r.name,
-    city: r.city ?? "—",
+    ...mapChargerLocation(r),
+    highwayDirection: r.highway_direction ?? null,
     lat: r.latitude,
     lng: r.longitude,
     connectors: keys,

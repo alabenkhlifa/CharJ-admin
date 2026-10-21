@@ -32,7 +32,7 @@ What's wired to live data, what's behind an Edge Function, what's stripped becau
 | ~~New users this week~~ | ⚠️ | no auth.users access |
 | ~~Registered vehicles~~ | ⚠️ | user_vehicles is RLS-blocked from anon |
 | ~~Trip plans created~~ | ⚠️ | no trips table |
-| ~~Coverage by gouvernorat~~ | ⚠️ | only `city`, no gouvernorat column |
+| ~~Coverage by gouvernorat~~ | ⚠️ | data exists now (`governorate_code` on the reader RPCs, `get_region_options()` counts); card not built yet |
 | ~~Verification velocity per admin~~ | ⚠️ | no per-row history |
 | ~~Top requested locations~~ | ⚠️ | no source |
 | ~~OCM sync status~~ | ⚠️ | no last-run table |
@@ -45,7 +45,9 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 
 | Field | Status | Source |
 |---|---|---|
-| Name, city, connectors, power, status, access, source | ✅ | `search_chargers` RPC |
+| Name, connectors, power, status, access, source | ✅ | `search_chargers` RPC |
+| City column ("Hammamet, Nabeul") | ✅ | `city_fr` + `governorate_fr` from `search_chargers`; unlinked rows show the legacy `city` text with a "no city" tag |
+| City / governorate / addresses in drawer | ✅ | `city_*`, `governorate_*`, `address`, `address_ar` from `search_chargers` |
 | Working hours (table column + drawer grid) | ✅ | `working_hours` JSONB |
 | Amenities chips in drawer (icons + labels) | ✅ | `amenities` TEXT[] from `search_chargers` |
 | Verified flag | ✅ | `is_verified` |
@@ -54,17 +56,19 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 | Mini map in drawer | ✅ | Google Maps via `@vis.gl/react-google-maps` |
 | Pagination (table footer) | ✅ | client-side slice; `page` / `per` live in the hash, default 25/page |
 | Column sorting | ✅ | all columns except Connectors; `sort=<key>:<dir>` in the hash, `aria-sort` on the header, numbers/dates start descending |
-| In-table search | ✅ | name / city / id, 250 ms debounce into `q=` |
-| Multi-value filters | ✅ | status, access, connector, source, city (searchable, with counts) — each a comma list in the hash |
+| In-table search | ✅ | name / city / governorate / address / id, 250 ms debounce into `q=` |
+| Multi-value filters | ✅ | status, access, connector, source, governorate (`gov=TN-21`), city (`cities=<city_id>`, plus `none` = "No city", i.e. `city_id IS NULL`) — searchable, with counts, each a comma list in the hash |
+| Old `city=` links | ✅ | still work: matched as text against the legacy label and city names, shown as a removable "City text" chip |
 | Single-value filters | ✅ | power bucket, verified, hours set/missing, updated within 7/30/90 days |
 | Updated column | ✅ | `updated_at`, relative, full timestamp on hover |
-| CSV export | ✅ | the rows currently shown, in the shown order, incl. lat/lng and id |
+| CSV export | ✅ | the rows currently shown, in the shown order, incl. city, governorate, address, Arabic address, lat/lng, id and city id |
 | Keyboard | ✅ | rows are focusable, Enter/Space opens the drawer, Escape closes it |
 | **Verify** button → mark verified | 🔐 | `admin-verify-charger` EF |
-| **Add charger** modal | 🔐 | `admin-add-charger` EF — same fields as the `charger-adder` agent's migration template |
+| **Add charger** modal | 🔐 | `admin-add-charger` EF — same fields as the `charger-adder` agent's migration template; city picker (`cities` table, auto-filled from `suggest_city`), Arabic address |
+| City picker → **Add city** | 🔐 | `admin-cities` EF; governorate prefilled from `governorate_for_point` |
+| Pin vs city governorate warning | ✅ | `governorate_for_point` RPC (anon) |
 | Deep-link from topbar search | ✅ | `#/chargers?id=<uuid>`; `App.tsx` reads the hash param, page opens drawer on mount |
 | ~~Edit override~~ | ⚠️ | UI exists but no-op for now |
-| ~~Gouvernorat column~~ | ⚠️ | no column — replaced by `city` |
 
 ## Submissions page
 
@@ -154,7 +158,7 @@ analytics. See KNOWN_ISSUES #5.
 
 ## Map page
 
-✅ Real Google Maps, all chargers as status-colored pins, click → InfoWindow with name / city / power / hours / connectors / status. Driven by the same `useChargers()` hook as the Chargers page.
+✅ Real Google Maps, all chargers as status-colored pins, click → InfoWindow with name / "City, Governorate" (legacy `city` when unlinked) / power / hours / connectors / status. Driven by the same `useChargers()` hook as the Chargers page.
 
 ## Feedback page
 

@@ -1,6 +1,9 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { iconBtnStyle } from "./charts";
+import { CityPicker } from "./city-picker";
+import { useLocations, usePinPlace } from "../data/locations";
+import { cityPlace } from "../data/locations-model";
 import { AMENITY_SLUGS, AmenityIcon, labelForAmenity } from "../lib/amenity-icons";
 import { adminFetch } from "../lib/admin-fetch";
 import { Icons } from "../lib/icons";
@@ -36,6 +39,10 @@ type AddChargerPayload = {
   latitude: number;
   longitude: number;
   address: string | null;
+  address_ar: string;
+  city_id: string;
+  // Legacy label for admin-add-charger builds that predate city_id. The
+  // database rewrites it from city_id anyway.
   city: string;
   connectors: RawConnector[];
   operator: string | null;
@@ -59,7 +66,11 @@ type FormState = {
   lat: string;
   lng: string;
   address: string;
-  city: string;
+  addressAr: string;
+  cityId: string | null;
+  // The city came from the pin (suggest_city), not a hand pick, so moving the
+  // pin again may replace it.
+  cityAuto: boolean;
   operator: string;
   status: ChargerStatus;
   access: AccessType;
@@ -82,7 +93,9 @@ const INITIAL: FormState = {
   lat: "",
   lng: "",
   address: "",
-  city: "Tunis",
+  addressAr: "",
+  cityId: null,
+  cityAuto: false,
   operator: "",
   status: "operational",
   access: "public",
@@ -119,10 +132,13 @@ const parsePastedCoords = (raw: string): { lat: string; lng: string } | null => 
   return null;
 };
 
-const validate = (s: FormState): { ok: true; payload: AddChargerPayload } | { ok: false; error: string } => {
+const validate = (
+  s: FormState,
+  cityLabel: string,
+): { ok: true; payload: AddChargerPayload } | { ok: false; error: string } => {
   if (!s.name.trim()) return { ok: false, error: "Name is required" };
   if (!s.nameAr.trim()) return { ok: false, error: "Arabic name is required" };
-  if (!s.city.trim()) return { ok: false, error: "City is required" };
+  if (!s.cityId) return { ok: false, error: "Choose a city, or add it if it's missing" };
   const lat = parseCoord(s.lat);
   const lng = parseCoord(s.lng);
   if (lat === null || lat < -90 || lat > 90) return { ok: false, error: "Latitude must be between -90 and 90" };
@@ -160,7 +176,9 @@ const validate = (s: FormState): { ok: true; payload: AddChargerPayload } | { ok
       latitude: lat,
       longitude: lng,
       address: s.address.trim() || null,
-      city: s.city.trim(),
+      address_ar: s.addressAr.trim(),
+      city_id: s.cityId,
+      city: cityLabel,
       connectors,
       operator: s.operator.trim() || null,
       status: s.status,
@@ -194,9 +212,22 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
   const [form, setForm] = useState<FormState>(INITIAL);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cityInputId = useId();
+  const { cities, governorates } = useLocations();
 
   const update = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((prev) => ({ ...prev, [k]: v }));
+
+  // Coordinates → governorate (mismatch warning) + nearest city, which fills
+  // the city while it is empty or still an earlier automatic pick.
+  const pin = usePinPlace(form.lat, form.lng, (place) =>
+    setForm((prev) => {
+      if (prev.cityId && !prev.cityAuto) return prev;
+      return place.suggestedCityId
+        ? { ...prev, cityId: place.suggestedCityId, cityAuto: true }
+        : { ...prev, cityId: null, cityAuto: false };
+    }),
+  );
 
   const updateConnector = (i: number, patch: Partial<ConnectorDraft>) =>
     setForm((prev) => ({
@@ -228,7 +259,8 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
 
   const handleSubmit = async () => {
     setError(null);
-    const v = validate(form);
+    const city = cities.find((c) => c.id === form.cityId);
+    const v = validate(form, city ? cityPlace(city, governorates) : "");
     if (!v.ok) {
       setError(v.error);
       return;
@@ -380,24 +412,46 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
                 />
               </Field>
             </Row>
+            {/* Not a <Field>: that wraps its child in a <label>, and the
+                picker holds its own buttons and inputs. */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label htmlFor={cityInputId} style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                City
+              </label>
+              <CityPicker
+                id={cityInputId}
+                value={form.cityId}
+                onChange={(id) => setForm((prev) => ({ ...prev, cityId: id, cityAuto: false }))}
+                pin={pin.point}
+                pinGovernorate={pin.governorateCode}
+                suggestedCityId={pin.suggestedCityId}
+                inputStyle={inputStyle}
+              />
+              {pin.pending && <div style={hintStyle}>Looking up the city for this pin…</div>}
+              {form.cityAuto && !pin.pending && (
+                <div style={hintStyle}>Picked from the pin — change it if it's wrong.</div>
+              )}
+            </div>
             <Row>
-              <Field label="City (governorate)">
-                <input
-                  value={form.city}
-                  onChange={(e) => update("city", e.target.value)}
-                  placeholder="Tunis, Ariana, Sfax…"
-                  style={inputStyle}
-                />
-              </Field>
               <Field label="Address (optional)">
                 <input
                   value={form.address}
                   onChange={(e) => update("address", e.target.value)}
-                  placeholder="Street, neighborhood, city"
+                  placeholder="Street and number"
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label="Address in Arabic (optional)">
+                <input
+                  value={form.addressAr}
+                  onChange={(e) => update("addressAr", e.target.value)}
+                  dir="rtl"
+                  placeholder="الشارع والرقم"
                   style={inputStyle}
                 />
               </Field>
             </Row>
+            <div style={hintStyle}>Street only — city and governorate are shown separately.</div>
           </Section>
 
           <Section title={`Connectors · peak ${peakPower || "—"} kW`}>

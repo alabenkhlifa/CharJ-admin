@@ -32,6 +32,9 @@ If `SUPABASE_CONFIGURED` is false, the hook short-circuits to `{ data: [], loadi
 | `useAdminUsers(page, perPage)` | `admin-users` Edge Function via `adminFetch` | admin session |
 | `useGlobalSearch(query)` | Debounced `search_chargers` RPC + in-memory NAV match (powers the topbar spotlight) | anon |
 | `addCharger` (modal submit) | `admin-add-charger` Edge Function via `adminFetch` | admin session |
+| `useLocations()` | `governorates` (code + names) and `cities`, loaded once per page load and shared (module cache in `src/data/locations.ts`) | anon |
+| `usePinPlace(lat, lng)` | `governorate_for_point` + `suggest_city` RPCs, debounced 400 ms | anon |
+| `createCity` (Add city) | `admin-cities` Edge Function via `adminFetch`; appends to the shared city list | admin session |
 
 ## Mappers
 
@@ -92,6 +95,8 @@ Per RLS audits:
 - `ev_models` — SELECT where `is_active = TRUE`
 - `ratings` — SELECT all
 - `community_submissions` — SELECT all (RLS uses `USING (true)`)
+- `governorates` — SELECT on `code, name_fr, name_ar, name_en` only (not `geom`): name the columns
+- `cities` — SELECT all; writes need the `admin-cities` Edge Function
 
 ## Service-role only (need an Edge Function)
 

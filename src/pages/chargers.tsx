@@ -19,6 +19,8 @@ import {
 import { adminFetch } from "../lib/admin-fetch";
 import { AmenityIcon, labelForAmenity } from "../lib/amenity-icons";
 import { downloadCsv, stampedFilename } from "../lib/csv";
+import { useLocations } from "../data/locations";
+import { fold, withCityNames } from "../data/locations-model";
 import { Icons } from "../lib/icons";
 import { darkMapStyle, lightMapStyle } from "../lib/map-styles";
 import { SUPABASE_CONFIGURED } from "../lib/supabase";
@@ -108,6 +110,9 @@ const CONNECTOR_OPTIONS: MultiOption[] = (
   ["t2", "ccs", "chademo", "t1", "other"] as ConnectorKey[]
 ).map((v) => ({ v, l: CONNECTOR_LABELS[v] }));
 
+// `cities` value for chargers not linked to a city yet (city_id IS NULL).
+const NO_CITY = "none";
+
 const SOURCE_OPTIONS: MultiOption[] = [
   { v: "ocm", l: "OCM" },
   { v: "curated", l: "Curated" },
@@ -142,7 +147,7 @@ const ts = (iso: string) => {
 
 const COMPARATORS: Record<SortKey, (a: Charger, b: Charger) => number> = {
   name: (a, b) => collator.compare(a.name, b.name),
-  city: (a, b) => collator.compare(a.city, b.city),
+  city: (a, b) => collator.compare(a.place, b.place),
   power: (a, b) => a.power - b.power,
   status: (a, b) => collator.compare(STATUS_LABELS[a.status], STATUS_LABELS[b.status]),
   access: (a, b) => collator.compare(ACCESS_LABELS[a.access], ACCESS_LABELS[b.access]),
@@ -236,7 +241,11 @@ export const ChargersPage = ({
   const accessSel = listParam("access");
   const connSel = listParam("conn");
   const sourceSel = listParam("src");
-  const citySel = listParam("city");
+  const govSel = listParam("gov");
+  const citySel = listParam("cities");
+  // Links saved before structured locations used `city=<legacy text>`. Keep
+  // them working as a text match on the legacy label and the city names.
+  const legacyCitySel = listParam("city");
   const verified = oneOf<TriFilter>("ver", ["all", "yes", "no"], "all");
   const power = oneOf<PowerFilter>("power", ["all", "ac", "dc50", "dc100", "dc150"], "all");
   const hoursFilter = oneOf<HoursFilter>("hours", ["all", "set", "missing"], "all");
@@ -249,7 +258,9 @@ export const ChargersPage = ({
     accessSel.length +
     connSel.length +
     sourceSel.length +
+    govSel.length +
     citySel.length +
+    legacyCitySel.length +
     (verified === "all" ? 0 : 1) +
     (power === "all" ? 0 : 1) +
     (hoursFilter === "all" ? 0 : 1) +
@@ -263,6 +274,8 @@ export const ChargersPage = ({
       access: null,
       conn: null,
       src: null,
+      gov: null,
+      cities: null,
       city: null,
       ver: null,
       power: null,
@@ -308,25 +321,60 @@ export const ChargersPage = ({
 
   // ── Derived data ────────────────────────────────────────────────────────
 
-  // NB: plain object, not `new Map` — `Map` in this module is the Google Maps
-  // component imported from @vis.gl/react-google-maps.
-  const cityOptions = useMemo<MultiOption[]>(() => {
-    const counts: Record<string, number> = {};
+  // NB: plain objects, not `new Map` — `Map` in this module is the Google
+  // Maps component imported from @vis.gl/react-google-maps.
+  const governorateOptions = useMemo<MultiOption[]>(() => {
+    const counts: Record<string, { l: string; count: number }> = {};
     for (const c of chargers) {
-      if (!c.city || c.city === "—") continue;
-      counts[c.city] = (counts[c.city] ?? 0) + 1;
+      if (!c.governorateCode) continue;
+      const entry = (counts[c.governorateCode] ??= {
+        l: c.governorateName ?? c.governorateCode,
+        count: 0,
+      });
+      entry.count += 1;
     }
     return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1] || collator.compare(a[0], b[0]))
-      .map(([v, count]) => ({ v, l: v, count }));
+      .sort((a, b) => collator.compare(a[1].l, b[1].l))
+      .map(([v, { l, count }]) => ({ v, l, count }));
   }, [chargers]);
+
+  // Cities with chargers, narrowed to the chosen governorates (keeping any
+  // city that is already selected so it can still be unticked). "No city"
+  // comes first: it is the cleanup queue.
+  const cityOptions = useMemo<MultiOption[]>(() => {
+    const counts: Record<string, { l: string; gov: string | null; count: number }> = {};
+    let unlinked = 0;
+    for (const c of chargers) {
+      if (!c.cityId) {
+        unlinked += 1;
+        continue;
+      }
+      const entry = (counts[c.cityId] ??= {
+        l: c.place,
+        gov: c.governorateCode,
+        count: 0,
+      });
+      entry.count += 1;
+    }
+    const cities = Object.entries(counts)
+      .filter(
+        ([v, { gov }]) =>
+          !govSel.length || (gov !== null && govSel.includes(gov)) || citySel.includes(v),
+      )
+      .sort((a, b) => b[1].count - a[1].count || collator.compare(a[1].l, b[1].l))
+      .map(([v, { l, count }]) => ({ v, l, count }));
+    return unlinked || citySel.includes(NO_CITY)
+      ? [{ v: NO_CITY, l: "No city", count: unlinked }, ...cities]
+      : cities;
+  }, [chargers, govSel, citySel]);
 
   // Snapshot once per mount: recomputing Date.now() on every render would let
   // the "last 7 days" boundary creep while you page through the table.
   const [mountedAt] = useState(() => Date.now());
 
   const filtered = useMemo(() => {
-    const needle = urlQuery.trim().toLowerCase();
+    // Folded so "sidi bou said" finds "Sidi Bou Saïd".
+    const needle = fold(urlQuery);
     const cutoff = updated === "all" ? 0 : mountedAt - Number(updated) * 86_400_000;
     const powerOk = power === "all" ? null : POWER_PREDICATES[power];
 
@@ -334,7 +382,13 @@ export const ChargersPage = ({
       if (statusSel.length && !statusSel.includes(c.status)) return false;
       if (accessSel.length && !accessSel.includes(c.access)) return false;
       if (sourceSel.length && !sourceSel.includes(c.source)) return false;
-      if (citySel.length && !citySel.includes(c.city)) return false;
+      if (govSel.length && !(c.governorateCode && govSel.includes(c.governorateCode)))
+        return false;
+      if (citySel.length && !citySel.includes(c.cityId ?? NO_CITY)) return false;
+      if (legacyCitySel.length) {
+        const hay = fold(`${c.city} ${c.place} ${c.cityNameAr ?? ""}`);
+        if (!legacyCitySel.some((v) => hay.includes(fold(v)))) return false;
+      }
       if (connSel.length && !connSel.some((k) => c.connectors.includes(k as ConnectorKey)))
         return false;
       if (verified === "yes" && !c.verified) return false;
@@ -344,8 +398,17 @@ export const ChargersPage = ({
       if (hoursFilter === "missing" && c.hours !== "—") return false;
       if (cutoff && ts(c.updatedAt) < cutoff) return false;
       if (needle) {
-        const hay = `${c.name} ${c.city} ${c.id}`.toLowerCase();
-        if (!hay.includes(needle)) return false;
+        const hay = [
+          c.name,
+          c.place,
+          c.city,
+          c.cityNameAr,
+          c.governorateNameAr,
+          c.address,
+          c.addressAr,
+          c.id,
+        ].join(" ");
+        if (!fold(hay).includes(needle)) return false;
       }
       return true;
     });
@@ -355,7 +418,9 @@ export const ChargersPage = ({
     accessSel,
     connSel,
     sourceSel,
+    govSel,
     citySel,
+    legacyCitySel,
     verified,
     power,
     hoursFilter,
@@ -393,6 +458,9 @@ export const ChargersPage = ({
       [
         "Name",
         "City",
+        "Governorate",
+        "Address",
+        "Address (AR)",
         "Connectors",
         "Max power (kW)",
         "Status",
@@ -404,10 +472,15 @@ export const ChargersPage = ({
         "Latitude",
         "Longitude",
         "ID",
+        "City ID",
       ],
       ...sorted.map((c) => [
         c.name,
-        c.city,
+        // Unlinked chargers keep their legacy text so the column is never blank.
+        c.cityName ?? (c.city === "—" ? "" : c.city),
+        c.governorateName ?? "",
+        c.address,
+        c.addressAr,
         c.connectors.map((k) => CONNECTOR_LABELS[k]).join(" / "),
         c.power,
         STATUS_LABELS[c.status],
@@ -419,6 +492,7 @@ export const ChargersPage = ({
         c.lat,
         c.lng,
         c.id,
+        c.cityId ?? "",
       ]),
     ]);
 
@@ -525,7 +599,7 @@ export const ChargersPage = ({
             onKeyDown={(e) => {
               if (e.key === "Escape") setQueryInput("");
             }}
-            placeholder="Search name, city or id…"
+            placeholder="Search name, city, address or id…"
             aria-label="Search chargers"
             style={{
               width: "100%",
@@ -588,12 +662,44 @@ export const ChargersPage = ({
           onChange={(v) => setFilter({ src: v.join(",") || null })}
         />
         <MultiSelectChip
+          label="Governorate"
+          values={govSel}
+          options={governorateOptions}
+          searchable
+          onChange={(v) => setFilter({ gov: v.join(",") || null })}
+        />
+        <MultiSelectChip
           label="City"
           values={citySel}
           options={cityOptions}
           searchable
-          onChange={(v) => setFilter({ city: v.join(",") || null })}
+          onChange={(v) => setFilter({ cities: v.join(",") || null })}
         />
+        {legacyCitySel.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setFilter({ city: null })}
+            title="From an older link. Matches the legacy city text and city names."
+            aria-label={`Remove city text filter ${legacyCitySel.join(", ")}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 10px",
+              background: "var(--bg-elev)",
+              border: "1px solid var(--accent)",
+              borderRadius: 6,
+              fontSize: 12,
+              fontFamily: "inherit",
+              cursor: "pointer",
+              color: "var(--text)",
+            }}
+          >
+            <span style={{ color: "var(--text-dim)" }}>City text</span>
+            <span style={{ color: "var(--accent)" }}>{legacyCitySel.join(", ")}</span>
+            <Icons.X size={11} style={{ color: "var(--text-dim)" }} />
+          </button>
+        )}
         <SelectChip<PowerFilter>
           label="Power"
           value={power}
@@ -734,7 +840,22 @@ export const ChargersPage = ({
                         <span style={{ color: "var(--text)", fontWeight: 500 }}>{c.name}</span>
                       </div>
                     </td>
-                    <td style={{ padding: "12px 16px", color: "var(--text-muted)" }}>{c.city}</td>
+                    <td style={{ padding: "12px 16px", color: "var(--text-muted)" }}>
+                      {c.place}
+                      {!c.cityId && (
+                        <span
+                          title="Not linked to a city yet"
+                          style={{
+                            marginInlineStart: 6,
+                            fontSize: 10,
+                            color: "var(--amber)",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          no city
+                        </span>
+                      )}
+                    </td>
                     <td style={{ padding: "12px 16px" }}>
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                         {c.connectors.map((k) => (
@@ -1022,6 +1143,7 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [statusBusy, setStatusBusy] = useState<SettableStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const { cities, governorates } = useLocations();
 
   // Rows open on Enter, so the drawer has to close on Escape — otherwise a
   // keyboard user is stuck behind the overlay with no way back to the table.
@@ -1078,7 +1200,7 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
 
   if (editing) return <EditChargerDrawer chargerId={charger.id} onClose={() => setEditing(false)} onSaved={updated => {
     const mapped = mapRawCharger(updated as RawChargerRow);
-    if (mapped) onLocalUpdate(mapped);
+    if (mapped) onLocalUpdate({ ...mapped, ...withCityNames(mapped, cities, governorates) });
     setEditing(false);
     setSaved(true);
     void refetch();
@@ -1281,7 +1403,63 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
           )}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <KV k="City" v={charger.city} />
+            <KV
+              k="City"
+              v={
+                charger.cityName ? (
+                  <>
+                    {charger.cityName}
+                    {charger.cityNameAr && (
+                      <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>
+                        {" · "}
+                        <span dir="rtl">{charger.cityNameAr}</span>
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {charger.city}
+                    <span
+                      style={{
+                        display: "block",
+                        fontSize: 11,
+                        color: "var(--amber)",
+                        fontWeight: 400,
+                      }}
+                    >
+                      No city linked
+                    </span>
+                  </>
+                )
+              }
+            />
+            <KV
+              k="Governorate"
+              v={
+                charger.governorateName ? (
+                  <>
+                    {charger.governorateName}
+                    {charger.governorateNameAr && (
+                      <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>
+                        {" · "}
+                        <span dir="rtl">{charger.governorateNameAr}</span>
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  "—"
+                )
+              }
+            />
+            <div style={{ gridColumn: "1 / -1" }}>
+              <KV k="Address" v={charger.address || "—"} />
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <KV
+                k="Address (Arabic)"
+                v={charger.addressAr ? <span dir="rtl">{charger.addressAr}</span> : "—"}
+              />
+            </div>
             <KV k="Source" v={charger.source.toUpperCase()} />
             <KV k="OCM ID" v={charger.ocmId ?? "—"} />
             <KV k="Updated" v={fmtAgo(charger.updatedAt)} />

@@ -50,7 +50,13 @@ export type AdminCharger = {
   manual_overrides: Record<string, Json>;
   created_at: string;
   updated_at: string;
+  // Optional so a read from before the location migration still opens.
+  city_id?: string | null;
+  address_ar?: string | null;
+  highway_direction?: string | null;
 };
+export const HIGHWAY_DIRECTIONS = ["north", "east", "south", "west"] as const;
+const UUID = /^[\da-f]{8}(-[\da-f]{4}){3}-[\da-f]{12}$/i;
 export type ConnectorDraft = {
   type: string;
   power: string;
@@ -68,7 +74,11 @@ export type ChargerDraft = {
   latitude: string;
   longitude: string;
   address: string;
-  city: string;
+  address_ar: string;
+  // "" = no city. The legacy `city` text is derived from it by the database.
+  city_id: string;
+  // "" = reachable from both carriageways.
+  highway_direction: string;
   operator: string;
   status: string;
   access_type: string;
@@ -114,7 +124,9 @@ export function createDraft(c: AdminCharger): ChargerDraft {
     latitude: String(c.latitude),
     longitude: String(c.longitude),
     address: c.address ?? "",
-    city: c.city ?? "",
+    address_ar: c.address_ar ?? "",
+    city_id: c.city_id ?? "",
+    highway_direction: c.highway_direction ?? "",
     operator: c.operator ?? "",
     status: c.status,
     access_type: c.access_type,
@@ -166,7 +178,7 @@ export function buildChanges(
     "name_ar",
     "name_fr",
     "address",
-    "city",
+    "address_ar",
     "operator",
     "status",
     "access_type",
@@ -175,6 +187,19 @@ export function buildChanges(
     if (changed(key)) changes[key] = draft[key].trim();
   }
   if (!draft.name.trim()) throw new Error("Name is required");
+  if (changed("city_id")) {
+    if (draft.city_id && !UUID.test(draft.city_id))
+      throw new Error("Choose a city from the list");
+    changes.city_id = draft.city_id || null;
+  }
+  if (changed("highway_direction")) {
+    if (
+      draft.highway_direction &&
+      !(HIGHWAY_DIRECTIONS as readonly string[]).includes(draft.highway_direction)
+    )
+      throw new Error("Highway direction must be north, east, south, west or empty");
+    changes.highway_direction = draft.highway_direction || null;
+  }
   if (changed("latitude") || changed("longitude")) {
     const lat = Number(draft.latitude),
       lng = Number(draft.longitude);

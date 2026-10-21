@@ -16,9 +16,12 @@ import {
   buildChanges,
   createDraft,
   DAYS,
+  HIGHWAY_DIRECTIONS,
   isDirty,
   newConnector,
 } from "../data/charger-editor-model";
+import { usePinPlace } from "../data/locations";
+import { parseLatLng } from "../data/locations-model";
 import type {
   AdminCharger,
   ChargerDraft,
@@ -31,6 +34,7 @@ import {
   labelForAmenity,
 } from "../lib/amenity-icons";
 import { Icons } from "../lib/icons";
+import { CityPicker } from "./city-picker";
 import "./edit-charger-drawer.css";
 
 type Props = {
@@ -122,6 +126,9 @@ function Editor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discard, setDiscard] = useState(false);
+  // True while the city came from the pin rather than a hand pick, so moving
+  // the pin again may replace it.
+  const [cityAuto, setCityAuto] = useState(false);
   const dirty = isDirty(draft, createDraft(original));
   const close = useCallback(() => {
     if (!busy) {
@@ -138,6 +145,24 @@ function Editor({
       ...d,
       days: { ...d.days, [day]: { ...d.days[day], ...patch } },
     }));
+  const originalPoint = parseLatLng(original.latitude, original.longitude);
+  const pin = usePinPlace(draft.latitude, draft.longitude, (place) => {
+    // Opening the editor never changes the city on its own: only coordinates
+    // that differ from the saved ones fill an empty (or auto-filled) city.
+    if (
+      place.key === `${originalPoint?.lat},${originalPoint?.lng}` ||
+      (draft.city_id && !cityAuto)
+    )
+      return;
+    if (place.suggestedCityId) {
+      setCityAuto(true);
+      update("city_id", place.suggestedCityId);
+    } else if (cityAuto) {
+      // No known city near the new pin: drop the earlier automatic pick.
+      setCityAuto(false);
+      update("city_id", original.city_id ?? "");
+    }
+  });
 
   useEffect(() => {
     if (!dirty) return;
@@ -172,6 +197,7 @@ function Editor({
       const latest = await loadChargerForEdit(original.id);
       setOriginal(latest);
       setDraft(createDraft(latest));
+      setCityAuto(false);
       setError(null);
       setDiscard(false);
     } catch (err) {
@@ -271,7 +297,7 @@ function Editor({
           </Section>
           <Section
             title="Location"
-            description="Coordinates identify the exact charging point."
+            description="Coordinates identify the exact charging point. Pick the city it belongs to; the governorate comes with it."
           >
             <div className="charger-editor-grid">
               <Field label="Latitude">
@@ -291,18 +317,56 @@ function Editor({
                 />
               </Field>
             </div>
-            <Field label="Address">
-              <textarea
-                rows={2}
-                value={draft.address}
-                onChange={(e) => update("address", e.target.value)}
+            <Field label="City">
+              <CityPicker
+                value={draft.city_id || null}
+                onChange={(id) => {
+                  setCityAuto(false);
+                  update("city_id", id ?? "");
+                }}
+                pin={pin.point}
+                pinGovernorate={pin.governorateCode}
+                suggestedCityId={pin.suggestedCityId}
               />
             </Field>
-            <Field label="City / governorate">
-              <input
-                value={draft.city}
-                onChange={(e) => update("city", e.target.value)}
-              />
+            {original.city && (
+              <p className="charger-editor-hint">
+                Older app versions show “{original.city}”. Saving a city
+                rewrites that label from the city and its governorate.
+              </p>
+            )}
+            <div className="charger-editor-grid">
+              <Field label="Address">
+                <textarea
+                  rows={2}
+                  value={draft.address}
+                  onChange={(e) => update("address", e.target.value)}
+                />
+              </Field>
+              <Field label="Address (Arabic)">
+                <textarea
+                  rows={2}
+                  dir="rtl"
+                  value={draft.address_ar}
+                  onChange={(e) => update("address_ar", e.target.value)}
+                />
+              </Field>
+            </div>
+            <p className="charger-editor-hint">
+              Street only — city and governorate are shown separately.
+            </p>
+            <Field label="Highway direction">
+              <select
+                value={draft.highway_direction}
+                onChange={(e) => update("highway_direction", e.target.value)}
+              >
+                <option value="">Both directions / not on a highway</option>
+                {HIGHWAY_DIRECTIONS.map((v) => (
+                  <option key={v} value={v}>
+                    {label(v)}bound traffic only
+                  </option>
+                ))}
+              </select>
             </Field>
           </Section>
           <Section

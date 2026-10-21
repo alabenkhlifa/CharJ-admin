@@ -14,11 +14,9 @@ Per-user counts on the Users page (Reviews, Submissions) are always 0 because th
 
 **Fix path**: either (a) require non-anonymous accounts in the mobile app, or (b) record a stable installation ID alongside `auth.uid()` on every write. Mobile-app change. The dashboard hides the misleading columns until then.
 
-## 3. No `gouvernorat` column on `chargers`
+## 3. ~~No `gouvernorat` column on `chargers`~~ (resolved)
 
-Only `city` (freeform TEXT). Several Overview charts and filters that would key off gouvernorat were dropped.
-
-**Fix path**: add `gouvernorat TEXT` (with a CHECK against the 24 known values), backfill from existing `city` text via a one-shot script, then expose in `search_chargers` RPC. ~2 hours.
+Chargers now point at `cities` (`chargers.city_id`), each city at one of the 24 `governorates`. The Chargers page filters by governorate and city and flags rows with no city yet ("No city" filter). The Overview "Coverage by gouvernorat" card is still not built.
 
 ## 4. `feedback` and `review_reports` not surfaced
 

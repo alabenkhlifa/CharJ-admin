@@ -11,6 +11,7 @@ Live in **`../charj/supabase/functions/`** (mobile-app repo). Deployed against t
 | `admin-confirmations` | List + hide/unhide driver visit reports (`charging_confirmations`) |
 | `admin-set-charger-status` | Pin a charger's status via `set_charger_override` |
 | `admin-update-charger` | Read + atomically edit one charger for the structured editor |
+| `admin-cities` | Insert a `cities` row from the city picker's inline "Add city" form |
 
 All of them follow the same pattern, all deploy with `--no-verify-jwt`, all answer CORS preflight before the auth check.
 
@@ -136,7 +137,9 @@ Content-Type: application/json
   "name_fr": "Hotel Le Corail",
   "latitude": 36.84,
   "longitude": 10.27,
-  "address": "Avenue de la République, Tunis",
+  "address": "Avenue de la République",
+  "address_ar": "شارع الجمهورية",
+  "city_id": "<cities.id>",
   "city": "Tunis",
   "connectors": [{ "type": "Type 2", "power_kw": 22, "count": 2 }],
   "operator": "Le Corail",
@@ -148,13 +151,16 @@ Content-Type: application/json
 }
 ```
 
+**Location.** `city_id` is the real link. A database trigger (`chargers_sync_city_label`) rewrites the legacy `city` text from it ("Hammamet, Nabeul"), so old app versions keep showing a place. The dashboard still sends `city` (that same label) so a deploy order mismatch with an older build of this function can't reject the request. Legacy `city` text without `city_id` is accepted for one transition release; the trigger then links the nearest city within 15 km when there is one. `address` / `address_ar` are the street only — city and governorate are shown separately.
+
 ### Response
 
 ```ts
 // 201 Created
 { id: "<uuid>", name: "Hotel Le Corail" }
 
-// 400 — validation failure (the response `error` describes which field)
+// 400 — validation failure (the response `error` describes which field),
+//       including a `city_id` that is not in `cities`
 // 401 — bad/missing token
 // 403 — signed in, not an admin
 // 500 — Supabase insert error (rare; usually FK or check-constraint trip)
@@ -164,7 +170,9 @@ Content-Type: application/json
 
 Even though the modal validates client-side, the EF re-validates everything — never trust the browser:
 
-- `name`, `name_ar`, `name_fr`, `city` non-empty strings.
+- `name`, `name_ar`, `name_fr` non-empty strings.
+- `city_id` a UUID that exists in `cities`; without it, a non-empty legacy `city`.
+- `address`, `address_ar`, `city` text up to 2000 characters (trimmed; empty when omitted).
 - `latitude` ∈ [-90, 90], `longitude` ∈ [-180, 180].
 - `connectors[*].type` ∈ {Type 2, CCS, CHAdeMO}; `power_kw > 0`; `count` positive integer.
 - `status` ∈ {operational, under_repair, planned, unknown}.
@@ -172,6 +180,50 @@ Even though the modal validates client-side, the EF re-validates everything — 
 - `amenities[]` slugs must be in the same allowlist as `set_charger_override` (`toilet`, `restaurant`, `cafe`, `shop`, `air_pump`, `wifi`, `atm`, `lounge`, `mosque`, `pharmacy`, `car_wash`, `kids_playground`).
 
 When `is_verified` is true, `verified_at = now()` and `verified_by = 'a2000000-0000-0000-0000-000000000000'` (same admin-dashboard UID as `admin-verify-charger`).
+
+## `admin-update-charger`
+
+**Files**: `../charj/supabase/functions/admin-update-charger/{index,validation}.ts`
+
+`GET ?charger_id=<uuid>` returns `admin_get_charger` (every column, incl. `city_id`, `address_ar`, `highway_direction`). `POST { charger_id, expected_updated_at, changes }` validates only the changed fields and calls `admin_update_charger` in one transaction (409 when the row changed since it was opened).
+
+Location fields: `city_id` (UUID or `null`; the RPC checks it exists), `address_ar` (text), `highway_direction` (`north` | `east` | `south` | `west` | `null`). Legacy `city` text is still accepted, but the editor no longer sends it — setting `city_id` relabels `city` through the trigger.
+
+## `admin-cities`
+
+**File**: `../charj/supabase/functions/admin-cities/{index,validation}.ts`
+**URL**: `https://<project>.supabase.co/functions/v1/admin-cities`
+
+`cities` is public reference data (anon/authenticated `SELECT`, which is how the dashboard lists them) but only `service_role` may write it. The city picker's inline "Add city" form posts here.
+
+```http
+POST /functions/v1/admin-cities
+Authorization: Bearer <admin access token>
+Content-Type: application/json
+
+{
+  "slug": "yasmine-hammamet",
+  "governorate_code": "TN-21",
+  "name_fr": "Yasmine Hammamet",
+  "name_ar": "ياسمين الحمامات",
+  "name_en": "Yasmine Hammamet",
+  "lat": 36.37,
+  "lng": 10.54
+}
+```
+
+```ts
+// 201 Created
+{ id, slug, governorate_code, name_fr, name_ar, name_en }
+
+// 400 — slug not ^[a-z0-9-]+$, unknown/malformed governorate_code, blank name, bad lat/lng
+// 401 / 403 — auth
+// 409 — slug already taken
+```
+
+- The dashboard derives `slug` from the French name and `governorate_code` from `governorate_for_point(pin)`; both stay editable.
+- `lat` / `lng` become `cities.location` (`SRID=4326;POINT(lng lat)`). `suggest_city` measures from it (nearest city within 15 km in the pin's governorate), so use the town centre when the charger pin is far from it.
+- Renaming a city or moving it to another governorate is not exposed; the `cities_relabel_chargers` trigger would relabel its chargers if done in SQL.
 
 ### Deep-link from search
 
@@ -188,9 +240,12 @@ npx supabase functions deploy admin-analytics --no-verify-jwt
 npx supabase functions deploy admin-confirmations --no-verify-jwt
 npx supabase functions deploy admin-set-charger-status --no-verify-jwt
 npx supabase functions deploy admin-update-charger --no-verify-jwt
+npx supabase functions deploy admin-cities --no-verify-jwt
 ```
 
-Each deploy bundles `_shared/admin-auth.ts` — a change there means redeploying all seven.
+Each deploy bundles `_shared/admin-auth.ts` — a change there means redeploying all eight.
+
+**City picker rollout order:** deploy `admin-cities`, `admin-add-charger` and `admin-update-charger` first, then the dashboard. The dashboard also sends the legacy `city` label on add, so an older `admin-add-charger` still accepts it, but only the new one stores `city_id` / `address_ar`.
 
 `--no-verify-jwt` stays **required**. During the transition the legacy secret (a hex string, not a JWT) has to reach the function; and even afterwards the gateway check only proves a token is signed — an anonymous mobile user passes it. `authorizeAdmin` validates the token against Supabase Auth and the `admins` table itself.
 

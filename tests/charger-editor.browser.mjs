@@ -8,6 +8,31 @@ const { chromium } = await import(
 const output =
   process.env.CHARGER_EDITOR_ARTIFACTS || "/tmp/charj-editor-browser";
 await mkdir(output, { recursive: true });
+const KORBA = "c1000000-0000-4000-8000-000000000001";
+const SOUSSE = "c1000000-0000-4000-8000-000000000002";
+const governorates = [
+  { code: "TN-21", name_fr: "Nabeul", name_ar: "نابل", name_en: "Nabeul" },
+  { code: "TN-51", name_fr: "Sousse", name_ar: "سوسة", name_en: "Sousse" },
+];
+let cities = [
+  { id: KORBA, slug: "korba", governorate_code: "TN-21", name_fr: "Korba", name_ar: "قربة", name_en: "Korba" },
+  { id: SOUSSE, slug: "sousse", governorate_code: "TN-51", name_fr: "Sousse", name_ar: "سوسة", name_en: "Sousse" },
+];
+// search_chargers joins the city and governorate names onto each row.
+const readerRow = (c) => {
+  const city = cities.find((v) => v.id === c.city_id);
+  const gov = governorates.find((g) => g.code === city?.governorate_code);
+  return {
+    ...c,
+    city_fr: city?.name_fr ?? null,
+    city_ar: city?.name_ar ?? null,
+    city_en: city?.name_en ?? null,
+    governorate_code: gov?.code ?? null,
+    governorate_fr: gov?.name_fr ?? null,
+    governorate_ar: gov?.name_ar ?? null,
+    governorate_en: gov?.name_en ?? null,
+  };
+};
 let charger = {
   id: "ee625f21-1111-4444-8888-111111111111",
   name: "Africa Jade Thalasso Hôtel Korba",
@@ -16,6 +41,9 @@ let charger = {
   latitude: 36.5597,
   longitude: 10.8577,
   address: "Korba",
+  address_ar: "",
+  city_id: null,
+  highway_direction: null,
   city: "Nabeul",
   operator: "Hotel",
   status: "operational",
@@ -71,13 +99,45 @@ try {
   await context.route("**/auth/v1/**", (route) => route.abort());
   let writes = [],
     conflict = false;
-  await context.route("**/rest/v1/**", (route) =>
-    route.fulfill({
-      json: route.request().url().includes("search_chargers") ? [charger] : [],
-      headers: { "content-range": "0-0/1" },
-    }),
-  );
+  const cityWrites = [],
+    chargerInserts = [];
+  // Pins north of 36.5 sit near Korba; everything here is in Nabeul unless
+  // it is south of 36 (Sousse).
+  await context.route("**/rest/v1/**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const lat = request.postDataJSON()?.p_lat;
+    const json = url.pathname.endsWith("/rpc/search_chargers")
+      ? [readerRow(charger)]
+      : url.pathname.endsWith("/governorates")
+        ? governorates
+        : url.pathname.endsWith("/cities")
+          ? cities
+          : url.pathname.endsWith("/rpc/governorate_for_point")
+            ? lat < 36
+              ? "TN-51"
+              : "TN-21"
+            : url.pathname.endsWith("/rpc/suggest_city")
+              ? lat > 36.5
+                ? KORBA
+                : null
+              : [];
+    await route.fulfill({ json, headers: { "content-range": "0-0/1" } });
+  });
   await context.route("**/functions/v1/**", async (route) => {
+    if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204 });
+    if (route.request().url().includes("admin-cities")) {
+      const body = route.request().postDataJSON();
+      cityWrites.push(body);
+      const { lat: _lat, lng: _lng, ...row } = body;
+      const created = { id: "c1000000-0000-4000-8000-000000000003", ...row };
+      cities = [...cities, created];
+      return route.fulfill({ status: 201, json: created });
+    }
+    if (route.request().url().includes("admin-add-charger")) {
+      chargerInserts.push(route.request().postDataJSON());
+      return route.fulfill({ status: 201, json: { id: "new-charger", name: "Yasmine test" } });
+    }
     if (!route.request().url().includes("admin-update-charger"))
       return route.fulfill({ json: {} });
     if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204 });
@@ -120,10 +180,15 @@ try {
   await page.goto(
     `${process.env.CHARGER_EDITOR_URL || "http://127.0.0.1:5175"}/#/chargers`,
   );
+  // An unlinked charger shows its legacy text, flagged for cleanup.
+  const row = page.getByRole("button", { name: `Open ${charger.name}` });
+  assert.match(await row.locator("td").nth(1).innerText(), /^Nabeul\s*no city$/);
   await page.getByText(charger.name, { exact: true }).click();
   await page.getByRole("button", { name: "Edit charger", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Display name", { exact: true }).waitFor();
+  // Opening never changes the city; the pin's nearest city is only offered.
+  await dialog.getByText("Suggested from the pin: Korba, Nabeul", { exact: true }).waitFor();
   assert.equal(
     await dialog
       .getByRole("button", { name: "Save changes", exact: true })
@@ -156,7 +221,52 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await dialog.getByLabel("Arabic name", { exact: true }).fill("أفريكا جاد");
+  // Hand-pick a city in another governorate: the pin mismatch is flagged.
+  const cityInput = dialog.getByRole("combobox", { name: "City", exact: true });
+  await cityInput.click();
+  await cityInput.fill("sous");
+  await dialog.getByRole("option", { name: /^Sousse/ }).waitFor();
+  assert.equal(await dialog.getByRole("option", { name: /^Korba/ }).count(), 0);
+  await cityInput.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${output}/editor-city-list-1440.png` });
+  await cityInput.press("Enter");
+  assert.equal(await cityInput.inputValue(), "Sousse");
+  await dialog
+    .getByText("The pin is in Nabeul, but Sousse is in Sousse.", { exact: true })
+    .waitFor();
+  await page.screenshot({ path: `${output}/editor-city-mismatch-1440.png` });
+  // The open list fits a phone, and Escape closes the list, not the editor.
+  await page.setViewportSize({ width: 375, height: 1000 });
+  await cityInput.click();
+  await dialog.getByRole("listbox", { name: "Cities" }).waitFor();
+  await dialog.getByRole("listbox", { name: "Cities" }).scrollIntoViewIfNeeded();
+  assert.ok(
+    await dialog
+      .locator(".charger-editor-body")
+      .evaluate((el) => el.scrollWidth <= el.clientWidth),
+  );
+  await page.screenshot({ path: `${output}/editor-city-list-375.png` });
+  await cityInput.press("Escape");
+  assert.equal(await dialog.getByRole("listbox", { name: "Cities" }).count(), 0);
+  assert.equal(await cityInput.inputValue(), "Sousse");
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await dialog.getByLabel("Latitude", { exact: true }).fill("36.5598");
+  // Moving the pin never overrides a hand-picked city.
+  await page.waitForTimeout(900);
+  assert.equal(await cityInput.inputValue(), "Sousse");
+  await dialog.getByRole("button", { name: "Clear city", exact: true }).click();
+  await dialog.getByRole("button", { name: "Use", exact: true }).click();
+  assert.equal(await cityInput.inputValue(), "Korba, Nabeul");
+  assert.equal(
+    await dialog.getByText("The pin is in Nabeul", { exact: false }).count(),
+    0,
+  );
+  await dialog
+    .getByLabel("Address (Arabic)", { exact: true })
+    .fill("  طريق قربة ");
+  await dialog
+    .getByLabel("Highway direction", { exact: true })
+    .selectOption("south");
   await dialog.getByLabel("Status", { exact: true }).selectOption("planned");
   await dialog
     .getByRole("button", { name: "Add connector", exact: true })
@@ -242,6 +352,10 @@ try {
   assert.equal("verified_at" in writes[0].changes, false);
   assert.equal("name" in writes[0].changes, false);
   assert.equal(charger.contact_phone, "+216 12345678");
+  assert.equal(writes[0].changes.city_id, KORBA);
+  assert.equal(writes[0].changes.address_ar, "طريق قربة");
+  assert.equal(writes[0].changes.highway_direction, "south");
+  assert.equal("city" in writes[0].changes, false);
   await page.getByRole("button", { name: "Edit charger", exact: true }).click();
   assert.equal(
     await dialog
@@ -300,9 +414,71 @@ try {
   await page
     .getByRole("button", { name: "Edit charger", exact: true })
     .waitFor();
+  // Detail panel and table read the structured place after the refetch.
+  await page.getByText("Korba · قربة", { exact: false }).waitFor();
+  await page.keyboard.press("Escape");
+  await row.locator("td").nth(1).getByText("Korba, Nabeul", { exact: true }).waitFor();
+
+  // ── Add charger: no default city, add a missing city inline ─────────────
+  await page.getByRole("button", { name: "Add charger", exact: true }).click();
+  const modal = page.getByRole("dialog");
+  const modalCity = modal.getByRole("combobox", { name: "City", exact: true });
+  assert.equal(await modalCity.inputValue(), "");
+  await modal.getByLabel("Name (display)", { exact: true }).fill("Yasmine test");
+  await modal.getByLabel("Name (Arabic)", { exact: true }).fill("اختبار");
+  await modal
+    .getByPlaceholder("36.84, 10.27 — or paste a maps URL", { exact: true })
+    .fill("36.40, 10.61");
+  // No known city near this pin: nothing is auto-picked.
+  await page.waitForTimeout(900);
+  assert.equal(await modalCity.inputValue(), "");
+  await modal.getByRole("button", { name: "Create charger", exact: true }).click();
+  await modal.getByText("Choose a city, or add it if it's missing", { exact: true }).waitFor();
+  await modalCity.click();
+  await modalCity.fill("Yasmine");
+  await modal.getByRole("option", { name: "Add city “Yasmine”", exact: true }).waitFor();
+  await modalCity.press("Enter");
+  assert.equal(await modal.getByLabel("City slug", { exact: true }).inputValue(), "yasmine");
+  assert.equal(await modal.getByLabel("City name (English)", { exact: true }).inputValue(), "Yasmine");
+  assert.equal(await modal.getByLabel("City governorate", { exact: true }).inputValue(), "TN-21");
+  await modal.getByText("From the charger pin", { exact: true }).waitFor();
+  await modal.getByLabel("City name (French)", { exact: true }).fill("Yasmine Hammamet");
+  assert.equal(await modal.getByLabel("City slug", { exact: true }).inputValue(), "yasmine-hammamet");
+  await modal.getByLabel("City name (Arabic)", { exact: true }).fill("ياسمين الحمامات");
+  for (const width of [1440, 768, 375]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const [scroll, client] = await modal.evaluate((el) => [el.scrollWidth, el.clientWidth]);
+    assert.ok(scroll <= client + 1, `add modal overflows at ${width}px: ${scroll}/${client}`);
+    await page.screenshot({ path: `${output}/add-city-${width}.png` });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await modal.getByRole("button", { name: "Add city", exact: true }).click();
+  await page.waitForFunction(
+    () => document.querySelector('[role="combobox"]')?.value === "Yasmine Hammamet, Nabeul",
+  );
+  assert.deepEqual(cityWrites, [
+    {
+      slug: "yasmine-hammamet",
+      governorate_code: "TN-21",
+      name_fr: "Yasmine Hammamet",
+      name_ar: "ياسمين الحمامات",
+      name_en: "Yasmine Hammamet",
+      lat: 36.4,
+      lng: 10.61,
+    },
+  ]);
+  await modal.getByLabel("Address (optional)", { exact: true }).fill("Avenue de la Paix");
+  await modal.getByLabel("Address in Arabic (optional)", { exact: true }).fill("شارع السلام");
+  await modal.getByRole("button", { name: "Create charger", exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector('[role="dialog"]'));
+  assert.equal(chargerInserts.length, 1);
+  assert.equal(chargerInserts[0].city_id, "c1000000-0000-4000-8000-000000000003");
+  assert.equal(chargerInserts[0].city, "Yasmine Hammamet, Nabeul");
+  assert.equal(chargerInserts[0].address, "Avenue de la Paix");
+  assert.equal(chargerInserts[0].address_ar, "شارع السلام");
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: editor opens, 375/768/1440 layouts, structured fields, patch save, read-back, unsaved guard, conflict preservation, reload, keyboard focus and no page errors.",
+    "PASS: editor opens, 375/768/1440 layouts, structured fields, city picker (suggestion, mismatch, no override), patch save, read-back, unsaved guard, conflict preservation, reload, keyboard focus, add charger with inline add-city and no page errors.",
   );
 } finally {
   await browser.close();

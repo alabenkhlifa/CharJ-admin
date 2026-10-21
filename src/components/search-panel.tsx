@@ -171,7 +171,7 @@ const ChargerRow = ({
             whiteSpace: "nowrap",
           }}
         >
-          {hit.city}
+          {hit.charger.place}
         </span>
       </span>
     </span>

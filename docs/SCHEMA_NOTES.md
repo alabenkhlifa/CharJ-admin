@@ -54,13 +54,15 @@ The mappers handle the difference; pages don't see it.
 
 The column on `user_vehicles` that flags the user's primary EV is `is_default`. The `admin-users` EF response renames it to `is_primary` to keep the wire format clean. Don't be surprised when querying the table directly — `is_default` is the truth.
 
-## No `gouvernorat` column on chargers
+## Structured locations: `governorates` → `cities` → `chargers.city_id`
 
-Only `city` (TEXT, freeform). The original Overview "Coverage by gouvernorat" chart was dropped because mapping `city` → gouvernorat would either:
-1. Need a hardcoded city→gouvernorat lookup table maintained by hand
-2. Need a real address parser
+Since `20261021000010_structured_locations.sql` (mobile-app repo):
 
-For v1 we just drop the chart. If we ever need it, add `gouvernorat TEXT` to the chargers table and backfill from the existing data.
+- `governorates(code 'TN-xx', name_fr, name_ar, name_en, geom)` — anon can read the code and names, never `geom`, so always name the columns in a `select`.
+- `cities(id, slug, governorate_code, name_fr, name_ar, name_en, location)` — anon-readable; writes go through the `admin-cities` Edge Function.
+- `chargers.city_id` (nullable) + `chargers.address_ar`. The reader RPCs return `city_id, city_fr/ar/en, governorate_code, governorate_fr/ar/en, address_ar` as trailing columns.
+- `chargers.city` (legacy TEXT) is kept non-empty for old app versions: the `chargers_sync_city_label` trigger rewrites it from `city_id` ("Hammamet, Nabeul", or just "Tunis" when city and governorate share a name). Never edit it by hand when a city is set.
+- `governorate_for_point(lat, lng)` and `suggest_city(lat, lng)` are anon-callable RPCs; the dashboard uses them for the pin mismatch warning and to pre-fill the city.
 
 ## `chargers.verified_at` — admin-only signal
 
@@ -68,4 +70,4 @@ Set by `admin-verify-charger` Edge Function alongside `is_verified` and `verifie
 
 ## What we don't have at all
 
-No event log, no sessions table, no trips/route_plans, no per-charger uptime history, no admin per-action audit trail, no city→gouvernorat mapping, no per-user-vehicle telemetry. If a UI feature requires any of these, it's a feature waiting for a schema change.
+No event log, no sessions table, no trips/route_plans, no per-charger uptime history, no admin per-action audit trail, no per-user-vehicle telemetry. If a UI feature requires any of these, it's a feature waiting for a schema change.

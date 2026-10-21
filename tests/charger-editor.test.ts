@@ -154,3 +154,43 @@ test("validates photo URL protocol and supports custom connector types", () => {
     "GB/T",
   );
 });
+const HAMMAMET = "c1000000-0000-4000-8000-000000000001";
+test("structured location: sends city_id, address_ar and highway_direction only when edited", () => {
+  const c = fixture();
+  c.city_id = HAMMAMET;
+  c.address_ar = "شارع الحبيب بورقيبة";
+  c.highway_direction = "south";
+  assert.deepEqual(buildChanges(createDraft(c), c), {});
+  const d = createDraft(c);
+  d.city_id = "";
+  d.address_ar = "  شارع فرحات حشاد ";
+  d.highway_direction = "";
+  assert.deepEqual(buildChanges(d, c), {
+    address_ar: "شارع فرحات حشاد",
+    city_id: null,
+    highway_direction: null,
+  });
+});
+test("structured location: never writes the legacy city text", () => {
+  const c = fixture(),
+    d = createDraft(c);
+  assert.equal("city" in d, false);
+  d.city_id = HAMMAMET;
+  d.highway_direction = "north";
+  assert.deepEqual(buildChanges(d, c), {
+    city_id: HAMMAMET,
+    highway_direction: "north",
+  });
+});
+test("structured location: reads rows from before the migration and rejects bad values", () => {
+  const c = fixture();
+  const d = createDraft(c);
+  assert.equal(d.city_id, "");
+  assert.equal(d.address_ar, "");
+  assert.equal(d.highway_direction, "");
+  d.city_id = "Hammamet";
+  assert.throws(() => buildChanges(d, c), /city from the list/);
+  d.city_id = "";
+  d.highway_direction = "northeast";
+  assert.throws(() => buildChanges(d, c), /Highway direction/);
+});

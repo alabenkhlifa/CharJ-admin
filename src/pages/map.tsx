@@ -140,7 +140,7 @@ export const MapPage = () => {
                     {selected.name}
                   </div>
                   <div style={{ fontSize: 11, color: "#52525b", marginBottom: 8 }}>
-                    {selected.city} · {selected.power} kW · {selected.hours}
+                    {selected.place} · {selected.power} kW · {selected.hours}
                   </div>
                   <div
                     style={{
