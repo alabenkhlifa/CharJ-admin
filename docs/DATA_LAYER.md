@@ -35,6 +35,9 @@ If `SUPABASE_CONFIGURED` is false, the hook short-circuits to `{ data: [], loadi
 | `useLocations()` | `governorates` (code + names) and `cities`, loaded once per page load and shared (module cache in `src/data/locations.ts`) | anon |
 | `usePinPlace(lat, lng)` | `governorate_for_point` + `suggest_city` RPCs, debounced 400 ms | anon |
 | `createCity` (Add city) | `admin-cities` Edge Function via `adminFetch`; appends to the shared city list | admin session |
+| `useNotifications(days)` | `admin-notifications` GET overview (pending, suggestions, history, subscribers, totals, funnel), parsed strictly by `notifications-report.ts`; `refresh()` keeps the old data on screen while it reloads; `skewMs` = server − local clock for countdowns | admin session |
+| `useChargerNotifications(id)` | same GET narrowed with `charger_id` (charger drawer's "Announce update") | admin session |
+| `cancelNotification` / `releaseNotification` / `announceUpdate` / `dismissSuggestion` / `previewNotification` | `admin-notifications` POST; resolve to `{ ok } \| { ok: false, error }` with the error already mapped to admin-facing copy | admin session |
 
 ## Mappers
 
@@ -86,6 +89,16 @@ Plain TEXT[], not JSONB. No power_kw / count per connector here.
 ```ts
 Array<{ soc: number; power_kw: number }>  // SoC % → power
 ```
+
+### `admin-notifications` overview
+
+Wire names stay snake_case (`src/data/notifications-report.ts`, like `analytics-report.ts`). Things that bite:
+
+- `pending[].needs_review` is SQL `note = 'needs_review'`, so it is `null` (not `false`) when there is no note. The parser normalises it.
+- `pending[].eta` is already moved past quiet hours: an ETA of exactly 08:00:00 Tunis means "waiting for quiet hours to end". `waitsForQuietHours` keys on that.
+- `suggestions[].before` / `after` hold only the changed fields of `charger_update_events`, as raw JSONB. Compare connectors per type, never by array position (`connectorsLabel`).
+- `funnel` steps are counted independently, so a later step can be larger than an earlier one; the Funnel percentages can pass 100%.
+- `history[].opens` excludes users with analytics off, so the open rate is shown as "≥ x%".
 
 ## Anon-readable tables
 

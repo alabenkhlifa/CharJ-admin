@@ -54,9 +54,12 @@ src/
     multi-select-chip.tsx    # checkbox popover chip — filters that take several values at once
     table.tsx                # Th / SortableTh (aria-sort, arrow indicator)
     pagination.tsx           # Pagination footer + usePaginated client-side slicer
+    city-picker.tsx          # searchable city picker grouped by governorate + inline "Add city"
+    announce-dialog.tsx      # preview (FR/AR/EN) + confirm for announce / send-now
   pages/
     overview.tsx             # KPIs + status/connector/access charts + map
     analytics.tsx            # app usage report via the admin-analytics EF
+    notifications.tsx        # region alerts: pending, suggested updates, history, subscribers (admin-notifications EF)
     chargers.tsx             # Table + filter chips + detail drawer (verify/map/hours)
     submissions.tsx          # community_submissions list, status tabs
     feedback.tsx             # EmptyState — needs Edge Function (service-role)
@@ -76,6 +79,9 @@ src/
     sidebar-counts.ts        # useSidebarCounts() — badge numbers
     admin-users.ts           # useAdminUsers() — adminFetch to EF
     visits.ts                # useVisits() + moderateVisit() — admin-confirmations EF
+    analytics.ts             # useAnalytics() — admin-analytics EF; analytics-report.ts parses it
+    locations.ts             # governorates + cities cache, suggestCity, createCity (admin-cities EF); locations-model.ts = pure helpers
+    notifications.ts         # useNotifications() + cancel/release/announce/dismiss/preview; notifications-report.ts parses it
   lib/
     supabase.ts              # client factory + SUPABASE_CONFIGURED
     icons.tsx                # all SVG icons (lucide-style)
@@ -100,7 +106,7 @@ Read these before touching the related area. Each is short and gotcha-focused.
 
 - **[Architecture](docs/ARCHITECTURE.md)** — stack choices, why no Tailwind, module boundaries
 - **[Auth + access control](docs/AUTH.md)** — Supabase Auth sign-in, the `admins` allowlist, how to add an admin, turning off the legacy secret
-- **[Edge Functions](docs/EDGE_FUNCTIONS.md)** — `admin-users`, `admin-verify-charger`, `admin-add-charger`: contract, deployment, CORS gotcha
+- **[Edge Functions](docs/EDGE_FUNCTIONS.md)** — every `admin-*` function (incl. `admin-cities`, `admin-notifications`): contract, deployment, CORS gotcha
 - **[Data layer](docs/DATA_LAYER.md)** — hooks pattern, JSONB shapes, what's anon-readable vs needs an EF
 - **[Deployment](docs/DEPLOYMENT.md)** — GH Pages + GH Actions, required secrets, Vite `base` path
 - **[Responsiveness](docs/RESPONSIVENESS.md)** — sidebar drawer pattern, breakpoints, `minmax(0, 1fr)` gotcha
@@ -138,6 +144,8 @@ npx supabase functions deploy admin-analytics --no-verify-jwt
 npx supabase functions deploy admin-confirmations --no-verify-jwt
 npx supabase functions deploy admin-set-charger-status --no-verify-jwt
 npx supabase functions deploy admin-update-charger --no-verify-jwt
+npx supabase functions deploy admin-cities --no-verify-jwt
+npx supabase functions deploy admin-notifications --no-verify-jwt
 # --no-verify-jwt is REQUIRED — see docs/EDGE_FUNCTIONS.md
 
 # Verify CORS preflight on a deployed function

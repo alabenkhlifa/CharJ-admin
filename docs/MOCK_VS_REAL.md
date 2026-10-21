@@ -66,6 +66,7 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 | **Verify** button → mark verified | 🔐 | `admin-verify-charger` EF |
 | **Add charger** modal | 🔐 | `admin-add-charger` EF — same fields as the `charger-adder` agent's migration template; city picker (`cities` table, auto-filled from `suggest_city`), Arabic address |
 | City picker → **Add city** | 🔐 | `admin-cities` EF; governorate prefilled from `governorate_for_point` |
+| Drawer **Announce update** | 🔐 | `admin-notifications?days=7&charger_id=` — shown only when that charger has a suggestion; same preview + confirm dialog as the Notifications page (`components/announce-dialog.tsx`). Re-checked after a status toggle or an editor save |
 | Pin vs city governorate warning | ✅ | `governorate_for_point` RPC (anon) |
 | Deep-link from topbar search | ✅ | `#/chargers?id=<uuid>`; `App.tsx` reads the hash param, page opens drawer on mount |
 | ~~Edit override~~ | ⚠️ | UI exists but no-op for now |
@@ -93,6 +94,29 @@ The header subtitle ("X pending submissions waiting for review") uses real `useO
 | ~~Helpful count~~ | ⚠️ no column on `ratings` |
 | ~~Reported reviews queue~~ | ⚠️ `review_reports` service-role |
 | ~~Hide / Approve actions~~ | ⚠️ would need an EF |
+
+## Notifications page
+
+Region alerts (`#/notifications`). Everything goes through the `admin-notifications` EF; the queue, batches, followers and devices tables are service-role only. Pushes are templated: there is no free-text field.
+
+| Field | Status | Source |
+|---|---|---|
+| History period (7 / 30 / 90 days) | 🔐 | `days=` on the GET; narrows history + funnel only (pending is always the last 24 h, suggestions the last 7 days) |
+| Mode note (dispatcher every 5 min, quiet hours 22:00–08:00 Tunis) + "Quiet hours now" chip | 🔐 | static rule + `totals.quiet_now` |
+| **Pending**: charger, governorate, kind / update class, held vs released, queued time, Needs review badge | 🔐 | `pending[]` |
+| Pending countdown + ETA (Tunis time) | 🔐 | `pending[].eta`, ticked client-side every 15 s against the server clock (`server_time` skew) |
+| Quiet-hours note on a pending row | 🔐 | ETA of exactly 08:00 Tunis (the server's after-quiet value) or inside quiet hours |
+| **Cancel** (inline confirm) | 🔐 | POST `cancel` |
+| **Send now** | 🔐 | POST `preview` then `release`; disabled with a tooltip for rows already released |
+| **Suggested updates**: class label, before → after (status / connectors / access), recipients + with push | 🔐 | `suggestions[]` |
+| **Announce** (preview dialog: FR / AR rtl / EN title + body, recipient + push estimate) | 🔐 | POST `preview` then `announce`; 429 → "Already announced recently / daily limit reached"; disabled at 10 announcements / 24 h (`totals.announcements_24h`) |
+| **Dismiss** | 🔐 | POST `dismiss` |
+| **History**: date, source, events, recipients, devices, accepted (ticket OK), receipts OK, errors, opens | 🔐 | `history[]`, paginated client-side (10 / page) |
+| Open rate "≥ x%" | 🔐 | `opens / recipient_count`; a lower bound (analytics opt-outs never report an open), tooltip says so; "—" without recipients or opens |
+| **Subscribers** by governorate (followers vs with push) | 🔐 | `subscribers[]`, `HBarList`; governorates with no followers are left out |
+| Reach totals (users following, region follows, users with push, active devices) | 🔐 | `totals` (current, not period-bound) |
+| Opt-in funnel (map card shown → accepted → permission granted → regions saved) | 🔐 | `funnel` (distinct users per step, each step independent); a plain list when no card was shown in the period, "—" if the field is absent |
+| Charger name → Chargers drawer | ✅ | `#/chargers?id=` |
 
 ## Driver visits page
 

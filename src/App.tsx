@@ -17,14 +17,17 @@ import { VehiclesPage } from "./pages/vehicles";
 import { MapPage } from "./pages/map";
 import { SettingsPage } from "./pages/settings";
 import { AnalyticsPage } from "./pages/analytics";
+import { NotificationsPage } from "./pages/notifications";
 
-// Pages with no route params render straight from here. Chargers, Visits and
-// Users read/write the hash query string, so they're wired up explicitly below.
+// Pages with no route params render straight from here. Chargers, Visits,
+// Users and Notifications take props (hash params / cross-page links), so
+// they're wired up explicitly below.
 const ROUTE_COMPONENTS: Record<RouteKey, () => React.ReactElement> = {
   overview: OverviewPage,
   analytics: AnalyticsPage,
   chargers: ChargersPage,
   submissions: SubmissionsPage,
+  notifications: NotificationsPage,
   feedback: FeedbackPage,
   reviews: ReviewsPage,
   visits: VisitsPage,
@@ -87,6 +90,8 @@ const App = () => {
             onChargerOpened={() => patchParams({ id: null })}
           />
         );
+      case "notifications":
+        return <NotificationsPage onOpenCharger={(id) => navigate("chargers", { id })} />;
       case "visits":
         return <VisitsPage onOpenDriver={(userId) => navigate("users", { user: userId })} />;
       case "users":

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { AddChargerModal } from "../components/add-charger-modal";
+import { AnnounceDialog } from "../components/announce-dialog";
 import { EditChargerDrawer } from "../components/edit-charger-drawer";
 import { Card, EmptyState } from "../components/card";
 import { iconBtnStyle } from "../components/charts";
@@ -20,6 +21,8 @@ import { adminFetch } from "../lib/admin-fetch";
 import { AmenityIcon, labelForAmenity } from "../lib/amenity-icons";
 import { downloadCsv, stampedFilename } from "../lib/csv";
 import { useLocations } from "../data/locations";
+import { useChargerNotifications } from "../data/notifications";
+import { suggestionDiff, UPDATE_CLASS_LABELS } from "../data/notifications-report";
 import { fold, withCityNames } from "../data/locations-model";
 import { Icons } from "../lib/icons";
 import { darkMapStyle, lightMapStyle } from "../lib/map-styles";
@@ -956,6 +959,9 @@ export const ChargersPage = ({
 
       {selected && (
         <DetailDrawer
+          // Per-charger state (announce notice, notifications query) must not
+          // carry over when a deep link swaps the open charger.
+          key={selected.id}
           charger={selected}
           onClose={() => setSelected(null)}
           onLocalUpdate={(patch) =>
@@ -1144,17 +1150,26 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
   const [statusBusy, setStatusBusy] = useState<SettableStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const { cities, governorates } = useLocations();
+  // An announceable update for this charger (admin-notifications, narrowed
+  // to it). Silent when the function is unreachable: the button just stays
+  // hidden.
+  const notifications = useChargerNotifications(charger.id);
+  const suggestion = notifications.data?.suggestions[0] ?? null;
+  const moreSuggestions = Math.max(0, (notifications.data?.suggestions.length ?? 0) - 1);
+  const [announcing, setAnnouncing] = useState(false);
+  const [announced, setAnnounced] = useState<string | null>(null);
+  const refreshNotifications = notifications.refresh;
 
   // Rows open on Enter, so the drawer has to close on Escape — otherwise a
   // keyboard user is stuck behind the overlay with no way back to the table.
   useEffect(() => {
-    if (editing) return;
+    if (editing || announcing) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [editing, onClose]);
+  }, [editing, announcing, onClose]);
 
   const handleVerify = async () => {
     if (!SUPABASE_CONFIGURED) return;
@@ -1182,6 +1197,8 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
     try {
       const updated = await setChargerStatus(charger.id, next);
       onLocalUpdate({ status: updated.status });
+      // A status flip can create an announceable update.
+      refreshNotifications();
       await refetch();
     } catch (err) {
       setStatusError(err instanceof Error ? err.message : "Failed to update status");
@@ -1203,6 +1220,7 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
     if (mapped) onLocalUpdate({ ...mapped, ...withCityNames(mapped, cities, governorates) });
     setEditing(false);
     setSaved(true);
+    refreshNotifications();
     void refetch();
   }} />;
 
@@ -1291,6 +1309,58 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
               </span>
             )}
           </div>
+
+          {announced && (
+            <div role="status" style={{ fontSize: 12, color: "var(--accent)" }}>
+              {announced}
+            </div>
+          )}
+          {suggestion && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                padding: 12,
+                border: "1px solid var(--accent-border)",
+                background: "var(--accent-soft)",
+                borderRadius: 8,
+              }}
+            >
+              <div style={smallLbl}>Announceable update</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>
+                {UPDATE_CLASS_LABELS[suggestion.update_class]}
+              </div>
+              {suggestionDiff(suggestion).map((line) => (
+                <div key={line.field} style={{ fontSize: 12, color: "var(--text-muted)", overflowWrap: "anywhere" }}>
+                  {line.field}: {line.before} → <span style={{ color: "var(--text)" }}>{line.after}</span>
+                </div>
+              ))}
+              <div className="num" style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                {suggestion.recipient_estimate} recipients · {suggestion.push_estimate} with push
+                {moreSuggestions > 0 && ` · ${moreSuggestions} more on the Notifications page`}
+              </div>
+              <button
+                type="button"
+                onClick={() => setAnnouncing(true)}
+                style={{
+                  padding: "10px 12px",
+                  background: "var(--accent)",
+                  color: "#0a0a0b",
+                  border: "none",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                <Icons.Bell size={13} /> Announce update
+              </button>
+            </div>
+          )}
 
           {GOOGLE_MAPS_API_KEY ? (
             <MiniMap charger={charger} theme={theme} />
@@ -1590,6 +1660,20 @@ const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawer
           </div>
         </div>
       </div>
+      {announcing && suggestion && (
+        <AnnounceDialog
+          action="announce"
+          id={suggestion.update_event_id}
+          chargerName={charger.name}
+          detail={UPDATE_CLASS_LABELS[suggestion.update_class]}
+          onClose={() => setAnnouncing(false)}
+          onDone={(message) => {
+            setAnnouncing(false);
+            setAnnounced(message);
+            refreshNotifications();
+          }}
+        />
+      )}
     </>
   );
 };

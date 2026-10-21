@@ -5,6 +5,7 @@ export type RouteKey =
   | "analytics"
   | "chargers"
   | "submissions"
+  | "notifications"
   | "feedback"
   | "reviews"
   | "visits"
@@ -29,6 +30,7 @@ export const NAV: NavItem[] = [
   { k: "analytics", l: "App analytics", ic: "Overview" },
   { k: "chargers", l: "Chargers", ic: "Charger", shortcut: "g c" },
   { k: "submissions", l: "Submissions", ic: "Submission", accent: true },
+  { k: "notifications", l: "Notifications", ic: "Bell" },
   { k: "feedback", l: "Feedback", ic: "Feedback", shortcut: "g f" },
   { k: "reviews", l: "Reviews", ic: "Reviews" },
   { k: "visits", l: "Driver visits", ic: "Visit" },

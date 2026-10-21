@@ -12,6 +12,7 @@ Live in **`../charj/supabase/functions/`** (mobile-app repo). Deployed against t
 | `admin-set-charger-status` | Pin a charger's status via `set_charger_override` |
 | `admin-update-charger` | Read + atomically edit one charger for the structured editor |
 | `admin-cities` | Insert a `cities` row from the city picker's inline "Add city" form |
+| `admin-notifications` | Region alerts: overview for the Notifications page + cancel / release / announce / dismiss / preview |
 
 All of them follow the same pattern, all deploy with `--no-verify-jwt`, all answer CORS preflight before the auth check.
 
@@ -225,6 +226,81 @@ Content-Type: application/json
 - `lat` / `lng` become `cities.location` (`SRID=4326;POINT(lng lat)`). `suggest_city` measures from it (nearest city within 15 km in the pin's governorate), so use the town centre when the charger pin is far from it.
 - Renaming a city or moving it to another governorate is not exposed; the `cities_relabel_chargers` trigger would relabel its chargers if done in SQL.
 
+## `admin-notifications`
+
+**Files**: `../charj/supabase/functions/admin-notifications/{index,handler}.ts`
+**URL**: `https://<project>.supabase.co/functions/v1/admin-notifications`
+**Dashboard**: `src/data/notifications.ts` (hooks + action helpers), parsed by `src/data/notifications-report.ts`
+
+Wraps the service-role `admin_*` notification RPCs (`20261021000015_notifications_dispatcher_admin.sql`, overview extended by `…16_notification_analytics.sql`). Pushes are templates only: no request carries free text.
+
+### GET: overview
+
+```http
+GET /functions/v1/admin-notifications?days=30[&charger_id=<uuid>]
+```
+
+`days` is 1–365 (the page offers 7 / 30 / 90) and only narrows `history` and `funnel`. With `charger_id` (the charger drawer), `pending`, `suggestions` and `history` are filtered to that charger and `charger_id` is echoed; `subscribers` / `totals` stay global.
+
+```ts
+{
+  pending: Array<{            // queue rows held / released in the last 24 h
+    event_id, kind: "charger_added" | "charger_updated", update_class: UpdateClass | null,
+    reason: "new_charger" | "update", state: "held" | "released",
+    note: string | null, needs_review: boolean | null,   // null when note is null
+    charger_id, charger_name, governorate_code, governorate_name_fr / _ar / _en,
+    queued_at, release_at, requested_by: uuid | null,
+    eta,                      // when it goes out, already moved past quiet hours (exactly 08:00 Tunis if it was in them)
+  }>;
+  suggestions: Array<{        // classified charger_update_events of the last 7 days, not announced / dismissed
+    update_event_id, charger_id, charger_name, update_class, occurred_at,
+    changed_fields: string[], before: {status?, access_type?, connectors?, working_hours?}, after: {…},
+    governorate_code, governorate_name_*, recipient_estimate, push_estimate,
+  }>;
+  history: Array<{            // notification_batches claimed in the window
+    batch_id, source: "auto" | "admin", status: "claimed" | "sending" | "sent" | "failed",
+    claimed_at, sent_at, recipient_count, device_count, ticket_ok, ticket_error,
+    receipt_ok, receipt_error, opens /* distinct users, analytics opt-outs excluded */, event_count,
+  }>;
+  subscribers: Array<{ governorate_code, name_fr, name_ar, name_en, followers, followers_with_push }>;
+  totals: { region_followers, region_follows, active_devices, users_with_push, pending, suggestions,
+            batches, announcements_24h, quiet_now: boolean };
+  funnel: { region_prompt_shown, region_prompt_accepted, permission_granted, regions_updated }; // distinct users per step, each step independent
+  server_time: string;
+  charger_id?: string;
+}
+```
+
+`UpdateClass` = `planned_to_operational | out_of_service | back_in_service | power_upgrade | new_connector`. The dashboard parser is strict (unknown enum values or wrong types reject the whole response with the field path in the error), except inside `before` / `after`, which are free-form JSONB snapshots used for display only. `opens` and `funnel` are optional in the parser and render as "—" when absent.
+
+### POST: actions
+
+```http
+POST /functions/v1/admin-notifications
+Content-Type: application/json
+
+{ "action": "cancel" | "release", "event_id": "<uuid>" }
+{ "action": "announce" | "dismiss", "update_event_id": "<uuid>" }
+{ "action": "preview", "event_id" | "update_event_id": "<uuid>" }   // exactly one of the two
+```
+
+- `cancel`: held or released → cancelled. `release` ("Send now"): held only; goes out at the next dispatcher run, and marks a `needs_review` event as reviewed. `announce`: queues the templated update for region + charger followers. `dismiss`: hides a suggestion.
+- `release` / `announce` also poke `dispatch-notifications` (fire and forget). Success: `{ ok: true, result, dispatch_requested }`.
+- `preview` sends nothing: `{ kind, update_class, charger_id, url, previews: { fr, ar, en: { title, body } }, recipient_estimate, push_estimate, estimate_scope: "region" | "region_only_lower_bound" | "region_and_charger" }`. The dashboard always previews before Announce and Send now.
+- POST needs a real admin session: the legacy shared secret gets `403 session_required` (no user id to stamp).
+
+### Errors
+
+`{ error: <code> }`. The dashboard maps them in `notificationErrorMessage`:
+
+| Status | Code | Meaning |
+|---|---|---|
+| 400 | `invalid_parameters`, `invalid_request`, `invalid_json`, `invalid_action`, `notification_invalid`, `announce_not_classified` | bad input / not an announceable change |
+| 404 | `notification_not_found`, `announce_not_found` | gone, refresh |
+| 409 | `notification_state`, `announce_duplicate`, `announce_stale` | already sent / cancelled / released, already announced, charger changed since or update older than 7 days |
+| 429 | `announce_rate_limited` | 1 announcement per charger per 24 h, 10 per day ("Already announced recently / daily limit reached") |
+| 503 | `notifications_unavailable` | RPC failed |
+
 ### Deep-link from search
 
 The topbar search calls `search_chargers` and surfaces results. Clicking a charger row sets `pendingChargerId` in `App.tsx`, which the Chargers page consumes to auto-open the detail drawer. No DB call required for the deep-link itself — it reuses the already-loaded `useChargers()` data.
@@ -241,9 +317,10 @@ npx supabase functions deploy admin-confirmations --no-verify-jwt
 npx supabase functions deploy admin-set-charger-status --no-verify-jwt
 npx supabase functions deploy admin-update-charger --no-verify-jwt
 npx supabase functions deploy admin-cities --no-verify-jwt
+npx supabase functions deploy admin-notifications --no-verify-jwt
 ```
 
-Each deploy bundles `_shared/admin-auth.ts` — a change there means redeploying all eight.
+Each deploy bundles `_shared/admin-auth.ts` — a change there means redeploying all nine.
 
 **City picker rollout order:** deploy `admin-cities`, `admin-add-charger` and `admin-update-charger` first, then the dashboard. The dashboard also sends the legacy `city` label on add, so an older `admin-add-charger` still accepts it, but only the new one stores `city_id` / `address_ar`.
 
