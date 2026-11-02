@@ -249,6 +249,10 @@ On Community, the four queues keep their Needs-you colours (feedback Needs Orang
 
 On Chargers, the catalogue is **Screens Blue** (the colour charger submissions already wear on Summary and Community): the list, the map card and every network card, and the single-series bars (access, power, governorates). Charger status (operational `#10B981`, under repair `#F59E0B`, planned `#6366F1`, unknown `#71717A`) and connector type (Type 2 `#3B82F6`, CCS `#8B5CF6`, CHAdeMO `#EC4899`) keep the colours they have in the app (`src/data/chargers.ts`) as **domain marks only**: map pins, 8px dots and squares beside a row's words, and the bars of the Status and Connectors charts. They are never text and never a category square; the words beside them are Ink. "Needs a look" (catalogue gaps that wait for the admin: unverified, no city, no hours) borrows **Needs Orange**, the colour of what waits for you. An empty catalogue turns the network square Idle Grey.
 
+On Notifications, the alerts themselves (Pending and History) wear **Screens Blue** too: every region alert is news about a charger in that catalogue. Suggested updates wait for the admin's decision, so **Needs Orange**, and a pending digest held for review carries a "Needs review" flag in Needs Orange text (like Chargers' "No city linked"). Followers are people: Subscribers by governorate and Reach are **People Raspberry**, the with-push part of each governorate's bar in it and the inbox-only rest in Idle Grey (one bar adds up to the followers). The opt-in ask (map card, accepted, permission, regions saved) is **Permission Rust**, as the permission answers are on Usage. A failed batch and an error count above zero are Alarm text; quiet hours and the update kinds (Back in service, Held, Released) are plain label pills.
+
+Settings holds preferences, not categories: its cards carry a title and no colour square.
+
 The four added for Usage (languages, permissions, users, android-auto) sit in the hue gaps the Apple system colours leave (magenta, raspberry, violet, rust). Picked by OKLab distance from every tone a Usage page shows (bases, light fills, light and dark text), each at least ΔE 10 from them, and validated as a set with the dataviz palette check in both modes (lightness band, chroma, CVD ≥ 8 pairwise, normal vision ≥ 15, ≥ 3:1 on the card; Auto Violet is under 3:1 on the dark card, which is legal because Android Auto draws no chart). The system was already crowded (Active and Alarm sit ΔE 4.5 apart), so a colour is never the only cue: every card carries its title.
 
 ### Neutral
@@ -327,7 +331,7 @@ Glyph ink on a filled square or bubble flips with the theme: white on light, bla
 - **Phone (under 768px):** one column, page padding 8px 16px with 96px plus the safe area at the bottom for the tab bar. Cards stack with 16px gaps.
 - **Tablet and desktop (768px and up):** a 260px sidebar column plus content; content padding 10px 28px 48px, max width 1120px, centred. Cards sit in a two-column grid (16px gap); a card may span both. Needs you sits beside the rings on Home.
 - **Rhythm:** 16px between cards, 26px above a section title and 10px below it, 10–12px between a card header and its content, 4px between a value and its sub line.
-- **Large title block:** 18px top, 14px bottom, the theme toggle (36px circle in Fill) at the end edge.
+- **Large title block:** 18px top, 14px bottom, the theme toggle (36px circle in Fill, a 22px moon or sun in Secondary Ink) at the end edge of every page, after any page action. The toggle flips what is on screen to the other theme and stores that choice; Settings' Theme control (System / Light / Dark) reads and writes the same one store (`src/lib/theme.ts`), so the two always agree and a change applies at once on every page. System, the default, follows the device live. On a phone under 400px a page action beside the toggle shows only its icon in a 36px circle (Chargers' Add charger), so the title never breaks.
 - **Responsive swaps, not shrinking:** the cohort table becomes per-phone chip rows (three chips across) under 768px and a table above it. Inside Usage the swap follows the room the page has, not the viewport: the table shows from 600px of content (at 768 the sidebar leaves ~450px), and once a week has 10 or more installs ("60% (12 of 20)") the chips go one per row on a narrow page.
 - Logical properties only: `inset-inline`, `margin-inline`, `padding-inline-start`, `border-block-start`.
 
@@ -395,6 +399,8 @@ Pills on the ground, not a segmented track: two by two on a phone, one row once 
 ### Dialog
 A native `<dialog>` (the browser keeps focus inside and closes on Escape): Card, 16px radius, at most 560px wide and the viewport less 16px on each side, scrolling inside itself. Section title as its heading; sections split by 0.5px separators; Cancel then the primary action at the end.
 
+The kit has it (`.ui-dialog` in `src/ui/ui.css`, with `.ui-btn`, `.ui-btn-primary`, `.ui-link`, `.ui-error` and `.ui-notice` for the buttons and lines above); the announce / send-now confirm uses it, and a click on the backdrop closes it like Escape.
+
 ### Chips and pills
 - **Stat chip:** Fill, 10px radius, 8px 10px; 12px/500 label above a 600 tabular value. Used for per-phone cohort values on phones.
 - **Label pill:** Fill, 6px radius, 12px/600 Secondary Ink. Tags such as app design (lune / classic / no label) and an "open" window.
@@ -422,7 +428,7 @@ A native `<dialog>` (the browser keeps focus inside and closes on Escape): Card,
 15px, collapsed borders, 0.5px separators, headers 13px/500 Secondary Ink start-aligned, numeric columns end-aligned and tabular.
 
 ### Navigation
-- **Tab bar (under 768px):** fixed to the bottom, five equal columns, frosted Bar Material, 0.5px top separator, safe-area padding. 24px icon over a 10px/500 label in Idle Grey; the current page in Active. A count badge (18px Alarm pill, 12px/600 white) sits at the icon's end corner.
+- **Tab bar (under 768px):** fixed to the bottom, five equal columns, frosted Bar Material, 0.5px top separator, safe-area padding. 24px icon over a 10px/500 label in Idle Grey; the current page in Active. A count badge (18px Alarm pill, 12px/600 white) sits at the icon's end corner. Notifications has no tab: on phones it is the first row of Settings (hidden from 768px, where the sidebar lists it).
 - **Sidebar (768px and up):** sticky, full height, Card background, 0.5px end separator, 22px/700 brand at top. Links 17px with a 22px icon, 9px 10px padding, 10px radius; hover Fill; current page gets Active at 14% behind Active Text at 600. The badge moves inline to the end.
 - **Build ceiling (not yet shipped):** the large title folds into a blurred inline bar on scroll.
 

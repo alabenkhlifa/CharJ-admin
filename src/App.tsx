@@ -13,7 +13,8 @@ import { useQueue } from "./data/queue";
 import { parseUsageEnvironment } from "./data/usage-report";
 
 const App = () => {
-  const [tweaks, setTweak, resolvedTheme] = useTweaks();
+  // One shared store: the large-title toggle and Settings read it too.
+  const [tweaks] = useTweaks();
   // The active page lives in the URL hash, so a refresh (or a bookmark, or a
   // link pasted to someone else) lands on the same page instead of Summary.
   const { route, params, navigate, replace } = useRoute();
@@ -42,7 +43,6 @@ const App = () => {
     replace(route, next);
   };
 
-  // Until Task 11 lands, Settings renders the page it replaces.
   const renderPage = () => {
     switch (route) {
       case "summary":
@@ -71,7 +71,8 @@ const App = () => {
           />
         );
       case "notifications":
-        return <NotificationsPage onOpenCharger={(id) => navigate("chargers", { id })} />;
+        // A charger's name links to #/chargers?id=<id>, which opens its drawer.
+        return <NotificationsPage />;
       case "settings":
         return <SettingsPage />;
     }
@@ -91,9 +92,6 @@ const App = () => {
         <Sidebar
           active={route}
           queueTotal={queueTotal}
-          theme={tweaks.theme}
-          resolvedTheme={resolvedTheme}
-          onTheme={(v) => setTweak("theme", v)}
           onNavigate={(k) => navigate(k)}
           onOpenCharger={(id) => navigate("chargers", { id })}
         />

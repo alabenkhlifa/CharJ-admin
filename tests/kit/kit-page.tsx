@@ -33,7 +33,6 @@ const P = {
   check: '<path d="M5 12l5 5L20 7"/>',
   trip: '<path d="M3 17l6-6 4 4 8-8"/>',
   car: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 18v2M17 18v2"/>',
-  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
 };
 
 const days = Array.from({ length: 30 }, (_, i) => new Date(Date.UTC(2026, 9, 4 + i)).toISOString().slice(0, 10));
@@ -56,7 +55,7 @@ const Row = ({ title, d, n, tone }: { title: string; d: string; n: number; tone:
 const Grid = ({ children }: { children: ReactNode }) => <div className="kit-grid">{children}</div>;
 
 export const KitPage = () => {
-  const [tweaks, setTweak, theme] = useTweaks();
+  const [tweaks] = useTweaks();
   const [env, setEnv] = useState<"test" | "prod">("test");
   const [plat, setPlat] = useState<"all" | "ios" | "android">("all");
   const test = env === "test";
@@ -67,8 +66,6 @@ export const KitPage = () => {
         .kit-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
         @media (min-width: 768px) { .kit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         .kit-sec { font: var(--type-section); margin: 26px 4px 10px; }
-        .kit-mode { width: 36px; height: 36px; border-radius: 18px; background: var(--fill); display: grid; place-items: center; color: var(--ink-2); border: 0; }
-        .kit-mode svg { width: 22px; height: 22px; stroke-width: 2; }
         .kit-hl { color: var(--ink-2); font: var(--type-subhead); margin: 0 4px 12px; }
         .kit-list { list-style: none; margin: 8px 0 0; padding: 0; }
         .kit-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 11px 0; border-block-start: 0.5px solid var(--sep); }
@@ -78,15 +75,8 @@ export const KitPage = () => {
         .kit-ver + .kit-ver { border-block-start: 0.5px solid var(--sep); }
         .kit-ver em { font-style: normal; color: var(--ink-2); }
       `}</style>
-      <LargeTitle
-        title="Summary"
-        subtitle="Monday 2 November"
-        trailing={
-          <button className="kit-mode" type="button" aria-label="Switch light or dark" onClick={() => setTweak("theme", theme === "dark" ? "light" : "dark")}>
-            <I d={P.moon} />
-          </button>
-        }
-      />
+      {/* The large title carries the light/dark toggle (.ui-mode) itself. */}
+      <LargeTitle title="Summary" subtitle="Monday 2 November" />
       <p className="kit-hl">
         {highlight(2, 1, "phones", "Monday")} · pref: {tweaks.theme}
       </p>

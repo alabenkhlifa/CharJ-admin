@@ -42,7 +42,7 @@ try {
     await page.emulateMedia({ colorScheme: "dark" });
     await page.waitForTimeout(200);
     ok((await themeOf(page)) === "dark", "a live system change is followed");
-    await page.click(".kit-mode");
+    await page.click(".ui-mode");
     await page.waitForTimeout(200);
     const st = await page.evaluate(() => ({ metas: [...document.querySelectorAll('meta[name="theme-color"]')].map((m) => m.content), stored: localStorage.getItem("charj-admin:tweaks") }));
     ok((await themeOf(page)) === "light" && st.metas.every((c) => c === "#f2f2f7") && st.stored.includes('"theme":"light"'), "override to light on a dark system paints both theme-color metas", st);

@@ -1,0 +1,70 @@
+/* The announce / send-now confirm. The dialog shell, sections and buttons are
+   the kit's (src/ui/ui.css "dialog", "buttons"); tokens from src/index.css.
+   Logical properties only, so Arabic flips cleanly. */
+
+.ann p {
+  margin: 0;
+}
+.ann-head {
+  display: grid;
+  gap: var(--s-hairline);
+  min-inline-size: 0;
+}
+.ann .ann-name {
+  margin-block-start: var(--s-xs);
+  font: 600 17px/1.3 var(--font);
+  overflow-wrap: anywhere;
+}
+.ann-meta {
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  overflow-wrap: anywhere;
+}
+/* One language's copy, on Fill like a notification banner. */
+.ann-copy {
+  min-inline-size: 0;
+  padding: 10px var(--s-md);
+  border-radius: var(--r-chip);
+  background: var(--fill);
+}
+.ann .ann-lang {
+  margin-block-end: var(--s-xs);
+  color: var(--ink-2);
+  font: var(--type-caption);
+}
+.ann-text {
+  overflow-wrap: anywhere;
+}
+.ann-title {
+  font: var(--type-card-title);
+}
+.ann .ann-body {
+  margin-block-start: var(--s-hairline);
+  font: var(--type-subhead);
+}
+/* An icon and a sentence: the recipient estimate, when it goes out. */
+.ann-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-sm);
+  font: var(--type-subhead);
+  overflow-wrap: anywhere;
+}
+.ann-line svg {
+  flex: none;
+  inline-size: 18px;
+  block-size: 18px;
+  margin-block-start: 1px;
+  color: var(--ink-2);
+}
+.ann-line span {
+  min-inline-size: 0;
+}
+.ann-line-2 {
+  color: var(--ink-2);
+}
+/* Quiet hours change when it goes out, so the sentence is Ink, not secondary. */
+.ann-quiet svg {
+  color: var(--ink);
+}

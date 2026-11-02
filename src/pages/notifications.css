@@ -1,65 +1,319 @@
-.notif-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; color: var(--text); }
-.notif-page > * { min-width: 0; }
-.notif-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 16px; }
-.notif-heading h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
-.notif-heading p { margin: 2px 0 0; font-size: 13px; color: var(--text-muted); }
-.notif-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.notif-mode { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elev); font-size: 12px; color: var(--text-muted); }
-.notif-mode > span { display: inline-flex; align-items: flex-start; gap: 6px; min-width: 0; }
-.notif-mode svg { flex-shrink: 0; margin-top: 2px; }
-.notif-banner { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 8px; font-size: 12px; }
-.notif-banner.ok { border: 1px solid var(--accent-border); background: var(--accent-soft); color: var(--accent); }
-.notif-banner.error { border: 1px solid color-mix(in srgb, var(--red) 35%, transparent); background: color-mix(in srgb, var(--red) 10%, transparent); color: var(--red); }
-.notif-banner button { background: transparent; border: none; color: inherit; padding: 0; display: inline-flex; }
+/* Notifications: region alerts. Components and their styles come from the
+   kit (src/ui/, ui.css); tokens from src/index.css. Logical properties only,
+   so Arabic flips cleanly. The page width (at most 1120px) comes from the
+   shell; layouts follow the room the page has (container queries), not the
+   viewport: at 768 the sidebar leaves ~450px. */
 
-.notif-list { border-top: 1px solid var(--border); }
-.notif-item { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 220px) auto; gap: 10px 20px; align-items: start; padding: 14px 16px; border-bottom: 1px solid var(--border); }
-.notif-item:last-child { border-bottom: none; }
-.notif-item-full { grid-column: 1 / -1; }
-.notif-name { display: inline; padding: 0; border: none; background: transparent; color: var(--text); font: inherit; font-size: 13px; font-weight: 500; text-align: start; overflow-wrap: anywhere; }
-button.notif-name:hover { color: var(--accent); }
-.notif-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-inline-start: 8px; vertical-align: 1px; }
-.notif-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 4px; font-size: 10px; font-weight: 500; white-space: nowrap; }
-.notif-meta { margin-top: 3px; font-size: 11px; color: var(--text-dim); overflow-wrap: anywhere; }
-.notif-note { margin-top: 6px; font-size: 11px; color: var(--amber); }
-.notif-diff { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; margin-top: 8px; font-size: 12px; }
-.notif-diff dt { color: var(--text-dim); }
-.notif-diff dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
-.notif-diff .before { color: var(--text-muted); }
-.notif-when { font-size: 12px; color: var(--text-muted); }
-.notif-when strong { display: block; font-size: 13px; font-weight: 500; color: var(--text); }
-.notif-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
-.notif-btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elev-2); color: var(--text); font: inherit; font-size: 12px; font-weight: 500; white-space: nowrap; }
-.notif-btn.primary { border-color: transparent; background: var(--accent); color: #0a0a0b; }
-.notif-btn.danger { border-color: color-mix(in srgb, var(--red) 40%, transparent); background: color-mix(in srgb, var(--red) 10%, transparent); color: var(--red); }
-.notif-btn:disabled { opacity: .5; cursor: not-allowed; }
-.notif-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--red) 30%, transparent); border-radius: 6px; font-size: 12px; color: var(--text); }
-.notif-confirm span { flex: 1 1 200px; }
-.notif-error { font-size: 11px; color: var(--red); }
+.notif {
+  container: notif / inline-size;
+}
 
-.notif-table-scroll { overflow-x: auto; }
-.notif-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.notif-table td { padding: 11px 16px; border-top: 1px solid var(--border); white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text); }
-.notif-table td.end, .notif-table th.end { text-align: end; }
-.notif-hint { text-decoration: underline dotted var(--text-dim); text-underline-offset: 3px; cursor: help; }
+/* The dispatcher's rhythm, under the large title. */
+.notif-mode {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-sm);
+  margin: calc(-1 * var(--s-sm)) var(--s-xs) var(--s-md);
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.notif-mode svg {
+  flex: none;
+  inline-size: 16px;
+  block-size: 16px;
+  margin-block-start: 1px;
+  stroke-width: 2;
+}
 
-.notif-subscribers { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; }
-.notif-subscribers > * { min-width: 0; }
-.notif-totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
-.notif-total { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elev-2); }
-.notif-total div:first-child { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
-.notif-total div:last-child { margin-top: 4px; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.notif-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 12px; font-size: 11px; color: var(--text-muted); }
-.notif-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.notif-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-.notif-stage-list { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; margin: 0; font-size: 12px; }
-.notif-stage-list dt { color: var(--text-muted); }
-.notif-stage-list dd { margin: 0; text-align: end; font-variant-numeric: tabular-nums; }
-.notif-footnote { margin: 0; font-size: 11px; line-height: 1.5; color: var(--text-dim); }
-.notif-skeleton { display: grid; gap: 10px; padding: 16px; }
+.notif-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm) var(--s-lg);
+  margin-block-end: var(--s-lg);
+}
+.notif-controls .ui-seg {
+  flex: 1 1 240px;
+}
+.notif-refresh {
+  margin-inline-start: auto;
+}
 
-@media (max-width: 1100px) { .notif-subscribers { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 700px) {
-  .notif-item { grid-template-columns: minmax(0, 1fr); }
-  .notif-actions { justify-content: flex-start; }
+.notif-banner {
+  margin-block-end: var(--s-lg);
+}
+.notif-x {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 24px;
+  block-size: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink-2);
+}
+.notif-x:hover {
+  color: var(--ink);
+}
+.notif-x svg {
+  inline-size: 14px;
+  block-size: 14px;
+  stroke-width: 2;
+}
+.notif-retry {
+  margin: 0 0 var(--s-lg);
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  overflow-wrap: anywhere;
+}
+.ui-card .notif-retry {
+  margin: var(--s-md) 0 0;
+}
+.notif-retry button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-screens-text);
+  font: inherit;
+  font-weight: 600;
+}
+.notif-wait {
+  display: flex;
+  align-items: center;
+  min-block-size: 96px;
+}
+
+/* ---- grid: one column on a phone; lists pair up once each has ~440px ---- */
+.notif-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-lg);
+  align-items: start;
+}
+.notif-pair,
+.notif-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-lg);
+  align-items: start;
+  min-inline-size: 0;
+}
+@container notif (min-width: 900px) {
+  .notif-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .notif-pair {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
+/* A sentence under a card's header: what the card holds. */
+.notif-lede {
+  margin: var(--s-sm) 0 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.notif-empty {
+  display: grid;
+  gap: var(--s-xs);
+  margin-block-start: var(--s-xs);
+}
+.notif-empty .ui-empty {
+  margin: 0;
+}
+.notif-empty .ui-empty-body {
+  color: var(--ink);
+}
+
+/* ---- lists ---- */
+.notif-list {
+  list-style: none;
+  margin: var(--s-sm) 0 0;
+  padding: 0;
+}
+.notif-item,
+.notif-batch {
+  min-inline-size: 0;
+  padding-block: var(--s-md);
+}
+.notif-list > li + li {
+  border-block-start: .5px solid var(--sep);
+}
+.notif-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-xs) var(--s-md);
+}
+.notif-name {
+  min-inline-size: 0;
+  color: var(--ink);
+  font: 600 17px/1.3 var(--font);
+  overflow-wrap: anywhere;
+}
+.notif-name:hover {
+  color: var(--c-screens-text);
+}
+.notif-when {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 6px;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  font-variant-numeric: tabular-nums;
+}
+.notif-when strong {
+  color: var(--ink);
+  font: 600 15px var(--font);
+  font-variant-numeric: tabular-nums;
+}
+.notif-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-xs) var(--s-sm);
+  margin: 6px 0 0;
+}
+.notif-tags .ui-pill {
+  margin: 0;
+}
+/* Waits for the admin: Needs Orange text, like Chargers' "No city linked". */
+.notif-flag {
+  color: var(--c-needs-you-text);
+  font: var(--type-caption);
+}
+.notif-mode .ui-pill {
+  margin-inline-start: var(--s-sm);
+}
+.notif-meta {
+  margin: var(--s-xs) 0 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  overflow-wrap: anywhere;
+}
+.notif-note {
+  margin: 6px 0 0;
+  max-inline-size: 70ch;
+  font: var(--type-footnote);
+}
+.notif-diff {
+  display: grid;
+  gap: var(--s-hairline);
+  margin: var(--s-sm) 0 0;
+  font: var(--type-subhead);
+}
+.notif-diff > div {
+  display: grid;
+  grid-template-columns: minmax(80px, auto) minmax(0, 1fr);
+  gap: 10px;
+}
+.notif-diff dt {
+  color: var(--ink-2);
+}
+.notif-diff dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.notif-diff .before {
+  color: var(--ink-2);
+}
+.notif-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm);
+  margin-block-start: 10px;
+}
+.notif-confirm {
+  margin-block-start: 10px;
+  padding: 10px var(--s-md);
+  border-radius: var(--r-chip);
+  background: var(--fill);
+}
+.notif-confirm p {
+  margin: 0;
+  font: var(--type-subhead);
+}
+/* Buttons on Fill would sit on Fill twice: lift them in Card. */
+.notif-confirm .ui-btn {
+  background: var(--card);
+}
+.notif-confirm .ui-btn:disabled {
+  color: var(--ink-2);
+}
+
+/* ---- history: a table from 900px of page (its ten columns need ~860px),
+   list rows below ---- */
+.notif-history-table {
+  display: none;
+}
+@container notif (min-width: 900px) {
+  .notif-history-table {
+    display: block;
+  }
+  .notif-history-list {
+    display: none;
+  }
+}
+.notif-table td {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.notif-status {
+  display: inline-block;
+  margin-inline-start: 6px;
+  color: var(--ink-2);
+  font: var(--type-caption);
+}
+/* A batch that failed, or errors above zero: something broke. */
+.notif-failed {
+  color: var(--c-alarm-text);
+}
+.notif-batch-t {
+  font: var(--type-body);
+  font-variant-numeric: tabular-nums;
+}
+.notif-hint {
+  text-decoration: underline dotted var(--ink-2);
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+/* ---- reach: four numbers, two by two ---- */
+.notif-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-md);
+  margin-block-start: 10px;
+}
+.notif-stats > div {
+  min-inline-size: 0;
+}
+.notif-stats b {
+  display: block;
+  font: 700 28px/1.15 var(--font);
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.notif-stats span {
+  display: block;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+
+.notif-foot {
+  margin: var(--s-lg) var(--s-xs) 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
 }

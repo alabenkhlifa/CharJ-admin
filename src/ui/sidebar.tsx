@@ -3,7 +3,6 @@ import { SearchPanel } from "../components/search-panel";
 import { useAdminSession } from "../lib/admin-session";
 import { Icons } from "../lib/icons";
 import { NAV, type RouteKey } from "../lib/routes";
-import type { ResolvedTheme, ThemePref } from "../lib/theme-prefs";
 import { useGlobalSearch, type SearchHit } from "../lib/use-global-search";
 import { buildHash } from "../lib/use-route";
 import "./shell.css";
@@ -12,22 +11,17 @@ type SidebarProps = {
   active: RouteKey;
   /** Open items in Community. No badge while undefined or 0. */
   queueTotal?: number;
-  theme: ThemePref;
-  resolvedTheme: ResolvedTheme;
-  onTheme: (next: ThemePref) => void;
   onNavigate: (k: RouteKey) => void;
   onOpenCharger: (id: string) => void;
 };
 
-const NEXT_THEME: Record<ThemePref, ThemePref> = { system: "light", light: "dark", dark: "system" };
-
-/** Tablet and desktop navigation (768px and up): nav, search (⌘K), account. */
+/**
+ * Tablet and desktop navigation (768px and up): nav, search (⌘K), account.
+ * The theme lives in every page's large title and in Settings.
+ */
 export const Sidebar = ({
   active,
   queueTotal,
-  theme,
-  resolvedTheme,
-  onTheme,
   onNavigate,
   onOpenCharger,
 }: SidebarProps) => {
@@ -99,9 +93,6 @@ export const Sidebar = ({
     }
   };
 
-  const ThemeIcon = resolvedTheme === "dark" ? Icons.Moon : Icons.Sun;
-  const themeLabel = `Theme: ${theme}. Switch to ${NEXT_THEME[theme]}`;
-
   return (
     <aside className="ui-side">
       <div className="ui-side-brand">Charj</div>
@@ -170,9 +161,6 @@ export const Sidebar = ({
         <span className="ui-side-mail" title={session?.email}>
           {session?.email ?? "Signed in"}
         </span>
-        <button type="button" onClick={() => onTheme(NEXT_THEME[theme])} title={themeLabel} aria-label={themeLabel}>
-          <ThemeIcon size={16} />
-        </button>
         {session && (
           <button type="button" onClick={() => void session.signOut()} title="Sign out" aria-label="Sign out">
             <Icons.SignOut size={16} />

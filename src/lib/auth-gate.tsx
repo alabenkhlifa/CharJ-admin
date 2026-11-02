@@ -39,8 +39,11 @@ export const AuthGate = ({ children }: { children: ReactNode }) => {
       session
         ? {
             email: session.user.email ?? "",
+            // The server revokes the session first; when it can't be
+            // reached the session stays, and the caller gets the reason.
             signOut: async () => {
-              await supabase.auth.signOut();
+              const { error } = await supabase.auth.signOut();
+              return error ? error.message || "The sign-in service could not be reached." : null;
             },
           }
         : null,

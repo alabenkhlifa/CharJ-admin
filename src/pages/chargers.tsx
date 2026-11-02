@@ -259,10 +259,10 @@ export const ChargersPage = ({
             className="chg-btn chg-btn-primary chg-add"
             onClick={() => setAddingLocal(true)}
             disabled={!SUPABASE_CONFIGURED}
-            title={SUPABASE_CONFIGURED ? undefined : "Admin API not configured"}
+            title={SUPABASE_CONFIGURED ? "Add charger" : "Admin API not configured"}
           >
             <ChgIcon name="plus" />
-            Add charger
+            <span className="chg-add-l">Add charger</span>
           </button>
         }
       />

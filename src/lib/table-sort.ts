@@ -1,6 +1,5 @@
-// Sorting vocabulary shared by every table. Kept out of the component file so
-// `components/table.tsx` exports components only — Vite's fast refresh bails
-// on a module that mixes the two.
+// Sorting vocabulary shared by every table. Kept out of component files:
+// Vite's fast refresh bails on a module that mixes components and helpers.
 
 export type SortDir = "asc" | "desc";
 export type Sort<K extends string> = { key: K; dir: SortDir };

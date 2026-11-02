@@ -1,0 +1,86 @@
+/* Settings: grouped cards of real controls. Components and their styles come
+   from the kit (src/ui/, ui.css); tokens from src/index.css. Logical
+   properties only, so Arabic flips cleanly. */
+
+.set {
+  container: set / inline-size;
+}
+
+.set-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-lg);
+  align-items: start;
+}
+/* Two cards side by side once each has ~340px. */
+@container set (min-width: 700px) {
+  .set-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* The Notifications row: phones only. From 768px the sidebar lists the page. */
+@media (min-width: 768px) {
+  .set-phone {
+    display: none;
+  }
+}
+.set-phone .ui-rows {
+  margin: 0;
+}
+.set-card.set-phone {
+  padding-block: var(--s-xs);
+}
+
+.set-h {
+  margin: 0;
+  font: var(--type-card-title);
+}
+
+.set-theme {
+  margin-block-start: var(--s-md);
+}
+.set-note {
+  margin: 10px 0 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+
+/* A label with its value, and an action at the end edge. */
+.set-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-sm) var(--s-md);
+  padding-block: 11px;
+}
+.set-row-main {
+  display: grid;
+  gap: var(--s-hairline);
+  min-inline-size: 0;
+  flex: 1 1 180px;
+}
+.set-label {
+  color: var(--ink-2);
+  font: var(--type-subhead);
+}
+.set-value {
+  margin: 0;
+  font: var(--type-body);
+  overflow-wrap: anywhere;
+}
+.set-value code {
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.set-build {
+  margin: var(--s-xs) 0 0;
+}
+.set-build .set-row + .set-row {
+  border-block-start: .5px solid var(--sep);
+}
+.set-card .ui-error {
+  margin-block-start: 0;
+}

@@ -15,6 +15,25 @@
 }
 
 /* ---- title action, buttons, text actions ---- */
+/* Beside the large title's theme toggle a small phone has no room for the
+   words (the title would break): the button shows the plus in a 36px circle
+   and keeps "Add charger" as its name for assistive tech and the tooltip. */
+@media (max-width: 399px) {
+  .chg-btn.chg-add {
+    inline-size: 36px;
+    min-block-size: 36px;
+    padding: 0;
+    border-radius: 18px;
+  }
+  .chg-add .chg-add-l {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
 .chg-btn {
   display: inline-flex;
   align-items: center;

@@ -1,7 +1,7 @@
 /* Health Rings design tokens (DESIGN.md, .impeccable/design.json).
    Values are copied verbatim; keep them in step with DESIGN.md.
    html[data-theme] is set before first paint by index.html and kept live by
-   useTweaks() (src/lib/theme.ts). The kit that uses these lives in src/ui/. */
+   the one theme store (src/lib/theme.ts). The kit that uses these lives in src/ui/. */
 
 :root {
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter Variable", Roboto, system-ui, sans-serif;

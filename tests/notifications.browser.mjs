@@ -5,11 +5,115 @@
 //   NOTIFICATIONS_URL=http://127.0.0.1:5181 PLAYWRIGHT_MODULE=<…>/playwright/index.mjs \
 //     node tests/notifications.browser.mjs
 // All Supabase traffic is intercepted; this suite never reaches a real backend.
+// Task 11 (Health look) adds: card colours, the under-10 open rate, open
+// charger, the native dialog (backdrop, Not now, focus), loading and error
+// states, light and dark at 375 / 768 / 1024 / 1440 (fits, nothing clipped,
+// text at 4.5:1), RTL, and the t11-*.png screenshots (T11_SHOTS).
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || "playwright");
 const output = process.env.NOTIFICATIONS_ARTIFACTS || "/tmp/charj-notifications-browser";
+const shots = process.env.T11_SHOTS || output;
 await mkdir(output, { recursive: true });
+await mkdir(shots, { recursive: true });
+let checks = 0;
+const ok = (cond, msg, extra) => { assert.ok(cond, extra === undefined ? msg : `${msg}: ${JSON.stringify(extra)}`); checks += 1; };
+
+// Copied from tests/chargers.browser.mjs / community.browser.mjs: nothing pokes
+// out of its card or the dialog, no text is cut off (one-line ellipsis aside).
+const fits = (page) => page.evaluate(() => {
+  const bad = [];
+  const boxes = [...document.querySelectorAll(".notif .ui-card, .ui-lt"), ...document.querySelectorAll(".ui-dialog[open]")];
+  for (const box of boxes) {
+    const c = box.getBoundingClientRect();
+    const name = box.querySelector("h2, h1")?.textContent ?? box.className;
+    for (const el of box.querySelectorAll("*")) {
+      // Visually hidden labels (.ui-sr, an icon-only button's name) are meant to be 1px.
+      if (el.closest(".ui-sr") || getComputedStyle(el).clipPath === "inset(50%)" || el.closest("svg") || el.closest("details:not([open])")) continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width && !r.height) continue;
+      if (r.left < c.left - 0.5 || r.right > c.right + 0.5) bad.push(`${name}: ${el.className || el.tagName} pokes out`);
+      const cs = getComputedStyle(el);
+      if (cs.display === "inline" || cs.textOverflow === "ellipsis" || el.scrollWidth <= el.clientWidth + 1) continue;
+      const clipped = cs.overflowX !== "visible";
+      const runsOut = r.left + el.scrollWidth > c.right + 0.5;
+      if (clipped || runsOut) bad.push(`${name}: ${el.className || el.tagName} is cut off`);
+    }
+  }
+  const dialog = document.querySelector(".ui-dialog[open]")?.getBoundingClientRect();
+  if (dialog && (dialog.left < 0 || dialog.right > innerWidth || dialog.top < 0 || dialog.bottom > innerHeight + 0.5)) bad.push("the dialog leaves the viewport");
+  // The large title stays one line: a word broken in two is cramped.
+  const h1 = document.querySelector(".ui-lt h1");
+  if (h1 && h1.getBoundingClientRect().height > parseFloat(getComputedStyle(h1).lineHeight) * 1.5) bad.push("the large title wraps");
+  return { bad };
+});
+// Text cut short inside a control or a one-line label: its box scrolls, or
+// (ellipsis) the text it holds is wider than the room inside its padding.
+const clipped = (page) => page.evaluate(() => {
+  const ctx = document.createElement("canvas").getContext("2d");
+  const bad = [];
+  const els = [...document.querySelectorAll(".ui-seg button, .ui-btn, .ui-link, .ui-pill, .ui-row-t, .ui-row-d, .ui-meta, .notif-when strong, .notif-flag, .notif-status, .ui-pager button, .ui-lt-bar span")]
+    .filter((el) => el.getClientRects().length && !el.closest(".ui-lt-bar[data-on=false]"));
+  for (const el of els) {
+    const cs = getComputedStyle(el);
+    ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const room = el.clientWidth - parseFloat(cs.paddingInlineStart) - parseFloat(cs.paddingInlineEnd);
+    const need = cs.whiteSpace === "normal" ? Math.max(...el.textContent.split(/\s+/).map((w) => ctx.measureText(w).width)) : ctx.measureText(el.textContent).width;
+    if (el.scrollWidth > el.clientWidth + 1 || need > room + 1) bad.push({ text: el.textContent.slice(0, 40), need: Math.round(need), room: Math.round(room) });
+  }
+  return { bad, checked: els.length };
+});
+// WCAG contrast of each element's text against what is really behind it (alpha composed up the tree).
+const contrasts = (page, selector) => page.evaluate((sel) => {
+  const parse = (c) => (c.match(/[\d.]+/g) ?? []).map(Number);
+  const over = (top, under) => {
+    const a = top[3] ?? 1;
+    return [0, 1, 2].map((i) => top[i] * a + under[i] * (1 - a)).concat(1);
+  };
+  const behind = (el) => {
+    const layers = [];
+    for (let n = el; n; n = n.parentElement) {
+      const bg = parse(getComputedStyle(n).backgroundColor);
+      if (bg.length && (bg[3] ?? 1) > 0) layers.push(bg);
+      if ((bg[3] ?? 0) === 1 || bg.length === 3) break;
+    }
+    let color = document.documentElement.dataset.theme === "dark" ? [0, 0, 0, 1] : [255, 255, 255, 1];
+    for (const layer of layers.reverse()) color = over(layer, color);
+    return color;
+  };
+  const lum = ([r, g, b]) => {
+    const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  return [...document.querySelectorAll(sel)].filter((el) => el.getClientRects().length && el.textContent.trim()).map((el) => {
+    const bg = behind(el);
+    const fg = over(parse(getComputedStyle(el).color), bg);
+    const [a, b] = [lum(fg), lum(bg)].sort((x, y) => y - x);
+    return { text: el.textContent.trim().slice(0, 24), ratio: +((a + 0.05) / (b + 0.05)).toFixed(2) };
+  });
+}, selector);
+const TEXT = [
+  ".ui-lt h1", ".ui-lt p", ".notif-mode span", ".ui-seg button", ".ui-link", ".ui-btn", ".ui-meta", ".ui-ch h2", ".notif-lede",
+  ".notif-name", ".notif-when", ".notif-when strong", ".ui-pill", ".notif-flag", ".notif-meta", ".notif-note", ".notif-diff dt",
+  ".notif-diff dd", ".notif-diff .before", ".notif-table th", ".notif-table td", ".notif-status", ".notif-batch-t", ".ui-pager",
+  ".ui-pager button", ".notif-stats b", ".notif-stats span", ".ui-lad-name", ".ui-lad-v", ".ui-details summary", ".ui-empty",
+  ".ui-notice span", ".ui-error", ".notif-retry", ".notif-foot", ".ui-dialog h2", ".ui-dialog h3", ".ann-name", ".ann-meta",
+  ".ann-lang", ".ann-title", ".ann-body", ".ann-line span",
+].join(", ");
+const lowContrast = async (page, selector = TEXT) => {
+  await page.mouse.move(1, 1);
+  await page.waitForTimeout(300);
+  return (await contrasts(page, selector)).filter((c) => c.ratio < 4.5);
+};
+// A whole-page shot with the fixed tab bar at the bottom: grow the viewport to the page first.
+const shot = async (page, name) => {
+  const { width, height } = page.viewportSize();
+  await page.setViewportSize({ width, height: Math.max(height, Math.min(6000, await page.evaluate(() => document.documentElement.scrollHeight))) });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `${shots}/${name}` });
+  await page.setViewportSize({ width, height });
+};
+const squareOf = (page, title) => page.locator(".notif .ui-card").filter({ has: page.getByRole("heading", { name: title, exact: true }) }).locator(".ui-sq").getAttribute("style");
 
 const id = (n) => `c1000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const CHARGERS = {
@@ -54,8 +158,8 @@ const batches = Array.from({ length: 12 }, (_, i) => ({
   batch_id: `b1000000-0000-4000-8000-${String(i).padStart(12, "0")}`, source: i % 3 ? "auto" : "admin",
   status: i === 2 ? "failed" : "sent", claimed_at: iso(now - (i + 1) * 86_400_000),
   sent_at: i === 2 ? null : iso(now - (i + 1) * 86_400_000 + 5000),
-  recipient_count: i === 1 ? 0 : 40, device_count: 44, ticket_ok: 43, ticket_error: 1, receipt_ok: 42,
-  receipt_error: i === 0 ? 2 : 0, opens: i === 1 ? 0 : 10, event_count: 2,
+  recipient_count: i === 1 ? 0 : i === 3 ? 5 : 40, device_count: 44, ticket_ok: 43, ticket_error: 1, receipt_ok: 42,
+  receipt_error: i === 0 ? 2 : 0, opens: i === 1 ? 0 : i === 3 ? 2 : 10, event_count: 2,
 }));
 
 let state;
@@ -79,6 +183,9 @@ const reset = () => {
 };
 reset();
 let empty = false;
+// The next overview GET answers 500, or waits until released.
+let failGets = 0;
+let holdGets = null;
 const overview = (chargerId) => {
   const own = (row) => !chargerId || row.charger_id === chargerId;
   return {
@@ -154,6 +261,11 @@ try {
     assert.equal(request.headers().authorization, "Bearer test.admin.session");
     if (request.method() === "GET") {
       gets.push(url.search);
+      if (holdGets) await holdGets;
+      if (failGets > 0) {
+        failGets -= 1;
+        return route.fulfill({ status: 500, json: { error: "internal_error" } });
+      }
       return route.fulfill({ json: overview(url.searchParams.get("charger_id")) });
     }
     const body = request.postDataJSON();
@@ -224,15 +336,42 @@ try {
   assert.equal(await historyRows.nth(1).locator("td").nth(9).innerText(), "—"); // 0 recipients
   assert.equal(await historyRows.first().locator("td").nth(7).innerText(), "3"); // 1 ticket + 2 receipt errors
   await historyRows.nth(2).getByText("failed", { exact: true }).waitFor();
-  await page.getByText("1–10", { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Next page", exact: true }).click();
+  // Under 10 recipients the rate is a count, never a percentage.
+  ok((await historyRows.nth(3).locator("td").nth(9).innerText()) === "2 of 5", "history: under 10 recipients the open rate reads 2 of 5");
+  await page.getByText("1–10 of 12", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
   assert.equal(await historyRows.count(), 2);
+  await page.getByRole("button", { name: "Previous", exact: true }).click();
 
   // Subscribers + funnel.
   await page.getByText("Subscribers by governorate", { exact: true }).waitFor();
   assert.equal(await page.getByText("Sousse", { exact: true }).count(), 0); // 0 followers: not charted
   await page.getByText("Map card shown", { exact: true }).waitFor();
   await page.getByText("Regions saved", { exact: true }).waitFor();
+  ok((await page.locator(".ui-lad-v").allInnerTexts()).join("|") === "100|40|30|35", "opt-in: four counts, no percentage", await page.locator(".ui-lad-v").allInnerTexts());
+  // The bars split each governorate's followers into with push + inbox only (they add up to the followers).
+  await page.locator(".notif .ui-details summary").first().click();
+  const subs = await page.locator(".notif .ui-details table tbody tr").allInnerTexts();
+  ok(subs.length === 2 && /Tunis\s+25\s+15\s+40/.test(subs[0]) && /Nabeul\s+6\s+12\s+18/.test(subs[1]), "subscribers: with push + inbox only = followers", subs);
+  await page.locator(".notif .ui-details summary").first().click();
+
+  // ── Health look: colours, the title toggle, one heading per card ──────
+  for (const [title, tone] of [["Pending", "screens"], ["Suggested updates", "needs-you"], ["History", "screens"], ["Subscribers by governorate", "users"], ["Reach", "users"], ["Opt-in funnel", "permissions"]]) {
+    ok((await squareOf(page, title))?.includes(`--c-${tone}-fill`), `${title} wears ${tone}`);
+  }
+  ok((await page.locator(".ui-lt .ui-mode").count()) === 1, "the large title carries the theme toggle");
+  ok((await page.locator(".notif .ui-card").filter({ hasText: "Pending" }).first().locator(".ui-meta").innerText()) === "3 queued", "pending meta counts the queue");
+  ok((await page.locator(".notif-flag").innerText()) === "Needs review", "needs review is a flag");
+
+  // ── Open charger: the name opens the charger's drawer ─────────────────
+  const hammametLink = hammamet.getByRole("link", { name: "Shell Hammamet", exact: true });
+  ok((await hammametLink.getAttribute("href")) === `#/chargers?id=${CHARGERS.hammamet.id}`, "open charger: the name links to chargers?id=", await hammametLink.getAttribute("href"));
+  await hammametLink.click();
+  await page.getByRole("complementary", { name: "Shell Hammamet, charger details" }).waitFor();
+  ok(true, "open charger: the drawer opens");
+  await page.goBack();
+  await page.getByRole("heading", { name: "Notifications", exact: true }).waitFor();
+  await pending.first().waitFor();
 
   // ── Responsive: no horizontal overflow ────────────────────────────────
   for (const width of [1440, 768, 375]) {
@@ -245,6 +384,36 @@ try {
     assert.ok(scroll <= client + 1, `main overflows at ${width}px: ${scroll}/${client}`);
     await page.screenshot({ path: `${output}/notifications-${width}.png`, fullPage: true });
   }
+  // Light and dark at every width: fits, nothing clipped, text at 4.5:1; the
+  // history is a table from 900px of page and list rows below.
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate((t) => document.documentElement.setAttribute("data-theme", t), theme);
+    for (const width of [375, 768, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.waitForTimeout(150);
+      const tag = `${width} ${theme}`;
+      ok(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), `${tag}: no horizontal scroll`);
+      const fit = await fits(page);
+      ok(fit.bad.length === 0, `${tag}: everything fits`, fit);
+      const cut = await clipped(page);
+      ok(cut.bad.length === 0 && cut.checked > 10, `${tag}: no label clipped`, cut);
+      const low = await lowContrast(page);
+      ok(low.length === 0, `${tag}: every text at 4.5:1`, low);
+      const table = await page.locator(".notif-history-table").isVisible();
+      const list = await page.locator(".notif-history-list").isVisible();
+      ok(table === width >= 1440 && list === !table, `${tag}: history ${table ? "table" : "rows"}`, { table, list });
+    }
+  }
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await shot(page, "t11-notifications-390-light.png");
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+  await shot(page, "t11-notifications-390-dark.png");
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await shot(page, "t11-notifications-1440-dark.png");
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+  await shot(page, "t11-notifications-1440-light.png");
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
   await page.screenshot({ path: `${output}/notifications-light-1440.png`, fullPage: true });
@@ -263,15 +432,44 @@ try {
   await dialog.getByRole("region", { name: "Arabic preview" }).waitFor();
   assert.deepEqual(lastPost(), { action: "preview", event_id: EVENT.quiet });
   await dialog.getByText("≈ 12 people following this governorate · 7 with push enabled", { exact: true }).waitFor();
+  ok(await dialog.evaluate((el) => el.tagName === "DIALOG" && el.open && el.matches(":modal")), "dialog: a native modal <dialog>");
+  ok((await dialog.getByRole("heading", { level: 2 }).innerText()) === "Send now", "dialog: the action is its heading");
+  ok(await dialog.getByRole("button", { name: "Not now", exact: true }).evaluate((b) => b === document.activeElement), "dialog: focus starts on Not now, not on the send");
   await page.setViewportSize({ width: 375, height: 800 });
   const [dScroll, dClient] = await dialog.evaluate((el) => [el.scrollWidth, el.clientWidth]);
   assert.ok(dScroll <= dClient + 1, `dialog overflows at 375px: ${dScroll}/${dClient}`);
   await page.screenshot({ path: `${output}/send-now-dialog-375.png` });
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate((t) => document.documentElement.setAttribute("data-theme", t), theme);
+    const fit = await fits(page);
+    ok(fit.bad.length === 0, `dialog 375 ${theme}: fits`, fit);
+    const low = await lowContrast(page, ".ui-dialog h2, .ui-dialog h3, .ann-name, .ann-meta, .ann-lang, .ann-title, .ann-body, .ann-line span, .ui-dialog .ui-btn");
+    ok(low.length === 0, `dialog 375 ${theme}: text at 4.5:1`, low);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: `${shots}/t11-announce-dialog-390-light.png` });
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
   await page.setViewportSize({ width: 1440, height: 1000 });
   await dialog.getByRole("button", { name: "Send now", exact: true }).click();
   await page.getByText("Night Station released. The dispatcher sends it at its next run.", { exact: true }).waitFor();
   assert.deepEqual(lastPost(), { action: "release", event_id: EVENT.quiet });
   assert.equal(await page.getByRole("dialog").count(), 0);
+
+  // ── The dialog closes on its backdrop and on Not now, sending nothing ──
+  const postsBefore = posts.length;
+  await suggestions.filter({ hasText: "Ennakl La Marsa" }).getByRole("button", { name: "Announce", exact: true }).click();
+  await dialog.getByRole("region", { name: "English preview" }).waitFor();
+  await page.mouse.click(8, 8);
+  await page.waitForFunction(() => !document.querySelector("dialog"));
+  await suggestions.filter({ hasText: "Ennakl La Marsa" }).getByRole("button", { name: "Announce", exact: true }).click();
+  await dialog.getByRole("region", { name: "English preview" }).waitFor();
+  await dialog.getByRole("button", { name: "Not now", exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector("dialog"));
+  // (Dev StrictMode runs the preview effect twice per open.)
+  ok(posts.length > postsBefore && posts.slice(postsBefore).every((b) => b.action === "preview"), "backdrop and Not now close the dialog with only previews sent", posts.slice(postsBefore));
+  ok(await suggestions.filter({ hasText: "Ennakl La Marsa" }).getByRole("button", { name: "Announce", exact: true }).evaluate((b) => b === document.activeElement), "focus returns to Announce");
 
   // ── Announce: preview shows FR / AR (rtl) / EN, then announce ─────────
   await suggestions.filter({ hasText: "Ennakl La Marsa" }).getByRole("button", { name: "Announce", exact: true }).click();
@@ -283,6 +481,7 @@ try {
   assert.equal(await dialog.getByRole("region", { name: "Arabic preview" }).locator("[dir]").getAttribute("dir"), "rtl");
   await dialog.getByText("≈ 12 people following this governorate or charger · 7 with push enabled", { exact: true }).waitFor();
   await page.screenshot({ path: `${output}/announce-dialog-1440.png` });
+  await page.screenshot({ path: `${shots}/t11-announce-dialog-1440-dark.png` });
   await dialog.getByRole("button", { name: "Announce", exact: true }).click();
   await page.getByText("Announcement queued for Ennakl La Marsa. The dispatcher sends it at its next run.", { exact: true }).waitFor();
   assert.deepEqual(lastPost(), { action: "announce", update_event_id: UPDATE.marsa });
@@ -304,8 +503,9 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="suggestion-item"]').length === 1);
 
   // Period select re-fetches with the new window.
-  await page.locator(".notif-controls select").selectOption("7");
+  await page.getByRole("group", { name: "History and opt-in period" }).getByRole("button", { name: "7 days", exact: true }).click();
   await until(() => gets.includes("?days=7"), "days=7 fetch");
+  await page.getByText("Dispatcher runs in the last 7 days. One row per batch; a batch can carry several events.", { exact: true }).waitFor();
 
   // ── Charger drawer: Announce update ───────────────────────────────────
   await page.goto(`${base}/#/chargers?id=${CHARGERS.drawer.id}`);
@@ -324,6 +524,20 @@ try {
     await page.setViewportSize({ width, height: 900 });
     await page.screenshot({ path: `${output}/drawer-announce-${width}.png` });
   }
+  // Over the drawer on a phone: the dialog fits and its text reads.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await announceBtn.click();
+  await dialog.getByRole("region", { name: "Arabic preview" }).waitFor();
+  {
+    const fit = await fits(page);
+    ok(fit.bad.length === 0, "drawer dialog 390: fits", fit);
+    const low = await lowContrast(page, ".ui-dialog h2, .ui-dialog h3, .ann-name, .ann-meta, .ann-lang, .ann-title, .ann-body, .ann-line span, .ui-dialog .ui-btn");
+    ok(low.length === 0, "drawer dialog 390: text at 4.5:1", low);
+  }
+  await page.screenshot({ path: `${shots}/t11-announce-drawer-390-dark.png` });
+  await dialog.getByRole("button", { name: "Not now", exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector("dialog"));
+  await announceBtn.waitFor();
   await page.setViewportSize({ width: 1440, height: 1000 });
   await announceBtn.click();
   await dialog.getByRole("region", { name: "Arabic preview" }).waitFor();
@@ -351,11 +565,58 @@ try {
     assert.ok(scroll <= client + 1, `empty page overflows at ${width}px: ${scroll}/${client}`);
   }
   await page.screenshot({ path: `${output}/notifications-empty-375.png`, fullPage: true });
+  {
+    const fit = await fits(page);
+    ok(fit.bad.length === 0, "empty 375: fits", fit);
+    ok((await page.locator(".ui-lad-v").allInnerTexts()).join("|") === "0|0|0|0", "empty: the opt-in funnel shows real zeros");
+  }
+  empty = false;
+
+  // ── Loading: card shells say Loading…, no numbers ─────────────────────
+  let release;
+  holdGets = new Promise((resolve) => { release = resolve; });
+  await page.reload();
+  await page.getByText("Loading…", { exact: true }).first().waitFor();
+  ok((await page.locator(".notif .ui-card").count()) === 3, "loading: the card shells stay up");
+  const metas = await page.locator(".notif .ui-card .ui-meta").allInnerTexts();
+  ok(metas.join("|") === "30 days" && (await page.getByTestId("pending-item").count()) === 0, "loading: no counts while loading", metas);
+  holdGets = null;
+  release();
+  await page.getByTestId("pending-item").first().waitFor();
+
+  // ── Error: each card says why and offers Try again ────────────────────
+  failGets = 1;
+  await page.reload();
+  await page.getByRole("alert").first().waitFor();
+  const alerts = await page.locator(".notif .notif-retry").allInnerTexts();
+  ok(alerts.length === 3 && alerts.every((t) => t.startsWith("Couldn't load.") && t.includes("Try again")), "error: Couldn't load + Try again, no numbers", alerts);
+  await page.locator(".notif .notif-retry button").first().click();
+  await page.getByTestId("pending-item").first().waitFor();
+  ok(true, "error: Try again loads the page");
+  // A refresh that fails keeps the data and says so.
+  failGets = 1;
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await page.getByText(/^Couldn't refresh:/).waitFor();
+  ok((await page.getByTestId("pending-item").count()) > 0, "a failed refresh keeps the rows");
+
+  // ── RTL at 390: everything still fits ─────────────────────────────────
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => { document.documentElement.dir = "rtl"; });
+  await page.waitForTimeout(200);
+  {
+    const fit = await fits(page);
+    ok(fit.bad.length === 0, "rtl 390: fits", fit);
+    ok(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), "rtl 390: no horizontal scroll");
+    const toggle = await page.locator(".ui-lt .ui-mode").boundingBox();
+    ok(toggle.x < 100, "rtl 390: the theme toggle sits at the end edge (left)", toggle);
+  }
+  await page.evaluate(() => { document.documentElement.dir = "ltr"; });
 
   assert.deepEqual(errors, []);
   console.log(
     `PASS: notifications page (pending countdown, needs review, quiet hours, released Send now disabled, history open rate + pagination, subscribers + funnel), cancel/release/announce/dismiss payloads, 3-language preview with rtl Arabic, 429 message, drawer Announce update, empty states, 375/768/1440 without overflow, no page errors. ${posts.length} POSTs, ${gets.length} GETs.`,
   );
+  console.log(`PASS: ${checks} Health-look checks (colours, under-10 rate, open charger, native dialog, loading, error, 375/768/1024/1440 light and dark fits + clipped + contrast, RTL).`);
 } finally {
   await browser.close();
 }

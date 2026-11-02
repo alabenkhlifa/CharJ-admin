@@ -419,6 +419,30 @@ a.ui-card:hover {
 }
 .ui-lt-trailing {
   flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-sm);
+}
+/* The light/dark switch: a 36px circle in Fill at the title's end edge. */
+.ui-mode {
+  inline-size: 36px;
+  block-size: 36px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  background: var(--fill);
+  color: var(--ink-2);
+  transition: color .2s var(--ease);
+}
+.ui-mode:hover {
+  color: var(--ink);
+}
+.ui-mode svg {
+  inline-size: 22px;
+  block-size: 22px;
 }
 .ui-lt-pin {
   position: sticky;
@@ -716,4 +740,113 @@ a.ui-card:hover {
 .ui-pager-steps button:disabled {
   color: var(--ink-2);
   cursor: default;
+}
+
+/* ---- buttons and text actions (DESIGN.md "Buttons and fields") ---- */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-block-size: 34px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--ink);
+  font: var(--type-card-title);
+  white-space: nowrap;
+}
+.ui-btn:disabled {
+  color: var(--ink-2);
+  cursor: default;
+}
+/* One per item. The text tone as fill, so the label in glyph ink keeps
+   4.5:1 in both themes (like a bubble). */
+.ui-btn-primary {
+  background: var(--c-screens-text);
+  color: var(--glyph);
+}
+.ui-btn-primary:disabled {
+  background: var(--fill);
+  color: var(--ink-2);
+}
+.ui-link {
+  padding: var(--s-xs) 0;
+  border: 0;
+  background: none;
+  color: var(--c-screens-text);
+  font: var(--type-card-title);
+  text-align: start;
+}
+.ui-link:disabled {
+  color: var(--ink-2);
+  cursor: default;
+}
+/* Something failed: Alarm text is earned. */
+.ui-error {
+  margin: var(--s-sm) 0 0;
+  max-inline-size: 70ch;
+  color: var(--c-alarm-text);
+  font: var(--type-subhead);
+  overflow-wrap: anywhere;
+}
+/* A done or refused action: one Ink line on Fill. */
+.ui-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-md);
+  margin: 0;
+  padding: var(--s-sm) var(--s-md);
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  font: var(--type-subhead);
+  overflow-wrap: anywhere;
+}
+.ui-notice > span {
+  min-inline-size: 0;
+}
+
+/* ---- dialog (a native <dialog>: focus and Escape are the browser's) ---- */
+.ui-dialog {
+  inline-size: min(560px, calc(100vw - 2 * var(--s-lg)));
+  max-block-size: calc(100dvh - 2 * var(--s-lg));
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow-dialog);
+  overflow: auto;
+}
+.ui-dialog::backdrop {
+  background: var(--scrim);
+}
+.ui-dialog-body {
+  display: grid;
+  gap: var(--s-md);
+  padding: 18px var(--s-lg) var(--s-lg);
+}
+.ui-dialog h2 {
+  margin: 0;
+  font: var(--type-section);
+  overflow-wrap: anywhere;
+}
+.ui-dialog h3 {
+  margin: 0;
+  font: var(--type-card-title);
+}
+.ui-dialog-sec {
+  display: grid;
+  gap: var(--s-sm);
+  min-inline-size: 0;
+  padding-block-start: var(--s-md);
+  border-block-start: .5px solid var(--sep);
+}
+.ui-dialog-end {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--s-sm);
 }

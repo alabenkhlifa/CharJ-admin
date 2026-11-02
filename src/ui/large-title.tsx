@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ThemeToggle } from "./theme-toggle";
 import "./ui.css";
 
 type Props = {
   title: string;
   subtitle?: ReactNode;
-  /** At the end edge, e.g. the 36px theme toggle. */
+  /** At the end edge, before the theme toggle (e.g. "Add charger"). */
   trailing?: ReactNode;
 };
 
 /**
- * The page's large title. Once it scrolls away, a blurred inline bar with the
- * same title pins to the top of the scroll area. The bar is decorative: the
- * h1 stays the page heading.
+ * The page's large title, with the light/dark toggle at its end edge on every
+ * page. Once it scrolls away, a blurred inline bar with the same title pins
+ * to the top of the scroll area. The bar is decorative: the h1 stays the page
+ * heading.
  */
 export const LargeTitle = ({ title, subtitle, trailing }: Props) => {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -40,7 +42,10 @@ export const LargeTitle = ({ title, subtitle, trailing }: Props) => {
           <h1 ref={heading}>{title}</h1>
           {subtitle != null && <p>{subtitle}</p>}
         </div>
-        {trailing != null && <div className="ui-lt-trailing">{trailing}</div>}
+        <div className="ui-lt-trailing">
+          {trailing}
+          <ThemeToggle />
+        </div>
       </header>
     </>
   );

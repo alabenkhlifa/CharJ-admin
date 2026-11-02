@@ -4,7 +4,8 @@ import { supabase } from "./supabase";
 // The signed-in admin, provided by <AuthGate> to everything inside it.
 export type AdminSession = {
   email: string;
-  signOut: () => Promise<void>;
+  /** Null once signed out; otherwise why it failed (the session stays). */
+  signOut: () => Promise<string | null>;
 };
 
 export const AdminSessionContext = createContext<AdminSession | null>(null);
