@@ -51,7 +51,7 @@ The queue page. Four tabs (`?tab=`), each badge the same count as Needs you and 
 
 | Tab | Status | Source |
 |---|---|---|
-| Feedback: open requests by default (design votes left out), Status and Show filters with counts, stats (open requests, resolved, received 7 days / all time), resolve / reopen | 🔐 | `admin-feedback` (`category=requests`, `summary.open_requests`; not deployed yet, see KNOWN_ISSUES) |
+| Feedback: open requests by default (design votes left out), Status and Show filters with counts, stats (open requests, resolved, received 7 days / all time), resolve / reopen | 🔐 | `admin-feedback` (`category=requests`, `summary.open_requests`) |
 | Design votes: likes / doesn't like, a share only from 10 votes, platform split, latest comments | 🔐 | `admin-feedback` `category=design` (up to 500 votes) |
 | Submissions: pending / approved / rejected / all, details, photos, nearby chargers (100 m), Approve (dialog, optional Arabic name / address / operator, opens the editor) and Reject (note) | 🔐 | `admin-submissions`; nearby from `search_chargers` (anon) |
 | Reviews: review reports (open / resolved / all) with the review behind "Show review", resolve / reopen | 🔐 | `admin-review-reports` |

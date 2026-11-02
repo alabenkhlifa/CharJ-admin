@@ -48,7 +48,7 @@ Admin responses are parsed **strictly** by a pure `*-report.ts` module (`node --
 
 ### The queue
 
-`useQueue()` lives in `App.tsx` and is passed down. A source that fails or answers in an unexpected shape is unknown (`null`), never 0, and then the total is unknown too: no nav badge, no Queue clear ring. It reads on mount, on `refresh()` (every Community action calls it) and when the window gets the focus back. It does not read again on a page change.
+`useQueue()` lives in `App.tsx` and is passed down. A source that fails or answers in an unexpected shape is unknown (`null`), never 0, and then the total is unknown too: no nav badge, no Queue clear ring. It reads on mount, on `refresh()` (every Community action calls it) and when the page comes back: `visibilitychange` to visible or window `focus`, deduped so one return (which often fires both) reads once. It does not read again on a page change.
 
 ### Writes
 

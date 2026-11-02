@@ -39,11 +39,15 @@ export type QueueState = {
   refresh: () => void;
 };
 
+/** One return to the page often fires both visibilitychange and focus: read once. */
+const RETURN_DEDUPE_MS = 2000;
+
 /**
  * Read on mount, again on `refresh()` (every Community action calls it) and
- * whenever the window gets the focus back (another tab, the phone unlocked).
- * Moving between pages inside the app reads nothing: only a Community action
- * changes the queue from here, and that already refreshes it.
+ * whenever the page comes back: it becomes visible again (another tab, the
+ * phone unlocked) or the window gets the focus back. Moving between pages
+ * inside the app reads nothing: only a Community action changes the queue
+ * from here, and that already refreshes it.
  */
 export const useQueue = (): QueueState => {
   const [revision, setRevision] = useState(0);
@@ -80,8 +84,21 @@ export const useQueue = (): QueueState => {
   }, [revision]);
 
   useEffect(() => {
-    window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
+    // Monotonic: the wall clock can jump (or be pinned in tests).
+    let last = -Infinity;
+    const back = () => {
+      if (document.visibilityState !== "visible") return;
+      const now = performance.now();
+      if (now - last < RETURN_DEDUPE_MS) return;
+      last = now;
+      refresh();
+    };
+    window.addEventListener("focus", back);
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      window.removeEventListener("focus", back);
+      document.removeEventListener("visibilitychange", back);
+    };
   }, [refresh]);
 
   return { ...state, refresh };

@@ -44,7 +44,7 @@ No secret lives in the bundle. See `docs/AUTH.md`.
 
 - **Under 768px** the frosted tab bar (`src/ui/tab-bar.tsx`) holds five tabs; Notifications is a row in Settings.
 - **From 768px** the sticky sidebar (`src/ui/sidebar.tsx`) lists all six, with ⌘K search (`useGlobalSearch` + `SearchPanel`), the signed-in email and sign out.
-- Both show the Community badge: the queue total from `useQueue()` (`src/data/queue.ts`), which App owns and passes to Summary (Needs you) and Community (tab badges). It reads on mount, after each Community action and on window focus.
+- Both show the Community badge: the queue total from `useQueue()` (`src/data/queue.ts`), which App owns and passes to Summary (Needs you) and Community (tab badges). It reads on mount, after each Community action and when the page comes back (visible again or focused; one read per return).
 - Every page opens with `LargeTitle` (`src/ui/large-title.tsx`): the title, an optional page action and the theme toggle. When it scrolls away, a blurred bar with the title is fixed to the top of the main area.
 - `main` caps content at 1120px, centred; `?view=map` on Chargers lifts the cap (`main[data-wide]`).
 

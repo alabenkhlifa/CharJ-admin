@@ -340,9 +340,32 @@ try {
     await page.waitForSelector(".ui-rings");
     await page.waitForTimeout(500);
     eq(queueReads(), before, "link: moving between pages doesn't read the queue again");
+    // Coming back to the page reads it again, once even when both events fire.
+    const until = async (n) => { for (let i = 0; i < 60 && queueReads() < n; i += 1) await page.waitForTimeout(50); };
+    await page.evaluate(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      window.dispatchEvent(new Event("focus"));
+    });
+    await until(before + 1);
+    await page.waitForTimeout(500);
+    eq(queueReads(), before + 1, "return: visible again and focus together read the queue once");
+    await page.waitForTimeout(2100);
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await until(before + 2);
+    eq(queueReads(), before + 2, "return: the page becoming visible reads the queue again");
+    await page.waitForTimeout(2100);
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-    for (let i = 0; i < 40 && queueReads() === before; i += 1) await page.waitForTimeout(50);
-    ok(queueReads() > before, "focus: the window getting the focus back reads the queue again", { before, after: queueReads() });
+    await until(before + 3);
+    eq(queueReads(), before + 3, "return: the window getting the focus back reads the queue again");
+    // Going hidden reads nothing.
+    await page.waitForTimeout(2100);
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await page.waitForTimeout(400);
+    eq(queueReads(), before + 3, "return: a page going hidden reads nothing");
+    await page.evaluate(() => delete document.visibilityState);
     eq(await hscroll(page), 0, "env: no horizontal scroll");
     await context.close();
   }

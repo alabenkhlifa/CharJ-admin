@@ -12,7 +12,8 @@
 // Each view asserts: no horizontal scroll, no console or page error, no NaN or
 // Infinity in any text or label, the large title is there, nothing still
 // loading and no error line (every read was answered), the folded title bar
-// spans the main area, and the nav badge has at least 4.5:1 contrast.
+// spans the main area, the current nav item is Active (label 4.5:1, icon 3:1),
+// and the nav badge has at least 4.5:1 contrast.
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || "playwright");
@@ -382,7 +383,11 @@ const open = async ({ width, height, colorScheme, rtl = false }) => {
 const contrastOf = (page, selector) => page.evaluate((sel) => {
   const el = [...document.querySelectorAll(sel)].find((e) => e.getClientRects().length);
   if (!el) return null;
-  const parse = (c) => (c.match(/[\d.]+/g) ?? []).map(Number);
+  // rgb()/rgba() in 0–255; color-mix() computes to color(srgb r g b / a) in 0–1.
+  const parse = (c) => {
+    const n = (c.match(/[\d.]+/g) ?? []).map(Number);
+    return c.startsWith("color(srgb") ? [n[0] * 255, n[1] * 255, n[2] * 255, n[3] ?? 1] : n;
+  };
   const over = (top, under) => {
     const a = top[3] ?? 1;
     return [0, 1, 2].map((i) => top[i] * a + under[i] * (1 - a)).concat(1);
@@ -486,6 +491,26 @@ for (const combo of COMBOS) {
     if (pinned.room > 160) {
       ok(pinned.on === "true" && pinned.top === 0 && Math.abs(pinned.start) <= 1 && Math.abs(pinned.end) <= 1, `${at}: the folded title bar spans the main area`, pinned);
       folded.push(hash);
+    }
+    // The current page in the nav is Active: its label in Active's text tone at 4.5:1 or more,
+    // its icon (the base tone on the tab bar) at 3:1 or more. Phones have no Notifications tab.
+    const where = combo.width >= 768 ? '.ui-side nav a[aria-current="page"]' : '.ui-tabs a[aria-current="page"]';
+    const label = await contrastOf(page, `${where} > span:not(.ui-nav-badge)`);
+    const icon = await contrastOf(page, `${where} svg`);
+    if (combo.width < 768 && hash.startsWith("#/notifications")) {
+      ok(label === null, `${at}: no tab is current (Notifications lives in Settings on a phone)`);
+    } else {
+      ok(label !== null && label >= 4.5, `${at}: the current page's nav label reads at 4.5:1 or more`, label);
+      ok(icon !== null && icon >= 3, `${at}: the current page's nav icon reads at 3:1 or more`, icon);
+      const tone = await page.evaluate((sel) => {
+        const probe = document.createElement("span");
+        probe.style.color = "var(--c-active-text)";
+        document.body.append(probe);
+        const want = getComputedStyle(probe).color;
+        probe.remove();
+        return { want, got: getComputedStyle(document.querySelector(sel)).color };
+      }, `${where} > span:not(.ui-nav-badge)`);
+      eq(tone.got, tone.want, `${at}: the current page's nav label is Active's text tone`);
     }
     const nav = combo.width >= 768 ? ".ui-side .ui-nav-badge" : ".ui-tabs .ui-nav-badge";
     const ratio = await contrastOf(page, nav);

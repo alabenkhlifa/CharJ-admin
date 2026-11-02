@@ -48,8 +48,14 @@
   font: var(--type-tab);
   color: var(--c-idle);
 }
+/* The current page is Active (DESIGN.md "Navigation"): the label in Active's
+   text tone (4.9:1 or more on the bar in both themes), the icon in the base
+   tone, a graphic, 3:1 or more. */
 .ui-tabs a[aria-current="page"] {
-  color: var(--c-screens-text);
+  color: var(--c-active-text);
+}
+.ui-tabs a[aria-current="page"] svg {
+  color: var(--c-active);
 }
 
 /* ---- badge (Community queue) ----
@@ -106,9 +112,11 @@
 .ui-side nav a:hover {
   background: var(--fill);
 }
+/* Active at 8% behind Active Text at 600. The mock's 14% tint leaves Active
+   Text at 4.28:1 (light) and 4.24:1 (dark); at 8% it reads 4.66:1 and 4.52:1. */
 .ui-side nav a[aria-current="page"] {
-  background: color-mix(in srgb, var(--c-screens) 14%, transparent);
-  color: var(--c-screens-text);
+  background: color-mix(in srgb, var(--c-active) 8%, transparent);
+  color: var(--c-active-text);
   font-weight: 600;
 }
 .ui-side .ui-nav-badge {

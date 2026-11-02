@@ -104,7 +104,7 @@ POST /functions/v1/admin-feedback  { "id": "<uuid>", "resolved": true | false }
 - POST stamps `resolved_by` with the admin (needs a real session: the legacy secret gets **403** `session_required`) → `{ ok: true, item }`; **404** `feedback_not_found`.
 - **400** `invalid_request`, **503** `feedback_unavailable`. `perPage` ≤ 100.
 
-**Not deployed yet:** `category=requests` and `summary.open_requests` are committed in charj (`4ca3ed2`) but the deployed function predates them. Until it is deployed, the requests read is a **400**: the Feedback tab says so and offers "Show all", and the queue's feedback row and the nav badge stay unknown (never a made-up number). Deploy `admin-feedback` before (or with) the dashboard.
+**Live** (charj `4ca3ed2`, deployed 2 Nov 2026): `category=requests` and `summary.open_requests`. Should an older deployment ever answer `category=requests` with a 400, the Feedback tab says so and offers "Show all", and the queue's feedback row and the nav badge stay unknown rather than show a made-up number.
 
 ## `admin-submissions`
 
@@ -444,7 +444,7 @@ npx supabase functions deploy admin-analytics --no-verify-jwt   # only for older
 
 Each deploy bundles `_shared/admin-auth.ts` — a change there means redeploying every one of them.
 
-**Health rebuild rollout order:** `admin-usage`, `admin-review-reports`, `admin-submissions` and `admin-confirmations` (`since_days`) are live. Deploy `admin-feedback` (`category=requests`, `summary.open_requests`) before pushing the dashboard, or its Needs-you feedback row and the nav badge stay unknown.
+**Health rebuild:** everything the rebuilt dashboard reads is live: `admin-usage`, `admin-feedback` (`category=requests`, `summary.open_requests`), `admin-review-reports`, `admin-submissions` and `admin-confirmations` (`since_days`).
 
 **City picker rollout order:** deploy `admin-cities`, `admin-add-charger` and `admin-update-charger` first, then the dashboard. The dashboard also sends the legacy `city` label on add, so an older `admin-add-charger` still accepts it, but only the new one stores `city_id` / `address_ar`.
 

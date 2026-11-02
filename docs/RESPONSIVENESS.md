@@ -1,95 +1,57 @@
 # Responsiveness
 
-> Hard rule: zero horizontal scroll on `<main>` at any viewport. Verified at 375 / 768 / 1440 via Chrome DevTools sweeps.
+> Hard rule: zero horizontal scroll at any viewport. `tests/pages.browser.mjs` checks every route and view at 375 / 768 / 1440, light and dark, plus right to left at 375 (`main.scrollWidth <= main.clientWidth` and the same for the document). DESIGN.md "Layout" is the source of the rules below.
 
-## Breakpoints
+## One viewport switch: 768px
 
-| Width | What changes |
+| Width | Shell |
 |---|---|
-| ≤ 1400 | KPI grid drops from 4 → 3 columns |
-| ≤ 1100 | KPI grid → 2 cols. `.row-2` and `.row-3` collapse to 1 col (with `minmax(0, 1fr)` — see gotcha below) |
-| ≤ 900 | **Sidebar becomes a slide-out drawer.** `.map-grid` and `.feedback-grid` stack |
-| ≤ 640 | KPI grid → 1 col. Topbar search hidden. `.card-grid-260` drops minmax floor so cards fit at 375px |
+| under 768px | Phone: one column, page padding 16px, the frosted tab bar fixed to the bottom (five tabs; Notifications is a row in Settings), 88px plus the safe area kept free under the content. |
+| 768px and up | The 260px sticky sidebar (`--sidebar-inline`) beside the content, page padding 28px, no tab bar. The sidebar lists all six pages, the ⌘K search and sign out. |
 
-CSS lives in `src/index.css` (search for `@media`).
+The shell lives in `src/ui/shell.css` (`.shell`, `.shell-main`, `.ui-tabs`, `.ui-side`); the padding token `--page-pad-inline` is in `src/index.css`. The kit has one more viewport rule: the cohort chips become a table from 768px (`.ui-coh` / `.ui-coh-table` in `ui.css`); Usage overrides it by room (below).
 
-## Sidebar drawer pattern
+**The one exception, inside a control:** under 400px, Chargers' Add charger beside the large title's theme toggle shows only its plus in a 36px circle (`.ui-btn.chg-add` in `chargers.css`), keeping "Add charger" as its accessible name and tooltip, so the large title never breaks. (The charger editor sheet also tightens its header padding under 480px.)
 
-The sidebar is part of the main flex container on desktop (sticky, 240px, takes column space). On mobile (<= 900px) it switches to:
+## Content width
 
-```css
-position: fixed;
-inset-block: 0;
-inset-inline-start: 0;
-transform: translateX(-100%);   /* off-screen by default */
-z-index: 60;
-transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
-```
+`.shell-main` pads its inline sides with `max(var(--page-pad-inline), (100% - 1120px) / 2)`: content is at most 1120px wide and centred, and every page inherits it. Chargers' map view (`#/chargers?view=map`) lifts the cap (`main[data-wide]`, `--content-max: 100%`) and keeps the page padding; the map bleeds to its card's edges.
 
-When `mobileNavOpen === true` the transform becomes `translateX(0)`. A backdrop sits at `z-index: 59`. Tapping the backdrop, pressing the `X` button, or clicking any nav item closes the drawer (auto-close on nav).
+## Inside a page: container queries
 
-The hamburger trigger lives in the Topbar (only renders when `isMobile === true`). On desktop the Topbar's hamburger slot is invisible and the existing collapse button on the sidebar header handles the 240↔64 toggle.
+Every page wrapper is a size container (`.sum`, `.use`, `.com`, `.chg`, `.notif`, `.set`: `container: <name> / inline-size`), and its layouts follow the room the page has, not the viewport: at 768 the sidebar leaves the page about 450px, at 1024 about 710px.
 
-State:
-- `App.tsx` owns `mobileNavOpen` and passes `mobileOpen` + `onCloseMobile` to `<Sidebar>` and `onOpenMenu` to `<Topbar>`.
-- `useIsMobile()` (`src/lib/use-is-mobile.ts`) is the single source of truth — `matchMedia('(max-width: 900px)')`.
+| Page | Rule |
+|---|---|
+| Summary | Two card columns from 720px of page (the Today legend then fits beside the rings). |
+| Usage | Two card columns from 720px; the cohort table from 600px (chips below, whatever the viewport); the Users table from 720px (list rows below). |
+| Community | The four tabs in one row and four stats across from 600px; Feedback beside Design votes and Review reports beside Recent reviews from 900px. |
+| Chargers | The list is one `<table>`: a sortable table from 860px of page, list rows below (with a Sort select and the filter chips folded behind "Filters"); connectors stay on one line from 1040px; network cards two across from 720px. |
+| Notifications | Two card columns and the History table (instead of its list) from 900px. |
+| Settings | Two cards across from 700px. |
+
+## The folded large title
+
+When a page's large title scrolls away, a blurred bar with the title (`.ui-lt-bar`, `src/ui/large-title.tsx`) is fixed to the top of the window. It is portalled to `<body>`, so no page container can box it in, and spans the whole main area at every width: the full width on a phone, everything after the sidebar from 768px (`body:has(.shell-side) .ui-lt-bar { inset-inline-start: var(--sidebar-inline) }`), however wide the page padding grows and on the full-width map view too. `pages.browser.mjs` checks both ends against `main` on every view that can scroll.
 
 ## The `minmax(0, 1fr)` gotcha (real bug we shipped + fixed)
 
-Default `1fr` is `minmax(auto, 1fr)`. Auto uses min-content as the floor. **Min-content of an SVG with intrinsic width = the SVG's width.** Our charts use `useSize` with a 600px fallback width — so a chart card inside a `1fr` column establishes a 600px floor, which then forces the column to 600px instead of collapsing to viewport width. Result: the page overflows 375px on mobile even though the row "should" be 1 column.
+Default `1fr` is `minmax(auto, 1fr)`. Auto uses min-content as the floor, and the min-content of a chart SVG drawn at a fixed width is that width, so a chart card inside a `1fr` column can force the column wider than the screen. Every grid in the app uses `minmax(0, 1fr)` (`repeat(2, minmax(0, 1fr))` for two columns), and grid / flex children that hold charts or tables set `min-inline-size: 0`. Keep it that way for anything new.
 
-Fix: always use `minmax(0, 1fr)` for grid columns that contain charts, tables, or any element with intrinsic min-content width:
+## Overflow patterns
 
-```css
-.row-2, .row-3 { grid-template-columns: minmax(0, 1fr) !important; }
-```
+- **Tables** scroll inside their card, never the page: `DataTable` wraps its table in `.ui-table-wrap` (`overflow-x: auto`).
+- **Charts** are drawn at the container's real width (`useBoxWidth`, at least 280px) with a viewBox in real pixels; they never scale, so text keeps its size.
+- **Long words** (charger names, emails, Arabic addresses) wrap with `overflow-wrap: anywhere` or truncate with an ellipsis on one-line rows (`.ui-row-d`, the search results).
+- **Segmented controls** that would clip a long label on a phone become a select (DESIGN.md "Buttons and fields").
 
-If you add new responsive grid rules, prefer `minmax(0, 1fr)` over plain `1fr`.
+## RTL
 
-## Page-level overflow patterns
+Logical properties only (`inset-inline-start`, `margin-inline-end`, `padding-inline`, `border-block-start`), chart marks mirrored as a group with text placed separately, drawers and the tooltip placed with `inset-inline-*`. `pages.browser.mjs` runs every view at 375 with `dir="rtl"`.
 
-### Tables (Chargers, Users)
+## Verifying a page by hand
 
-Wrap in `<div style={{ overflowX: "auto" }}>` and set `min-width` on the table so it scrolls *inside the card*, never blowing out the page.
-
-```tsx
-<Card padding={0}>
-  <div style={{ overflowX: "auto" }}>
-    <table style={{ width: "100%", minWidth: 720 }}>
-      ...
-    </table>
-  </div>
-</Card>
-```
-
-### Tab strips (Submissions)
-
-`flex` + `overflow-x: auto` + `whiteSpace: nowrap` + `flexShrink: 0` on each tab. So 4 tabs scroll horizontally inside the strip on narrow viewports without overflowing the page.
-
-### Card grids (Submissions, Vehicles)
-
-`grid-template-columns: repeat(auto-fill, minmax(320px, 1fr))` overflows below ~320px content area. Apply the `.card-grid-260` class so the @640px breakpoint drops the floor:
-
-```css
-.card-grid-260 {
-  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)) !important;
-}
-```
-
-`min(260px, 100%)` is the trick — never demand more than the container can give.
-
-## Topbar shrink rules
-
-On mobile:
-- Hamburger button shows
-- User button collapses to avatar only (label + role badge hidden)
-- Search input hidden via `.topbar-search { display: none !important; }` at <= 640px
-
-(Help + Notifications buttons were removed entirely — no source of data for either yet, so they were dead UI on every viewport.)
-
-## Verifying a page is mobile-clean
-
-Open Chrome DevTools, resize to 375px, run in console:
+Open Chrome DevTools, resize to 375px, run in the console:
 
 ```js
 const main = document.querySelector('main');
@@ -99,7 +61,7 @@ console.log({
 });
 ```
 
-Both should be `false`. If `mainHasHScroll: true`, walk the children:
+Both should be `false`. If not, walk the children:
 
 ```js
 const vw = window.innerWidth;
@@ -109,4 +71,4 @@ const vw = window.innerWidth;
   .forEach(el => console.log(el.tagName, el.className, el.getBoundingClientRect().width));
 ```
 
-The output is the offending elements. Usual culprits: a table without an `overflow-x` wrapper, a tab strip without `whiteSpace: nowrap`, a chart inside a `1fr` instead of `minmax(0, 1fr)`.
+Usual culprits: a table without its wrapper, a chart in a `1fr` instead of `minmax(0, 1fr)`, a flex child without `min-inline-size: 0`, a long unbroken string without `overflow-wrap`.
