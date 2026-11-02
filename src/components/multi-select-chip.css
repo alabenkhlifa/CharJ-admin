@@ -1,0 +1,130 @@
+/* Multi-select filter chip (DESIGN.md "Chips"): a Fill chip whose popover
+   floats in Card. Logical properties only, so Arabic flips cleanly. Tokens:
+   src/index.css. */
+
+.ms {
+  position: relative;
+  min-inline-size: 0;
+}
+.ms-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 36px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--ink);
+  font: 500 15px var(--font);
+  text-align: start;
+}
+.ms-label {
+  flex: none;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.ms-value {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Narrowing the rows: the value says so in Screens Text. */
+.ms-chip[data-active="true"] .ms-value {
+  color: var(--c-screens-text);
+  font-weight: 600;
+}
+.ms-chev {
+  flex: none;
+  inline-size: 12px;
+  block-size: 12px;
+  color: var(--ink-2);
+  transition: transform .12s var(--ease);
+}
+.ms-chev[data-open="true"] {
+  transform: rotate(180deg);
+}
+
+.ms-pop {
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-start: 0;
+  z-index: 30;
+  inline-size: 240px;
+  max-inline-size: calc(100vw - 16px);
+  max-block-size: 300px;
+  overflow: auto;
+  padding: 6px;
+  border-radius: var(--r-tooltip);
+  background: var(--card);
+  box-shadow: var(--shadow-tooltip);
+}
+.ms-pop[data-end="true"] {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+}
+.ms-find {
+  inline-size: 100%;
+  margin-block-end: 6px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--ink);
+  font: 400 17px/1.3 var(--font);
+}
+.ms-find::placeholder {
+  color: var(--ink-2);
+}
+.ms-none {
+  margin: 0;
+  padding: 8px;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.ms-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--r-chip);
+  color: var(--ink);
+  font: var(--type-subhead);
+  cursor: pointer;
+}
+.ms-opt:hover {
+  background: var(--card-pressed);
+}
+.ms-opt input {
+  flex: none;
+  inline-size: 16px;
+  block-size: 16px;
+  margin: 0;
+  accent-color: var(--c-screens-text);
+}
+.ms-opt-l {
+  flex: 1;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+.ms-opt-n {
+  flex: none;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  font-variant-numeric: tabular-nums;
+}
+.ms-clear {
+  inline-size: 100%;
+  margin-block-start: 6px;
+  padding: 8px;
+  border: 0;
+  border-block-start: .5px solid var(--sep);
+  background: none;
+  color: var(--c-screens-text);
+  font: var(--type-card-title);
+  text-align: start;
+}

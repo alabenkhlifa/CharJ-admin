@@ -34,7 +34,7 @@ export const ChartTooltip = ({ tip }: { tip: Tip | null }) => {
       {tip.rows.map((r) => (
         <div key={r.name} className="ui-tip-r">
           <span>
-            {r.tone && <i style={{ background: baseTone(r.tone) }} />}
+            {(r.color || r.tone) && <i style={{ background: r.color ?? (r.tone && baseTone(r.tone)) }} />}
             {r.name}
           </span>
           <b>{r.value}</b>

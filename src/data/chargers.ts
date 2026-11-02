@@ -218,54 +218,43 @@ type UseChargersResult = UseChargersState & {
   refetch: () => Promise<void>;
 };
 
-export const useChargers = (): UseChargersResult => {
-  const [state, setState] = useState<UseChargersState>({
-    data: [],
-    loading: true,
-    error: null,
+// One read of the catalogue, as the hook's next state. Never throws.
+const readChargers = async (): Promise<UseChargersState> => {
+  const { data, error } = await supabase.rpc("search_chargers", {
+    query: "",
+    sort_by: "name",
+    max_results: 1000,
+    include_employees_only: true,
   });
+  if (error) return { data: [], loading: false, error: error.message };
+  const rows = (data ?? []) as RawChargerRow[];
+  return { data: rows.map(mapRawCharger).filter((c): c is Charger => c !== null), loading: false, error: null };
+};
 
-  const fetchOnce = useCallback(async (signal?: { cancelled: boolean }) => {
-    if (!SUPABASE_CONFIGURED) {
-      if (!signal?.cancelled) {
-        setState({ data: [], loading: false, error: "Supabase not configured" });
-      }
-      return;
-    }
-
-    const { data, error } = await supabase.rpc("search_chargers", {
-      query: "",
-      sort_by: "name",
-      max_results: 1000,
-      include_employees_only: true,
-    });
-
-    if (signal?.cancelled) return;
-
-    if (error) {
-      setState({ data: [], loading: false, error: error.message });
-      return;
-    }
-
-    const rows = (data ?? []) as RawChargerRow[];
-    const mapped = rows
-      .map(mapRawCharger)
-      .filter((c): c is Charger => c !== null);
-
-    setState({ data: mapped, loading: false, error: null });
-  }, []);
+export const useChargers = (): UseChargersResult => {
+  // Without Supabase there is nothing to read: say so from the first render
+  // rather than setting state inside the effect.
+  const [state, setState] = useState<UseChargersState>(() =>
+    SUPABASE_CONFIGURED
+      ? { data: [], loading: true, error: null }
+      : { data: [], loading: false, error: "Supabase not configured" },
+  );
 
   useEffect(() => {
-    const signal = { cancelled: false };
-    void fetchOnce(signal);
+    if (!SUPABASE_CONFIGURED) return;
+    let cancelled = false;
+    void readChargers().then((next) => {
+      if (!cancelled) setState(next);
+    });
     return () => {
-      signal.cancelled = true;
+      cancelled = true;
     };
-  }, [fetchOnce]);
+  }, []);
 
   const refetch = useCallback(async () => {
-    await fetchOnce();
-  }, [fetchOnce]);
+    if (!SUPABASE_CONFIGURED) return;
+    setState(await readChargers());
+  }, []);
 
   return { ...state, refetch };
 };

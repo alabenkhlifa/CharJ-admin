@@ -1,0 +1,995 @@
+/* Chargers: the list, the map and About the network. Components and their
+   styles come from the kit (src/ui/, ui.css); tokens from src/index.css.
+   Logical properties only, so Arabic flips cleanly. The page width (at most
+   1120px) comes from the shell; the map view lifts it (App: data-wide).
+   Layouts follow the room the page has (container queries), not the
+   viewport: at 768 the sidebar leaves ~450px, at 1024 ~710px. */
+
+.chg {
+  container: chg / inline-size;
+}
+.chg-ic {
+  inline-size: 16px;
+  block-size: 16px;
+  flex: none;
+}
+
+/* ---- title action, buttons, text actions ---- */
+.chg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-block-size: 34px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--ink);
+  font: var(--type-card-title);
+  white-space: nowrap;
+  text-decoration: none;
+}
+.chg-btn:disabled {
+  color: var(--ink-2);
+  cursor: default;
+}
+/* The text tone as fill, so the label in glyph ink keeps 4.5:1 (like bubbles). */
+.chg-btn-primary {
+  background: var(--c-screens-text);
+  color: var(--glyph);
+}
+.chg-btn-primary:disabled {
+  background: var(--fill);
+  color: var(--ink-2);
+}
+.chg-btn-icon {
+  inline-size: 34px;
+  padding: 0;
+}
+.chg-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--s-xs) 0;
+  border: 0;
+  background: none;
+  color: var(--c-screens-text);
+  font: var(--type-card-title);
+  white-space: nowrap;
+}
+.chg-link:disabled {
+  color: var(--ink-2);
+  cursor: default;
+}
+
+/* ---- view tabs: pills on the ground, like Community's page tabs ---- */
+.chg-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-xs);
+  max-inline-size: 420px;
+  margin-block-end: var(--s-lg);
+}
+.chg-tabs a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-inline-size: 0;
+  min-block-size: 40px;
+  padding: 6px 10px;
+  border-radius: var(--r-chip);
+  color: var(--ink);
+  font: 500 15px var(--font);
+  transition: background .2s var(--ease);
+}
+.chg-tabs a:hover {
+  background: var(--card-pressed);
+}
+.chg-tabs a[aria-current="page"] {
+  background: var(--card);
+  box-shadow: var(--shadow-thumb);
+  font-weight: 600;
+}
+.chg-tabs .chg-ic {
+  inline-size: 18px;
+  block-size: 18px;
+  color: var(--ink-2);
+}
+
+/* "No charger with that id", above the view: Ink on Card (it sits on the ground). */
+.chg-notice {
+  margin: 0 0 var(--s-lg);
+  padding: var(--s-sm) var(--s-md);
+  border-radius: var(--r-chip);
+  background: var(--card);
+  font: var(--type-subhead);
+  overflow-wrap: anywhere;
+}
+.chg-notice .chg-link {
+  padding: 0;
+}
+
+/* ---- filters ---- */
+.chg-filters {
+  margin-block-start: var(--s-md);
+}
+.chg-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm) var(--s-md);
+}
+.chg-search {
+  position: relative;
+  flex: 1 1 220px;
+  min-inline-size: 0;
+  max-inline-size: 420px;
+}
+.chg-search > .chg-ic {
+  position: absolute;
+  inset-inline-start: 10px;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-2);
+  pointer-events: none;
+}
+.chg-search input {
+  inline-size: 100%;
+  block-size: 40px;
+  padding-inline: 34px 38px;
+  border: 0;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--ink);
+  font: 400 17px var(--font);
+  appearance: none;
+}
+.chg-search input::placeholder {
+  color: var(--ink-2);
+}
+.chg-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+.chg-search-clear {
+  position: absolute;
+  inset-inline-end: 6px;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  inline-size: 28px;
+  block-size: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-2);
+}
+.chg-count {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 20px;
+  block-size: 20px;
+  padding-inline: 6px;
+  border-radius: 10px;
+  background: var(--c-screens-text);
+  color: var(--glyph);
+  font: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+}
+.chg-export {
+  margin-inline-start: auto;
+}
+
+.chg-chips {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm);
+  margin-block-start: var(--s-md);
+}
+.chg-sel,
+.chg-legacy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-inline-size: 0;
+  min-block-size: 36px;
+  padding-block: 0;
+  padding-inline: 10px 4px;
+  border: 0;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--ink);
+}
+.chg-sel > span {
+  flex: none;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.chg-sel select {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  /* As wide as the value shown, not the longest option (where supported). */
+  field-sizing: content;
+  padding-block: 6px;
+  padding-inline: 0 22px;
+  margin-inline-end: -16px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: 500 15px var(--font);
+  text-overflow: ellipsis;
+  appearance: none;
+  cursor: pointer;
+}
+/* The multi-select chips' chevron, drawn over the select's end padding. */
+.chg-sel::after {
+  content: "";
+  flex: none;
+  inline-size: 12px;
+  block-size: 12px;
+  margin-inline-end: 6px;
+  background: var(--ink-2);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  pointer-events: none;
+}
+.chg-sel[data-active="true"] select {
+  color: var(--c-screens-text);
+  font-weight: 600;
+}
+.chg-sel select option {
+  color: var(--ink);
+  background: var(--card);
+}
+.chg-legacy {
+  padding-inline-end: 10px;
+}
+.chg-legacy .ms-label {
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.chg-legacy-v {
+  min-inline-size: 0;
+  overflow: hidden;
+  color: var(--c-screens-text);
+  font: 600 15px var(--font);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.chg-legacy .chg-ic {
+  inline-size: 14px;
+  block-size: 14px;
+  color: var(--ink-2);
+}
+
+/* A roomy table keeps a charger's connectors on one line. */
+@container chg (min-width: 1040px) {
+  .chg-c-conn .chg-conns {
+    flex-wrap: nowrap;
+  }
+}
+/* Wide: every chip shows, the table headers sort. */
+@container chg (min-width: 860px) {
+  .chg-filters-toggle,
+  .chg-sort {
+    display: none;
+  }
+}
+/* Narrow: the chips fold behind "Filters", two to a row when open; a menu
+   opens across the whole panel so it never runs off a phone. */
+@container chg (max-width: 859px) {
+  .chg-chips {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .chg-chips[data-open="false"] {
+    display: none;
+  }
+  .chg-chips .ms {
+    position: static;
+  }
+  .chg-chips .ms-pop {
+    inset-inline: 0;
+    inline-size: auto;
+  }
+  .chg-sort,
+  .chg-legacy {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---- marks ---- */
+.chg-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.chg-dot {
+  display: inline-block;
+  flex: none;
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+}
+.chg-sq {
+  display: inline-block;
+  flex: none;
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 2px;
+}
+.chg-conns {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+.chg-dim {
+  color: var(--ink-2);
+}
+.chg-pill.ui-pill {
+  margin: 0;
+}
+.chg-pill-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.chg-pill-icon .chg-ic {
+  inline-size: 13px;
+  block-size: 13px;
+}
+.chg-verified {
+  display: inline-flex;
+  margin-inline-start: 6px;
+  vertical-align: -2px;
+  color: var(--ink-2);
+}
+.chg-verified .chg-ic {
+  inline-size: 15px;
+  block-size: 15px;
+}
+
+/* ---- the list: a table on a wide page ---- */
+#chg-list {
+  scroll-margin-block-start: 56px;
+}
+.chg-table {
+  inline-size: 100%;
+  margin-block-start: var(--s-md);
+  border-collapse: collapse;
+  font: var(--type-subhead);
+}
+.chg-table th {
+  padding-block: 6px;
+  padding-inline: 0 10px;
+  color: var(--ink-2);
+  font: 500 13px var(--font);
+  text-align: start;
+  white-space: nowrap;
+}
+.chg-table th button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--s-xs) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.chg-table th button[data-on="true"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+.chg-table th svg {
+  inline-size: 12px;
+  block-size: 12px;
+  opacity: 0;
+  transition: opacity .15s var(--ease), transform .15s var(--ease);
+}
+.chg-table th button:hover svg {
+  opacity: .5;
+}
+.chg-table th svg[data-dir="asc"],
+.chg-table th svg[data-dir="desc"] {
+  opacity: 1;
+}
+.chg-table th svg[data-dir="desc"] {
+  transform: rotate(180deg);
+}
+.chg-table .chg-th-end {
+  text-align: end;
+}
+.chg-table td {
+  padding-block: 10px;
+  padding-inline: 0 10px;
+  border-block-start: .5px solid var(--sep);
+  vertical-align: middle;
+}
+.chg-table tbody tr {
+  cursor: pointer;
+  transition: background .2s var(--ease);
+}
+.chg-table tbody tr:hover {
+  background: var(--card-pressed);
+}
+.chg-table tbody tr:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -3px;
+  background: var(--card-pressed);
+}
+/* Secondary Ink on Fill over Card Pressed falls just under 4.5:1: a pill in
+   a hovered row reads in Ink. */
+.chg-table tbody tr:is(:hover, :focus-visible) .chg-pill {
+  color: var(--ink);
+}
+.chg-c-name {
+  min-inline-size: 150px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.chg-c-city {
+  min-inline-size: 130px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.chg-c-city .chg-pill.ui-pill {
+  margin-inline-start: 6px;
+}
+.chg-c-power {
+  text-align: end;
+  white-space: nowrap;
+}
+.chg-c-power b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.chg-c-power span {
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.chg-c-hours {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.chg-c-hours .chg-ic {
+  display: none;
+}
+.chg-c-updated {
+  color: var(--ink-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.chg-pre {
+  display: none;
+}
+.chg-c-chev {
+  inline-size: 14px;
+  padding-inline-end: 0;
+  color: var(--c-idle);
+}
+.chg-c-chev .chg-ic {
+  display: block;
+  inline-size: 14px;
+  block-size: 14px;
+}
+.chg-c-chev .chg-ic:dir(rtl) {
+  transform: scaleX(-1);
+}
+
+/* ---- the list: rows on a narrow page ---- */
+@container chg (max-width: 859px) {
+  .chg-table,
+  .chg-table tbody {
+    display: block;
+  }
+  .chg-table thead {
+    display: none;
+  }
+  .chg-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--s-xs) 10px;
+    margin-inline: calc(-1 * var(--s-sm));
+    padding: 11px var(--s-sm);
+  }
+  .chg-table tbody tr + tr {
+    border-block-start: .5px solid var(--sep);
+  }
+  .chg-table td {
+    display: block;
+    padding: 0;
+    border: 0;
+    font: var(--type-footnote);
+  }
+  .chg-c-name {
+    order: 1;
+    flex: 1 1 0;
+    min-inline-size: 0;
+  }
+  .chg-table td.chg-c-name {
+    font: 600 17px/1.3 var(--font);
+  }
+  .chg-c-power {
+    order: 2;
+    flex: none;
+  }
+  .chg-table td.chg-c-power b {
+    font: 700 17px var(--font);
+    font-variant-numeric: tabular-nums;
+  }
+  .chg-c-chev {
+    order: 3;
+    flex: none;
+    align-self: center;
+  }
+  .chg-c-city {
+    order: 4;
+    flex: 1 0 100%;
+    min-inline-size: 0;
+  }
+  .chg-c-status {
+    order: 5;
+  }
+  .chg-c-conn {
+    order: 6;
+  }
+  .chg-c-access {
+    order: 7;
+  }
+  .chg-c-hours {
+    order: 8;
+  }
+  .chg-c-source {
+    order: 9;
+  }
+  .chg-c-updated {
+    order: 10;
+  }
+  .chg-table td.chg-c-none {
+    display: none;
+  }
+  .chg-c-hours .chg-ic {
+    display: inline-block;
+    inline-size: 12px;
+    block-size: 12px;
+    margin-inline-end: 3px;
+    vertical-align: -1px;
+  }
+  .chg-pre {
+    display: inline;
+  }
+}
+
+.chg-empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-md);
+  padding-block: var(--s-sm);
+}
+
+/* ---- waiting, notes, errors ---- */
+.chg-wait {
+  display: flex;
+  align-items: center;
+  min-block-size: 120px;
+}
+.chg-wait-tall {
+  min-block-size: 320px;
+}
+.chg-retry {
+  margin: var(--s-md) 0 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  overflow-wrap: anywhere;
+}
+.chg-retry button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-screens-text);
+  font: inherit;
+  font-weight: 600;
+}
+.chg-note {
+  margin: 10px 0 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.chg-note a {
+  color: var(--c-screens-text);
+  font-weight: 600;
+}
+.chg-error {
+  margin: var(--s-sm) 0 0;
+  color: var(--c-alarm-text);
+  font: var(--type-subhead);
+  overflow-wrap: anywhere;
+}
+
+/* ---- the map: bleeds to the card's edges, as tall as the screen allows ---- */
+.chg-map {
+  position: relative;
+  block-size: max(360px, calc(100dvh - 330px));
+  margin: var(--s-md) calc(-1 * var(--s-lg)) calc(-1 * var(--s-lg));
+  overflow: hidden;
+  border-end-start-radius: var(--r-card);
+  border-end-end-radius: var(--r-card);
+  background: var(--fill);
+}
+.chg-map-count {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-start: 10px;
+  z-index: 1;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--r-chip);
+  background: var(--card);
+  box-shadow: var(--shadow-tooltip);
+  font: var(--type-footnote);
+  font-variant-numeric: tabular-nums;
+}
+/* Top end: the bottom corners hold Google's logo and zoom buttons. */
+.chg-map-key {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 10px;
+  z-index: 1;
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 8px 12px;
+  list-style: none;
+  border-radius: var(--r-tooltip);
+  background: var(--card);
+  box-shadow: var(--shadow-tooltip);
+  font: var(--type-footnote);
+}
+.chg-map-key li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chg-map-key span {
+  margin-inline-start: auto;
+  padding-inline-start: var(--s-md);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.chg-map-nokey {
+  display: grid;
+  place-items: center;
+  padding: var(--s-xl) var(--s-lg);
+}
+.chg-map-nokey p {
+  margin: 0;
+  max-inline-size: 60ch;
+  color: var(--ink-2);
+  font: var(--type-subhead);
+}
+.chg-map-nokey b {
+  color: var(--ink);
+}
+.chg-map code,
+.chg-nokey code {
+  font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink);
+}
+
+/* ---- About the network ---- */
+.chg-sec {
+  margin: 6px var(--s-xs) var(--s-xs);
+  font: var(--type-section);
+}
+.chg-lede {
+  margin: 0 var(--s-xs) var(--s-lg);
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-subhead);
+}
+.chg-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-lg);
+}
+@container chg (min-width: 720px) {
+  .chg-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.chg-open-map {
+  margin: var(--s-md) 0 0;
+}
+.chg-open-map a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-screens-text);
+  font: var(--type-card-title);
+}
+
+/* ---- the detail drawer: a side sheet over a scrim ---- */
+.chg-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--scrim);
+  animation: fadeIn .15s var(--ease);
+}
+.chg-drawer {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 51;
+  display: flex;
+  flex-direction: column;
+  inline-size: min(480px, 92vw);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow-dialog);
+  animation: chg-in .25s var(--ease);
+}
+.chg-drawer:dir(rtl) {
+  animation-name: chg-in-rtl;
+}
+@keyframes chg-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes chg-in-rtl {
+  from {
+    transform: translateX(-100%);
+  }
+}
+.chg-d-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--s-md);
+  padding: var(--s-lg) var(--s-lg) var(--s-md);
+  border-block-end: .5px solid var(--sep);
+}
+.chg-d-head > div {
+  min-inline-size: 0;
+}
+.chg-d-id {
+  margin: 0;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  font-variant-numeric: tabular-nums;
+}
+.chg-d-head h2 {
+  margin: 2px 0 0;
+  font: var(--type-section);
+  overflow-wrap: anywhere;
+}
+.chg-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 36px;
+  block-size: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--fill);
+  color: var(--ink);
+}
+.chg-d-body {
+  flex: 1;
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--s-lg) var(--s-xl);
+}
+.chg-d-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm);
+  padding-block: var(--s-md);
+}
+/* A done action ("Charger changes saved."): an Ink line on Fill. */
+.chg-d-done {
+  flex-basis: 100%;
+  margin: 0 0 var(--s-sm);
+  padding: var(--s-sm) var(--s-md);
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  font: var(--type-subhead);
+  overflow-wrap: anywhere;
+}
+.chg-d-tags .chg-d-done {
+  margin: 0;
+}
+.chg-announce {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  margin-block-end: var(--s-md);
+  padding: var(--s-md);
+  border-radius: var(--r-tooltip);
+  background: var(--fill);
+}
+.chg-announce h3 {
+  margin: 0;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.chg-announce-what {
+  margin: 0;
+  font: var(--type-card-title);
+}
+.chg-announce-diff,
+.chg-announce-n {
+  margin: 0;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  overflow-wrap: anywhere;
+}
+.chg-announce-diff span {
+  color: var(--ink);
+}
+.chg-announce-n {
+  font-variant-numeric: tabular-nums;
+}
+.chg-announce .chg-btn {
+  margin-block-start: var(--s-xs);
+}
+.chg-minimap {
+  block-size: 170px;
+  margin: 0 0 var(--s-md);
+  overflow: hidden;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+}
+.chg-nokey {
+  display: grid;
+  place-items: center;
+  padding: var(--s-lg);
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  text-align: center;
+}
+.chg-d-sec {
+  padding-block: 14px;
+  border-block-start: .5px solid var(--sep);
+}
+.chg-d-sec h3 {
+  margin: 0 0 var(--s-sm);
+  font: var(--type-card-title);
+}
+.chg-d-power {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-sm) var(--s-md);
+  font: var(--type-subhead);
+}
+.chg-d-kw {
+  color: var(--ink-2);
+  font: 500 15px var(--font);
+  white-space: nowrap;
+}
+.chg-d-kw b {
+  color: var(--ink);
+  font: 700 22px var(--font);
+  font-variant-numeric: tabular-nums;
+}
+.chg-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chg-days li {
+  min-inline-size: 0;
+  padding: var(--s-sm) 6px;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  text-align: center;
+}
+.chg-days span {
+  display: block;
+  color: var(--ink-2);
+  font: var(--type-caption);
+}
+.chg-days b {
+  display: block;
+  margin-block-start: 2px;
+  font: 500 13px var(--font);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+/* Today, like the sidebar's current page: Screens at 14% behind Screens Text. */
+.chg-days li[aria-current="date"] {
+  background: color-mix(in srgb, var(--c-screens) 14%, transparent);
+}
+.chg-days li[aria-current="date"] span,
+.chg-days li[aria-current="date"] b {
+  color: var(--c-screens-text);
+  font-weight: 600;
+}
+.chg-amen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chg-amen li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--s-xs) 10px;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  font: var(--type-footnote);
+}
+.chg-kvs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-md) var(--s-lg);
+  margin: 0;
+}
+.chg-kv {
+  min-inline-size: 0;
+}
+.chg-kv-wide {
+  grid-column: 1 / -1;
+}
+.chg-kv dt {
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.chg-kv dd {
+  margin: 2px 0 0;
+  font: var(--type-subhead);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.chg-kv-flag {
+  display: block;
+  color: var(--c-needs-you-text);
+  font: var(--type-footnote);
+}
+.chg-d-status {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-sm);
+}
+/* The current status, like the sidebar's current page. */
+.chg-status-btn[aria-pressed="true"],
+.chg-status-btn[aria-pressed="true"]:disabled {
+  background: color-mix(in srgb, var(--c-screens) 14%, transparent);
+  color: var(--c-screens-text);
+}
+.chg-d-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm);
+}
+.chg-d-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-end: auto;
+  color: var(--ink-2);
+  font: var(--type-subhead);
+}

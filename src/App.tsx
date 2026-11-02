@@ -6,7 +6,6 @@ import { TabBar } from "./ui/tab-bar";
 import { SummaryPage } from "./pages/summary";
 import { ChargersPage } from "./pages/chargers";
 import { CommunityPage } from "./pages/community";
-import { MapPage } from "./pages/map";
 import { SettingsPage } from "./pages/settings";
 import { UsagePage } from "./pages/usage";
 import { NotificationsPage } from "./pages/notifications";
@@ -43,8 +42,7 @@ const App = () => {
     replace(route, next);
   };
 
-  // Until the new pages land (Tasks 10-11) Chargers and Settings render the
-  // pages they replace.
+  // Until Task 11 lands, Settings renders the page it replaces.
   const renderPage = () => {
     switch (route) {
       case "summary":
@@ -60,7 +58,7 @@ const App = () => {
       case "community":
         return <CommunityPage params={params} onParams={patchParams} navigate={navigate} queue={queue} />;
       case "chargers":
-        if (params.get("view") === "map") return <MapPage />;
+        // ?view=map|stats are views of the same page (one charger read, one drawer).
         return (
           <ChargersPage
             params={params}
@@ -79,6 +77,10 @@ const App = () => {
     }
   };
 
+  // The charger map takes the page's full width (DESIGN.md: content is capped
+  // at 1120px everywhere else); the page padding stays.
+  const wide = route === "chargers" && params.get("view") === "map";
+
   return (
     <div
       className="shell"
@@ -96,7 +98,9 @@ const App = () => {
           onOpenCharger={(id) => navigate("chargers", { id })}
         />
       </div>
-      <main className="shell-main">{renderPage()}</main>
+      <main className="shell-main" data-wide={wide || undefined}>
+        {renderPage()}
+      </main>
       <TabBar active={route} queueTotal={queueTotal} />
     </div>
   );

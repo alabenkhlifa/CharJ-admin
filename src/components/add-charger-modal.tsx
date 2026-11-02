@@ -299,7 +299,7 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(0,0,0,.5)",
+          background: "var(--scrim)",
           zIndex: 60,
           animation: "fadeIn .15s",
         }}
@@ -312,32 +312,36 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
           insetBlock: 0,
           insetInlineEnd: 0,
           width: "min(560px, 96vw)",
-          background: "var(--bg-elev)",
-          borderInlineStart: "1px solid var(--border-strong)",
+          background: "var(--card)",
+          borderInlineStart: "0",
           zIndex: 61,
           display: "flex",
           flexDirection: "column",
-          boxShadow: "-12px 0 40px rgba(0,0,0,.35)",
+          boxShadow: "var(--shadow-dialog)",
           animation: "slideIn .25s cubic-bezier(0.32, 0.72, 0, 1)",
         }}
       >
         <div
           style={{
             padding: "16px 20px",
-            borderBottom: "1px solid var(--border)",
+            borderBottom: "0",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
           }}
         >
           <div>
-            <div style={smallLbl}>New charger</div>
-            <h2 style={{ margin: "2px 0 0", fontSize: 16, fontWeight: 600 }}>
+            <div style={{ fontSize: 13, color: "var(--ink-2)" }}>New charger</div>
+            <h2 style={{ margin: "2px 0 0", fontSize: 22, fontWeight: 700 }}>
               Add a charging station
             </h2>
           </div>
-          <button onClick={onClose} aria-label="Close" style={iconBtnStyle}>
-            <Icons.X size={14} />
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            style={{ display: "grid", placeItems: "center", width: 36, height: 36, flex: "none", padding: 0, border: 0, borderRadius: "50%", background: "var(--fill)", color: "var(--ink)" }}
+          >
+            <Icons.X size={16} />
           </button>
         </div>
 
@@ -415,7 +419,7 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
             {/* Not a <Field>: that wraps its child in a <label>, and the
                 picker holds its own buttons and inputs. */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label htmlFor={cityInputId} style={{ fontSize: 11, color: "var(--text-dim)" }}>
+              <label htmlFor={cityInputId} style={{ fontSize: 13, color: "var(--ink-2)" }}>
                 City
               </label>
               <CityPicker
@@ -509,12 +513,12 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
               onClick={addConnector}
               style={{
                 alignSelf: "flex-start",
-                fontSize: 12,
-                color: "var(--accent)",
-                background: "var(--accent-soft)",
-                border: "1px solid var(--accent-border)",
+                fontSize: 15,
+                color: "var(--c-screens-text)",
+                background: "color-mix(in srgb, var(--c-screens) 14%, transparent)",
+                border: "0",
                 padding: "6px 10px",
-                borderRadius: 6,
+                borderRadius: 10,
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 6,
@@ -589,12 +593,12 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 6,
-                      fontSize: 11,
+                      fontSize: 13,
                       padding: "5px 10px",
-                      borderRadius: 14,
-                      border: `1px solid ${on ? "var(--accent-border)" : "var(--border)"}`,
-                      background: on ? "var(--accent-soft)" : "var(--bg-elev-2)",
-                      color: on ? "var(--accent)" : "var(--text-muted)",
+                      borderRadius: 10,
+                      border: "0",
+                      background: on ? "color-mix(in srgb, var(--c-screens) 14%, transparent)" : "var(--fill)",
+                      color: on ? "var(--c-screens-text)" : "var(--ink-2)",
                       cursor: "pointer",
                     }}
                   >
@@ -612,11 +616,11 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
               alignItems: "center",
               gap: 10,
               padding: "10px 12px",
-              background: "var(--bg-elev-2)",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              fontSize: 12,
-              color: "var(--text)",
+              background: "var(--fill)",
+              border: "0",
+              borderRadius: 10,
+              fontSize: 15,
+              color: "var(--ink)",
               cursor: "pointer",
             }}
           >
@@ -632,7 +636,7 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
         <div
           style={{
             padding: "12px 20px",
-            borderTop: "1px solid var(--border)",
+            borderTop: "0.5px solid var(--sep)",
             display: "flex",
             flexDirection: "column",
             gap: 8,
@@ -641,12 +645,11 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
           {error && (
             <div
               style={{
-                fontSize: 11,
-                color: "var(--red)",
+                fontSize: 13,
+                color: "var(--c-alarm-text)",
                 padding: "6px 10px",
-                background: "color-mix(in srgb, var(--red) 10%, transparent)",
-                border: "1px solid color-mix(in srgb, var(--red) 30%, transparent)",
-                borderRadius: 6,
+                background: "color-mix(in srgb, var(--c-alarm) 10%, transparent)",
+                borderRadius: 10,
               }}
             >
               {error}
@@ -656,12 +659,14 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
             <button
               onClick={onClose}
               style={{
-                padding: "8px 14px",
-                background: "transparent",
-                color: "var(--text-muted)",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-                fontSize: 12,
+                minHeight: 34,
+                padding: "6px 14px",
+                background: "var(--fill)",
+                color: "var(--ink)",
+                border: "0",
+                borderRadius: 10,
+                fontSize: 15,
+                fontWeight: 600,
                 cursor: "pointer",
               }}
             >
@@ -672,18 +677,19 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
               disabled={submitting || !SUPABASE_CONFIGURED}
               title={SUPABASE_CONFIGURED ? undefined : "Admin API not configured"}
               style={{
-                padding: "8px 14px",
-                background: "var(--accent)",
-                color: "#0a0a0b",
+                minHeight: 34,
+                padding: "6px 14px",
+                // The text tone as fill, so the label in glyph ink keeps 4.5:1.
+                background: submitting || !SUPABASE_CONFIGURED ? "var(--fill)" : "var(--c-screens-text)",
+                color: submitting || !SUPABASE_CONFIGURED ? "var(--ink-2)" : "var(--glyph)",
                 border: "none",
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 500,
+                borderRadius: 10,
+                fontSize: 15,
+                fontWeight: 600,
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 6,
-                cursor: submitting || !SUPABASE_CONFIGURED ? "not-allowed" : "pointer",
-                opacity: submitting || !SUPABASE_CONFIGURED ? 0.6 : 1,
+                cursor: submitting || !SUPABASE_CONFIGURED ? "default" : "pointer",
               }}
             >
               <Icons.Plus size={12} stroke={2.4} />
@@ -709,33 +715,35 @@ const Row = ({ children }: { children: ReactNode }) => (
 
 const Field = ({ label, children }: { label: string; children: ReactNode }) => (
   <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-    <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{label}</span>
+    <span style={{ fontSize: 13, color: "var(--ink-2)" }}>{label}</span>
     {children}
   </label>
 );
 
+// Health Rings fields (DESIGN.md "Buttons and fields"): Fill, 10px radius,
+// 17px Ink; labels and hints in 13px Secondary Ink, plain sentence case.
 const inputStyle: CSSProperties = {
   width: "100%",
-  height: 34,
-  background: "var(--bg-elev-2)",
-  border: "1px solid var(--border)",
-  borderRadius: 6,
+  minWidth: 0,
+  height: 40,
+  background: "var(--fill)",
+  border: "0",
+  borderRadius: 10,
   paddingInline: 10,
-  color: "var(--text)",
+  color: "var(--ink)",
   fontFamily: "inherit",
-  fontSize: 12,
-  outline: "none",
+  fontSize: 17,
 };
 
 const hintStyle: CSSProperties = {
-  fontSize: 10,
-  color: "var(--text-dim)",
+  fontSize: 13,
+  lineHeight: 1.4,
+  color: "var(--ink-2)",
   marginTop: 2,
 };
 
 const smallLbl: CSSProperties = {
-  fontSize: 10,
-  color: "var(--text-dim)",
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
+  fontSize: 15,
+  fontWeight: 600,
+  color: "var(--ink)",
 };

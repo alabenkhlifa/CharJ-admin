@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FocusEvent, type PointerEvent } from "react";
 import type { Category } from "./category";
 
-export type TipRow = { name: string; value: string; tone?: Category };
+/** `color` (a domain mark colour) wins over `tone` for the swatch. */
+export type TipRow = { name: string; value: string; tone?: Category; color?: string };
 /** x / y are viewport pixels (physical); the tooltip converts to logical. */
 export type Tip = { x: number; y: number; title: string; rows: TipRow[] };
 

@@ -80,3 +80,20 @@ export const lightMapStyle: google.maps.MapTypeStyle[] = [
 // Tunisia center + initial zoom (matches mobile app's default region).
 export const TUNISIA_CENTER = { lat: 34.0, lng: 9.5 };
 export const TUNISIA_ZOOM = 6.5;
+
+// What the map shows before its tiles arrive: the dark land and the light
+// water of the styles above, so the first paint doesn't flash a third colour.
+export const MAP_BACKGROUND = { dark: "#18181B", light: "#DBEAFE" } as const;
+
+// Charger pins: a status-coloured dot (data/chargers.ts STATUS_COLORS) with a
+// dark rim, as in the old admin map, so pale dots stay visible on light tiles.
+export const PIN_STROKE = "#0a0a0b";
+export const pinIcon = (fillColor: string, radius = 8): google.maps.Symbol => ({
+  path: `M 0,0 m -${radius},0 a ${radius},${radius} 0 1,0 ${radius * 2},0 a ${radius},${radius} 0 1,0 -${radius * 2},0`,
+  fillColor,
+  fillOpacity: 1,
+  strokeColor: PIN_STROKE,
+  strokeWeight: 1.5,
+  scale: 1,
+  anchor: { x: 0, y: 0 } as google.maps.Point,
+});

@@ -182,7 +182,7 @@ export const CityPicker = ({
               padding: 0,
               background: "transparent",
               border: "none",
-              color: "var(--text-dim)",
+              color: "var(--ink-2)",
               cursor: "pointer",
             }}
           >
@@ -200,13 +200,13 @@ export const CityPicker = ({
             maxHeight: 260,
             overflowY: "auto",
             padding: 4,
-            background: "var(--bg-elev)",
-            border: "1px solid var(--border-strong)",
-            borderRadius: 6,
+            background: "var(--card)",
+            border: "0",
+            borderRadius: 10,
           }}
         >
           {groups.length === 0 && (
-            <div style={{ padding: "8px", fontSize: 12, color: "var(--text-dim)" }}>
+            <div style={{ padding: "8px", fontSize: 15, color: "var(--ink-2)" }}>
               {loading
                 ? "Loading cities…"
                 : query.trim()
@@ -233,7 +233,7 @@ export const CityPicker = ({
                     {c.id === value && <Icons.Check size={12} />}
                     {c.name_fr}
                   </span>
-                  <span dir="rtl" style={{ color: "var(--text-muted)" }}>
+                  <span dir="rtl" style={{ color: "var(--ink-2)" }}>
                     {c.name_ar}
                   </span>
                 </Option>
@@ -247,7 +247,7 @@ export const CityPicker = ({
             onHover={() => setActive(options.length - 1)}
             onPick={startAdd}
           >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--accent)" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--c-screens-text)" }}>
               <Icons.Plus size={12} stroke={2.4} />
               {query.trim() ? `Add city “${query.trim()}”` : "Add a city"}
             </span>
@@ -280,7 +280,7 @@ export const CityPicker = ({
       )}
 
       {error && (
-        <div style={{ ...hintStyle, color: "var(--red)", display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ ...hintStyle, color: "var(--c-alarm-text)", display: "flex", gap: 8, alignItems: "center" }}>
           <span>Could not load cities: {error}</span>
           <button type="button" onClick={() => void reload()} style={linkButtonStyle}>
             Retry
@@ -336,11 +336,11 @@ const Option = ({
       alignItems: "center",
       gap: 8,
       padding: "7px 8px",
-      borderRadius: 5,
-      fontSize: 12,
+      borderRadius: 10,
+      fontSize: 15,
       cursor: "pointer",
-      color: selected ? "var(--accent)" : "var(--text)",
-      background: active ? "var(--surface-hover)" : "transparent",
+      color: selected ? "var(--c-screens-text)" : "var(--ink)",
+      background: active ? "var(--card-pressed)" : "transparent",
     }}
   >
     {children}
@@ -414,12 +414,12 @@ const AddCityForm = ({
         flexDirection: "column",
         gap: 10,
         padding: 12,
-        border: "1px solid var(--border-strong)",
-        borderRadius: 8,
-        background: "var(--bg-elev-2)",
+        border: "0",
+        borderRadius: 10,
+        background: "var(--fill)",
       }}
     >
-      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>New city</div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>New city</div>
       <div style={gridStyle}>
         <SmallField label="City name (French)">
           <input
@@ -506,7 +506,7 @@ const AddCityForm = ({
         </SmallField>
       </div>
       {error && (
-        <div role="alert" style={{ fontSize: 11, color: "var(--red)" }}>
+        <div role="alert" style={{ fontSize: 13, color: "var(--c-alarm-text)" }}>
           {error}
         </div>
       )}
@@ -518,7 +518,7 @@ const AddCityForm = ({
           type="button"
           onClick={() => void save()}
           disabled={saving}
-          style={{ ...secondaryButtonStyle, color: "var(--accent)", borderColor: "var(--accent-border)", background: "var(--accent-soft)" }}
+          style={{ ...secondaryButtonStyle, color: "var(--c-screens-text)", background: "color-mix(in srgb, var(--c-screens) 14%, transparent)" }}
         >
           {saving ? "Adding…" : "Add city"}
         </button>
@@ -551,7 +551,7 @@ const SmallField = ({
         gridColumn: wide ? "1 / -1" : undefined,
       }}
     >
-      <label htmlFor={id} style={{ fontSize: 11, color: "var(--text-dim)" }}>
+      <label htmlFor={id} style={{ fontSize: 13, color: "var(--ink-2)" }}>
         {label}
       </label>
       {cloneElement(children, { id })}
@@ -572,46 +572,45 @@ const groupHeaderStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: 8,
   padding: "8px 8px 4px",
-  fontSize: 10,
-  color: "var(--text-dim)",
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
+  fontSize: 13,
+  color: "var(--ink-2)",
 };
 
 const hintStyle: CSSProperties = {
-  fontSize: 11,
-  color: "var(--text-dim)",
+  fontSize: 13,
+  color: "var(--ink-2)",
 };
 
 const warningChipStyle: CSSProperties = {
   alignSelf: "flex-start",
-  fontSize: 11,
+  fontSize: 13,
   lineHeight: 1.5,
-  color: "var(--amber)",
+  color: "var(--c-needs-you-text)",
   padding: "4px 8px",
-  borderRadius: 4,
-  background: "color-mix(in srgb, var(--amber) 12%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--amber) 30%, transparent)",
+  borderRadius: 10,
+  background: "color-mix(in srgb, var(--c-needs-you) 12%, transparent)",
 };
 
 const linkButtonStyle: CSSProperties = {
   padding: 0,
   background: "transparent",
   border: "none",
-  color: "var(--accent)",
+  color: "var(--c-screens-text)",
   fontFamily: "inherit",
-  fontSize: 11,
-  textDecoration: "underline",
+  fontSize: 13,
+  fontWeight: 600,
   cursor: "pointer",
 };
 
 const secondaryButtonStyle: CSSProperties = {
-  padding: "7px 12px",
-  background: "transparent",
-  color: "var(--text-muted)",
-  border: "1px solid var(--border)",
-  borderRadius: 6,
+  minHeight: 34,
+  padding: "6px 14px",
+  background: "var(--fill)",
+  color: "var(--ink)",
+  border: "0",
+  borderRadius: 10,
   fontFamily: "inherit",
-  fontSize: 12,
+  fontSize: 15,
+  fontWeight: 600,
   cursor: "pointer",
 };

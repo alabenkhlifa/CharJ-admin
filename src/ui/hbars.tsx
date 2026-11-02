@@ -15,7 +15,16 @@ const GAP = 2;
 /** Rough 13px glyph width, to keep a label inside its gutter. */
 const CHAR = 7;
 
-export type HBarRow = { name: string; values: number[] };
+export type HBarRow = {
+  name: string;
+  values: number[];
+  /**
+   * A domain colour for this row's bar (charger status, connector type), for
+   * single-series charts whose rows already carry a fixed meaning elsewhere.
+   * A mark only: the row's label names it.
+   */
+  color?: string;
+};
 
 type Props = {
   /** Drawn in this order; values line up with `series`. */
@@ -69,7 +78,7 @@ export const HBars = ({ rows, series, label, labelHeader = "Name" }: Props) => {
                   const w = Math.max(1, x(v) - (off ? GAP : 0));
                   const rr = last ? Math.min(4, w, BAR / 2) : 0;
                   off += v;
-                  return <path key={s.name} d={roundedEnd(xx, yy, w, BAR, rr)} style={{ fill: baseTone(s.tone) }} />;
+                  return <path key={s.name} d={roundedEnd(xx, yy, w, BAR, rr)} style={{ fill: r.color ?? baseTone(s.tone) }} />;
                 })}
               </g>
             );
@@ -82,7 +91,7 @@ export const HBars = ({ rows, series, label, labelHeader = "Name" }: Props) => {
               y={ri * ROW}
               width={W}
               height={ROW}
-              {...target(r.name, series.map((s, si) => ({ name: s.name, value: nf.format(at(r, si)), tone: s.tone })))}
+              {...target(r.name, series.map((s, si) => ({ name: s.name, value: nf.format(at(r, si)), tone: s.tone, color: r.color })))}
             />
           ))}
         </g>
