@@ -13,7 +13,6 @@ import {
   readPerPage,
   readSort,
   sortChargers,
-  sourceLabel,
   STATUS_LABELS,
   accessLabel,
   type ChargersView,
@@ -161,7 +160,7 @@ export const ChargersPage = ({
         STATUS_LABELS[c.status],
         accessLabel(c.access),
         c.hours,
-        sourceLabel(c.source),
+        c.source,
         c.verified ? "yes" : "no",
         c.updatedAt,
         c.lat,
@@ -303,7 +302,15 @@ export const ChargersPage = ({
       )}
 
       {view === "stats" && (
-        <NetworkView chargers={chargers} governorates={governorates} loading={loading} error={error} onRetry={() => void refetch()} filtered={narrowed} />
+        <NetworkView
+          chargers={chargers}
+          governorates={governorates}
+          loading={loading}
+          error={error}
+          onRetry={() => void refetch()}
+          filtered={narrowed}
+          cap={!loading && chargers.length >= READ_CAP ? READ_CAP : null}
+        />
       )}
 
       {selected && (

@@ -516,6 +516,17 @@ a.ui-card:hover {
 .ui-details summary::-webkit-details-marker {
   display: none;
 }
+/* "Show table" with an action at the end of its line; the table opens below
+   at the full width. */
+.ui-details-row {
+  position: relative;
+  display: flow-root; /* keeps the details' top margin inside, level with the action */
+}
+.ui-details-action {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 0;
+}
 
 /* ---- cohort chips (phones) / table (768px and up) ---- */
 .ui-coh {

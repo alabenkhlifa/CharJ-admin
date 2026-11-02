@@ -139,7 +139,10 @@ const open = async ({ width = 390, height = 844, colorScheme = "light", n = 40, 
     reads.push(path);
     if (path === "rpc/search_chargers") {
       if (S.rpcDelay) await new Promise((r) => setTimeout(r, S.rpcDelay));
-      if (S.fail) return route.fulfill({ status: 500, json: { message: "search_chargers unavailable", code: "XX000" } });
+      if (S.fail) {
+        S.failed = true;
+        return route.fulfill({ status: 500, json: { message: "search_chargers unavailable", code: "XX000" } });
+      }
       return route.fulfill({ json: S.rows.map(readerRow) });
     }
     const json = path === "governorates" ? S.govs : path === "cities" ? CITIES : [];
@@ -177,11 +180,18 @@ const open = async ({ width = 390, height = 844, colorScheme = "light", n = 40, 
   });
   const page = await context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
+  // Expected console errors only: the aborted Maps script (and the loader's
+  // message about it), the aborted Auth calls, and the 500 a test asked for.
   page.on("console", (m) => {
     if (m.type() !== "error") return;
     const text = m.text();
-    if (/Failed to load resource|Google Maps JavaScript API (failed to load|could not load)/.test(text)) return;
-    errors.push(text);
+    const url = m.location()?.url ?? "";
+    if (/Failed to load resource/.test(text)) {
+      if (/^https:\/\/maps\.googleapis\.com\//.test(url) || /\/auth\/v1\//.test(url)) return;
+      if (S.failed && /\/rest\/v1\/rpc\/search_chargers/.test(url)) return;
+    }
+    if (/^The Google Maps JavaScript API (failed to load|could not load)/.test(text)) return;
+    errors.push(`${text} (${url})`);
   });
   return { context, page, S, reads };
 };
@@ -356,6 +366,8 @@ try {
     const lines = csv.replace(/^﻿/, "").split("\r\n");
     eq(lines[0].split(",").slice(0, 3), ["Name", "City", "Governorate"], "list: Export writes the CSV header");
     eq(lines.length, 41, "list: Export writes every matching row, not only the page");
+    const sourceAt = lines[0].split(",").indexOf("Source");
+    eq([...new Set(lines.slice(1).map((l) => l.split(",")[sourceAt]))].sort(), ["community", "curated", "ocm"], "list: Export keeps the raw source values");
     // Table rows show the facts.
     await page.goto(`${base}/#/chargers`);
     await ready(page);
@@ -523,6 +535,27 @@ try {
     ], "stats: each gap opens the list already filtered");
     ok((await card("Coverage").innerText()).includes("No charger yet: Béja, Ben Arous, Bizerte"), "stats: the governorates with no charger are named");
     eq(await card("Coverage").locator(".chg-open-map a").getAttribute("href"), "#/chargers?view=map", "stats: Open the map");
+    eq(await card("Coverage").locator(".ui-table tbody tr").count(), 6, "stats: the covered count is the number of bars");
+    // Each chart downloads its rows, beside its table view; the section downloads everything.
+    const csvOf = async (name) => {
+      const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name, exact: true }).click()]);
+      return { file: dl.suggestedFilename(), lines: (await (await import("node:fs/promises")).readFile(await dl.path(), "utf8")).replace(/^\uFEFF/, "").split("\r\n") };
+    };
+    const statusCsv = await csvOf("Download chargers by status as CSV");
+    eq(statusCsv.lines, ["Status,Chargers", "Operational,20", "Under repair,7", "Planned,7", "Unknown,6"], "stats: Status downloads its rows");
+    ok(/^charj-chargers-by-status-.*\.csv$/.test(statusCsv.file), "stats: …named like the old Overview export", statusCsv.file);
+    eq((await csvOf("Download chargers by connector as CSV")).lines, ["Connector,Chargers", "Type 2,20", "CCS,26", "CHAdeMO,7"], "stats: Connectors download");
+    eq((await csvOf("Download chargers by access as CSV")).lines[1], "Public,16", "stats: Access download");
+    eq((await csvOf("Download chargers by power as CSV")).lines.at(-1), "Not listed,1", "stats: Power download");
+    eq((await csvOf("Download chargers per governorate as CSV")).lines.length, 7, "stats: Coverage download");
+    const all = await csvOf("Download every number on this page as CSV");
+    eq(all.lines.slice(0, 4), ["Section,Metric,Value", "Catalogue,Chargers,40", "Catalogue,Verified,13", "Catalogue,Plugs,87"], "stats: the summary download starts with the catalogue");
+    ok(all.lines.includes("Needs a look,No working hours,10") && all.lines.includes("Status,Operational,20"), "stats: …and holds every section");
+    const beside = await card("Status").locator(".ui-details-row").evaluate((r) => {
+      const [a, b] = [r.querySelector("summary").getBoundingClientRect(), r.querySelector(".chg-csv").getBoundingClientRect()];
+      return { summary: Math.round(a.top + a.height / 2), csv: Math.round(b.top + b.height / 2), end: Math.round(r.getBoundingClientRect().right - b.right) };
+    });
+    ok(Math.abs(beside.summary - beside.csv) <= 3 && beside.end <= 1, "stats: Download CSV sits at the end of the Show table line", beside);
     // Tooltip on a bar (hover).
     await card("Status").locator("rect.ui-hit").first().hover();
     eq(await page.locator(".ui-tip-t").innerText(), "Operational", "stats: a bar's tooltip names its row");
@@ -594,10 +627,28 @@ try {
     await failing.page.getByRole("button", { name: "Try again" }).click();
     await failing.page.locator(".chg-table tbody tr").first().waitFor();
     ok(true, "error: Try again loads the list");
-    await failing.page.goto(`${base}/#/chargers?view=stats`);
-    await ready(failing.page);
     failing.S.fail = true;
+    await failing.page.goto(`${base}/#/chargers?view=stats`);
+    await failing.page.reload();
+    await failing.page.locator(".chg-retry").waitFor();
+    const failText = await failing.page.locator(".chg-grid").innerText();
+    ok(/^About the network\s+Couldn't load chargers: search_chargers unavailable Try again$/.test(failText.trim()), "error: the network view says what failed, with no numbers", failText);
+    eq(await failing.page.locator(".chg-sec-row .chg-csv").count(), 0, "error: no download of numbers that didn't load");
     await failing.context.close();
+
+    // At the read cap every count may run short, and each view says so.
+    const capped = await open({ width: 390, n: 1000 });
+    await capped.page.goto(`${base}/#/chargers?view=stats`);
+    await ready(capped.page);
+    const lede = await capped.page.locator(".chg-lede").innerText();
+    ok(lede.startsWith("The first 1,000 chargers in the catalogue") && !/\bEvery\b/.test(lede) && lede.includes("may run short"), "cap: the network lede says the counts may run short", lede);
+    await capped.page.goto(`${base}/#/chargers`);
+    await ready(capped.page);
+    ok((await capped.page.locator("#chg-list").innerText()).includes("The list reads the first 1,000 chargers"), "cap: the list says so too");
+    await capped.page.goto(`${base}/#/chargers?view=map`);
+    await ready(capped.page);
+    ok((await capped.page.locator("#chg-map").innerText()).includes("The list reads the first 1,000 chargers"), "cap: and the map");
+    await capped.context.close();
   }
 
   // ---- 7. Old links land somewhere sensible ----
@@ -615,6 +666,81 @@ try {
     await page.goto(`${base}/#/chargers?id=1&status=operational`);
     await ready(page);
     eq((await hashParams(page)).status, "operational", "legacy: #/chargers?id=…&status= keeps its filters");
+    await context.close();
+  }
+
+// Text cut short inside a control: its box scrolls (scrollWidth past clientWidth),
+// or the text it shows (a select's chosen option, an input's value or
+// placeholder, a chip's value) is wider than the room inside its padding.
+const clipped = (page) => page.evaluate(() => {
+  const ctx = document.createElement("canvas").getContext("2d");
+  const bad = [];
+  const els = [...document.querySelectorAll(".chg-sel select, .chg-search input, .ms-value, .chg-legacy-v")].filter((el) => el.getClientRects().length);
+  for (const el of els) {
+    const cs = getComputedStyle(el);
+    const text = el.tagName === "SELECT" ? el.options[el.selectedIndex]?.text ?? "" : el.tagName === "INPUT" ? el.value || el.placeholder : el.textContent;
+    ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const room = el.clientWidth - parseFloat(cs.paddingInlineStart) - parseFloat(cs.paddingInlineEnd);
+    const wraps = cs.whiteSpace === "normal";
+    const need = wraps ? Math.max(...text.split(/\s+/).map((w) => ctx.measureText(w).width)) : ctx.measureText(text).width;
+    if (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1 || need > room + 1) {
+      bad.push({ text, need: Math.round(need), room: Math.round(room), scroll: [el.scrollWidth, el.clientWidth] });
+    }
+  }
+  // A stacked select chip is two lines (label, then value and chevron): a third line means the chevron wrapped.
+  for (const chip of document.querySelectorAll(".chg-sel")) {
+    const [label, select] = [chip.querySelector("span"), chip.querySelector("select")];
+    if (!chip.getClientRects().length || label.getBoundingClientRect().bottom > select.getBoundingClientRect().top + 1) continue;
+    const cs = getComputedStyle(chip);
+    const lines = label.offsetHeight + select.offsetHeight + parseFloat(cs.paddingBlockStart) + parseFloat(cs.paddingBlockEnd);
+    if (chip.offsetHeight > lines + 4) bad.push({ chip: label.textContent, height: chip.offsetHeight, lines });
+  }
+  return { bad, checked: els.length };
+});
+
+  // ---- 8a. Phones and 768: every chip shows its whole value, the search its whole placeholder,
+  //          and a menu opens right under the chip that was tapped ----
+  {
+    const LONG = `power=dc100&upd=30&ver=yes&hours=missing&status=under_repair&access=employees_only&src=community&conn=chademo&gov=TN-82&cities=${cid(6)}&city=Sousse%20Corniche`;
+    for (const [width, height] of [[375, 812], [768, 1024]]) {
+      const { context, page } = await open({ width, height });
+      for (const q of ["", `?${LONG}`]) {
+        await page.goto(`${base}/#/chargers${q}`);
+        await ready(page);
+        if ((await page.locator(".chg-filters-toggle").getAttribute("aria-expanded")) !== "true") await page.locator(".chg-filters-toggle").click();
+        await settle(page);
+        const tag = `${width} ${q ? "long values" : "defaults"}`;
+        const cut = await clipped(page);
+        ok(cut.bad.length === 0 && cut.checked >= 11, `${tag}: no chip value or search text is cut short (${cut.checked} checked)`, cut);
+        const fit = await fits(page);
+        ok(fit.bad.length === 0, `${tag}: everything fits`, fit);
+        eq(await hscroll(page), 0, `${tag}: no horizontal scroll`);
+        if (q) await shot(page, `t10-${width === 375 ? 390 : width}-filters.png`, { full: false });
+      }
+      const search = await page.locator(".chg-search").boundingBox();
+      const card = await page.locator("#chg-list").boundingBox();
+      ok(search.width >= card.width - 32 - 1, `${width}: the search takes the card's whole row`, { search: search.width, card: card.width });
+      for (const label of ["Status", "Governorate", "City"]) {
+        const chip = await page.locator(".ms-chip", { hasText: label }).boundingBox();
+        await page.locator(".ms-chip", { hasText: label }).click();
+        const pop = await page.locator(".ms-pop").boundingBox();
+        const panel = await page.locator(".chg-chips").boundingBox();
+        ok(Math.abs(pop.y - (chip.y + chip.height + 4)) < 2, `${width}: the ${label} menu opens right under its chip`, { chip, pop });
+        ok(Math.abs(pop.x - panel.x) < 1 && Math.abs(pop.width - panel.width) < 1, `${width}: …across the chip panel`, { pop, panel });
+        await page.keyboard.press("Escape");
+      }
+      await context.close();
+    }
+    // RTL: Add charger slides in from the inline end (the left).
+    const { context, page } = await open({ width: 390, rtl: true });
+    await page.goto(`${base}/#/chargers?add=1`);
+    const sheet = page.getByRole("dialog");
+    await sheet.getByText("Add a charging station", { exact: true }).waitFor();
+    eq(await sheet.evaluate((el) => getComputedStyle(el).animationName), "add-charger-in-rtl", "rtl: Add charger uses the RTL slide");
+    await settle(page);
+    ok((await sheet.boundingBox()).x < 1, "rtl: Add charger sits at the inline end (the left)");
+    const remove = sheet.getByRole("button", { name: "Remove connector 1" });
+    eq(await remove.evaluate((b) => [b.className, getComputedStyle(b).borderRadius, b.offsetWidth]), ["add-charger-icon-btn", "10px", 34], "add: Remove connector is the Fill icon button");
     await context.close();
   }
 

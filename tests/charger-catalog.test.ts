@@ -183,7 +183,20 @@ test("network stats: counts per status, connector, access, power, governorate", 
   assert.deepEqual(s.uncovered, ["Kasserine", "Tataouine"]);
   assert.equal(s.referenceCount, 4);
   assert.equal(s.unlinked, 1);
+  assert.equal(s.unplaced, 1);
   assert.equal(s.noHours, 2);
+});
+
+test("network stats: a governorate the reference list doesn't know is not a bar, and the covered count is the bars", () => {
+  const stray = { ...korba, id: "d-stray", governorateCode: "TN-99", governorateName: "Nowhere" };
+  const ref = [{ code: "TN-21", name_fr: "Nabeul", name_ar: "", name_en: "Nabeul" }, { code: "TN-12", name_fr: "Tunis", name_ar: "", name_en: "Tunis" }];
+  const s = networkStats([korba, sidi, stray, unlinked], ref);
+  assert.deepEqual(s.governorates.map((g) => g.code), ["TN-21", "TN-12"]);
+  assert.equal(s.referenceCount - s.uncovered.length, s.governorates.length);
+  assert.equal(s.unplaced, 2, "the stray and the unlinked one");
+  assert.equal(s.unlinked, 1);
+  // Before the reference loads, every governorate with chargers is a bar.
+  assert.equal(networkStats([korba, stray], []).governorates.length, 2);
 });
 
 test("network stats on an empty catalogue: zeros, never NaN", () => {

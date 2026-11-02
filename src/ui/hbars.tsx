@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { tone as baseTone, type Category } from "./category";
 import { ChartKey } from "./chart-key";
 import { ChartTooltip } from "./chart-tooltip";
@@ -34,6 +35,8 @@ type Props = {
   label: string;
   /** First column header of the table view. */
   labelHeader?: string;
+  /** Beside "Show table", e.g. a "Download CSV" text action. */
+  tableAction?: ReactNode;
 };
 
 const roundedEnd = (x: number, y: number, w: number, h: number, r: number) =>
@@ -46,7 +49,7 @@ const fit = (s: string, max: number) => (s.length <= max ? s : `${s.slice(0, Mat
  * bars, labels in a 112px (narrow) or 128px start gutter, the total after the
  * bar. Each row is a focusable hit area with a tooltip; "Show table" has the numbers.
  */
-export const HBars = ({ rows, series, label, labelHeader = "Name" }: Props) => {
+export const HBars = ({ rows, series, label, labelHeader = "Name", tableAction }: Props) => {
   const [ref, box] = useBoxWidth<HTMLDivElement>();
   const { tip, target } = useChartTip();
   const at = (r: HBarRow, i: number) => r.values[i] ?? 0;
@@ -121,6 +124,7 @@ export const HBars = ({ rows, series, label, labelHeader = "Name" }: Props) => {
       </div>
       <ChartTooltip tip={tip} />
       <TableView
+        action={tableAction}
         caption={label}
         head={[labelHeader, ...series.map((s) => s.name), ...(multi ? ["Total"] : [])]}
         numeric={series.map((_, i) => i + 1).concat(multi ? [series.length + 1] : [])}

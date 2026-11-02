@@ -279,26 +279,66 @@
     display: none;
   }
 }
-/* Narrow: the chips fold behind "Filters", two to a row when open; a menu
-   opens across the whole panel so it never runs off a phone. */
+/* Narrow: the search takes its own row; the chips fold behind "Filters",
+   two to a row when open, each with its label above its value so the whole
+   value always shows (a long one wraps rather than being cut). A menu opens
+   right under the chip that was tapped, across the whole panel, so it never
+   runs off a phone or opens far from the tap. */
 @container chg (max-width: 859px) {
+  .chg-search {
+    flex-basis: 100%;
+    max-inline-size: none;
+  }
   .chg-chips {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
   }
   .chg-chips[data-open="false"] {
     display: none;
+  }
+  .chg-chips .ms-chip,
+  .chg-sel,
+  .chg-legacy {
+    flex-wrap: wrap;
+    align-content: center;
+    row-gap: 0;
+    block-size: 100%;
+    padding-block: 6px;
+  }
+  .chg-chips .ms-label,
+  .chg-sel > span,
+  .chg-legacy .ms-label {
+    flex: 1 0 100%;
+  }
+  .chg-chips .ms-value,
+  .chg-legacy-v {
+    flex: 1 1 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+  }
+  .chg-sel select {
+    padding-block: 2px;
+    text-overflow: clip;
   }
   .chg-chips .ms {
     position: static;
   }
   .chg-chips .ms-pop {
+    inset-block-start: auto;
     inset-inline: 0;
     inline-size: auto;
+    margin-block-start: 4px;
   }
+  /* The longest values ("DC 100–150 kW", "Last 30 days") get a row each. */
   .chg-sort,
-  .chg-legacy {
+  .chg-legacy,
+  .chg-sel-wide {
     grid-column: 1 / -1;
+  }
+  .chg-legacy {
+    text-align: start;
   }
 }
 
@@ -687,9 +727,24 @@
 }
 
 /* ---- About the network ---- */
-.chg-sec {
+.chg-sec-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-xs) var(--s-md);
   margin: 6px var(--s-xs) var(--s-xs);
+}
+.chg-sec {
+  margin: 0;
   font: var(--type-section);
+}
+.chg-csv .chg-ic {
+  inline-size: 15px;
+  block-size: 15px;
+}
+.ui-details-action .chg-csv {
+  padding: 0;
 }
 .chg-lede {
   margin: 0 var(--s-xs) var(--s-lg);

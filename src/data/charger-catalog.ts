@@ -298,7 +298,11 @@ export type NetworkStats = {
   powerUnknown: number;
   /** Over 22 kW (the DC buckets). */
   fast: number;
-  /** Governorates with at least one charger, most first. */
+  /**
+   * Governorates with at least one charger, most first. Once the reference
+   * list has loaded, only governorates it knows: then the covered count is
+   * always the number of bars.
+   */
   governorates: { code: string; name: string; count: number }[];
   /** Reference governorates with no charger, A→Z. */
   uncovered: string[];
@@ -306,6 +310,8 @@ export type NetworkStats = {
   referenceCount: number;
   /** Not linked to a city (so no governorate either). */
   unlinked: number;
+  /** Not counted by governorate: no city, or a governorate the reference list doesn't know. */
+  unplaced: number;
   noHours: number;
 };
 
@@ -340,9 +346,12 @@ export const networkStats = (chargers: Charger[], reference: Governorate[] = [])
       g.count += 1;
     }
   }
-  const governorates = Object.entries(govs)
+  const known = new Set(reference.map((g) => g.code));
+  const matched = Object.entries(govs).filter(([code]) => !reference.length || known.has(code));
+  const governorates = matched
     .map(([code, g]) => ({ code, ...g }))
     .sort((a, b) => b.count - a.count || collator.compare(a.name, b.name));
+  const placed = governorates.reduce((n, g) => n + g.count, 0);
   const uncovered = reference
     .filter((g) => !govs[g.code])
     .map((g) => g.name_fr)
@@ -361,6 +370,7 @@ export const networkStats = (chargers: Charger[], reference: Governorate[] = [])
     uncovered,
     referenceCount: reference.length,
     unlinked,
+    unplaced: chargers.length - placed,
     noHours,
   };
 };

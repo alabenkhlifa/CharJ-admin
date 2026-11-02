@@ -1,0 +1,38 @@
+/* Add charger: the side sheet's entry and its icon buttons (the rest of the
+   modal is inline styles on the kit tokens, src/index.css). Logical
+   properties only, so Arabic flips cleanly. */
+
+/* Slides in from the inline end: the right, or the left in RTL. */
+.add-charger-sheet {
+  animation: add-charger-in .25s var(--ease);
+}
+.add-charger-sheet:dir(rtl) {
+  animation-name: add-charger-in-rtl;
+}
+@keyframes add-charger-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes add-charger-in-rtl {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+/* A Fill icon button (DESIGN.md "Buttons and fields"). */
+.add-charger-icon-btn {
+  display: grid;
+  place-items: center;
+  inline-size: 34px;
+  block-size: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--ink);
+}
+.add-charger-icon-btn:disabled {
+  color: var(--ink-2);
+  cursor: default;
+}

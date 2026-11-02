@@ -1,6 +1,5 @@
 import { useId, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { iconBtnStyle } from "./charts";
 import { CityPicker } from "./city-picker";
 import { useLocations, usePinPlace } from "../data/locations";
 import { cityPlace } from "../data/locations-model";
@@ -8,6 +7,7 @@ import { AMENITY_SLUGS, AmenityIcon, labelForAmenity } from "../lib/amenity-icon
 import { adminFetch } from "../lib/admin-fetch";
 import { Icons } from "../lib/icons";
 import { SUPABASE_CONFIGURED } from "../lib/supabase";
+import "./add-charger-modal.css";
 import type {
   AccessType,
   ChargerStatus,
@@ -305,6 +305,7 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
         }}
       />
       <div
+        className="add-charger-sheet"
         role="dialog"
         aria-modal="true"
         style={{
@@ -318,7 +319,6 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
           display: "flex",
           flexDirection: "column",
           boxShadow: "var(--shadow-dialog)",
-          animation: "slideIn .25s cubic-bezier(0.32, 0.72, 0, 1)",
         }}
       >
         <div
@@ -464,7 +464,7 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
                 key={i}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1.2fr 1fr 0.7fr 28px",
+                  gridTemplateColumns: "1.2fr 1fr 0.7fr 34px",
                   gap: 8,
                   alignItems: "center",
                 }}
@@ -495,17 +495,14 @@ export const AddChargerModal = ({ onClose, onCreated }: AddChargerModalProps) =>
                   style={inputStyle}
                 />
                 <button
+                  type="button"
+                  className="add-charger-icon-btn"
                   onClick={() => removeConnector(i)}
                   disabled={form.connectors.length === 1}
                   aria-label={`Remove connector ${i + 1}`}
-                  title="Remove connector"
-                  style={{
-                    ...iconBtnStyle,
-                    opacity: form.connectors.length === 1 ? 0.4 : 1,
-                    cursor: form.connectors.length === 1 ? "not-allowed" : "pointer",
-                  }}
+                  title={form.connectors.length === 1 ? "A charger needs at least one connector" : "Remove connector"}
                 >
-                  <Icons.X size={12} />
+                  <Icons.X size={14} />
                 </button>
               </div>
             ))}

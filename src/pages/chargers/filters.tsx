@@ -185,10 +185,10 @@ export const ChargerFilterBar = ({ filters: f, chargers, onFilter, onClear, coun
             <ChgIcon name="x" />
           </button>
         )}
-        <FilterSelect<PowerFilter> label="Power" value={f.power} active={f.power !== "all"} options={POWER_OPTIONS} onChange={(v) => onFilter({ power: v === "all" ? null : v })} />
+        <FilterSelect<PowerFilter> className="chg-sel-wide" label="Power" value={f.power} active={f.power !== "all"} options={POWER_OPTIONS} onChange={(v) => onFilter({ power: v === "all" ? null : v })} />
         <FilterSelect<TriFilter> label="Verified" value={f.verified} active={f.verified !== "all"} options={VERIFIED_OPTIONS} onChange={(v) => onFilter({ ver: v === "all" ? null : v })} />
         <FilterSelect<HoursFilter> label="Hours" value={f.hours} active={f.hours !== "all"} options={HOURS_OPTIONS} onChange={(v) => onFilter({ hours: v === "all" ? null : v })} />
-        <FilterSelect<UpdatedFilter> label="Updated" value={f.updated} active={f.updated !== "all"} options={UPDATED_OPTIONS} onChange={(v) => onFilter({ upd: v === "all" ? null : v })} />
+        <FilterSelect<UpdatedFilter> className="chg-sel-wide" label="Updated" value={f.updated} active={f.updated !== "all"} options={UPDATED_OPTIONS} onChange={(v) => onFilter({ upd: v === "all" ? null : v })} />
         {sort && (
           <FilterSelect<string>
             className="chg-sort"
