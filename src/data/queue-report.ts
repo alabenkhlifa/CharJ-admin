@@ -1,6 +1,6 @@
 // ── The admin's to-do queue: what waits in Community ──────────────────────
 // Four admin Edge Functions, one count + the newest items each:
-//   feedback        admin-feedback          summary.open
+//   feedback        admin-feedback          summary.open_requests (design votes are informational, never waiting)
 //   couldNotCharge  admin-confirmations     summary.window.could_not_charge (7 days, hidden left out)
 //   submissions     admin-submissions       counts.pending
 //   reports         admin-review-reports    open
@@ -14,7 +14,7 @@ export const QUEUE_KEYS: readonly QueueKey[] = ["feedback", "couldNotCharge", "s
 const NEWEST = 3;
 
 export const QUEUE_PATHS: Record<QueueKey, string> = {
-  feedback: `admin-feedback?status=open&category=all&page=1&perPage=${NEWEST}`,
+  feedback: `admin-feedback?status=open&category=requests&page=1&perPage=${NEWEST}`,
   couldNotCharge: `admin-confirmations?since_days=7&outcome=could_not_charge&page=1&perPage=${NEWEST}`,
   submissions: `admin-submissions?status=pending&page=1&perPage=${NEWEST}`,
   reports: `admin-review-reports?status=open&page=1&perPage=${NEWEST}`,
@@ -63,11 +63,15 @@ const REPORT_REASONS: Record<string, string> = {
   other: "Other",
 };
 
+// feedback-report's INFORMATIONAL_CATEGORIES (repeated: this module has no runtime imports).
+const INFORMATIONAL = new Set(["design"]);
+
 const parseFeedback = (value: unknown): NonNullable<Queue["feedback"]> => {
   const r = object(value);
+  const rows = Array.isArray(r.items) ? r.items.filter((f: unknown) => !INFORMATIONAL.has(String(object(f).category))) : r.items;
   return {
-    open: count(object(r.summary).open),
-    newest: items(r.items, (f) => {
+    open: count(object(r.summary).open_requests),
+    newest: items(rows, (f) => {
       const message = oneLine(optional(f.message) ?? "");
       return { id: str(f.id), text: message ? `“${message}”` : "No message", at: str(f.created_at) };
     }),

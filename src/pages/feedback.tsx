@@ -10,6 +10,8 @@ import {
   CATEGORY_LABELS,
   deviceLine,
   FEEDBACK_CATEGORIES,
+  isInformational,
+  VOTE_LABELS,
   type FeedbackCategoryFilter,
   type FeedbackItem,
   type FeedbackStatus,
@@ -35,6 +37,18 @@ const CategoryChip = ({ item }: { item: FeedbackItem }) => {
     >
       <span style={{ width: 6, height: 6, borderRadius: "50%", background: color }} />
       {CATEGORY_LABELS[item.category]}
+    </span>
+  );
+};
+
+/** A design vote's thumb: up in green, down in red, with its words for screen readers and a glance. */
+const VoteChip = ({ vote }: { vote: NonNullable<FeedbackItem["vote"]> }) => {
+  const color = vote === "up" ? "var(--green)" : "var(--red)";
+  const Thumb = vote === "up" ? Icons.ThumbsUp : Icons.ThumbsDown;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color, fontWeight: 500, whiteSpace: "nowrap" }}>
+      <Thumb size={14} />
+      {VOTE_LABELS[vote]}
     </span>
   );
 };
@@ -91,10 +105,22 @@ const FeedbackRow = ({ item, onChanged }: FeedbackRowProps) => {
           <CategoryChip item={item} />
         </td>
         <td style={{ padding: "12px 16px", minWidth: 260, maxWidth: 560 }}>
+          {item.vote && (
+            <div style={{ marginBottom: item.message ? 4 : 0 }}>
+              <VoteChip vote={item.vote} />
+            </div>
+          )}
           {/* the driver's own words: keep their line breaks, never let a long word push the table */}
-          <div style={{ color: "var(--text)", whiteSpace: "pre-wrap", overflowWrap: "anywhere", lineHeight: 1.5 }}>
-            {item.message}
-          </div>
+          {item.message ? (
+            <div style={{ color: "var(--text)", whiteSpace: "pre-wrap", overflowWrap: "anywhere", lineHeight: 1.5 }}>
+              {item.message}
+            </div>
+          ) : (
+            isInformational(item) && <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>No comment</div>
+          )}
+          {isInformational(item) && !item.resolved && (
+            <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 6 }}>Informational: not counted as waiting</div>
+          )}
           {item.resolved && (
             <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 6 }}>
               Resolved{item.resolvedBy ? ` by ${item.resolvedBy}` : ""}
@@ -140,13 +166,16 @@ export const FeedbackPage = () => {
 
   const emptyTitle =
     status === "open" ? "No open feedback" : status === "resolved" ? "Nothing resolved yet" : "No feedback yet";
+  // Design votes inform, they ask for nothing: "Open" counts what waits for a look.
+  const openVotes = summary.open - summary.openRequests;
 
   return (
     <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em" }}>Feedback</h1>
         <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>
-          What drivers send from Réglages → Envoyer un avis: bugs, ideas, charger data fixes and compliments.
+          What drivers send from Réglages → Envoyer un avis: bugs, ideas, charger data fixes and compliments, plus
+          the Lune design votes from the map card.
         </div>
       </div>
 
@@ -166,7 +195,11 @@ export const FeedbackPage = () => {
       )}
 
       <div className="kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
-        <Stat label="Open" value={summary.open} hint="Waiting for a look" />
+        <Stat
+          label="Open"
+          value={summary.openRequests}
+          hint={openVotes > 0 ? `Waiting for a look · ${openVotes} design votes aside` : "Waiting for a look"}
+        />
         <Stat label="Resolved" value={summary.resolved} hint="Handled" />
         <Stat label="Last 7 days" value={summary.last7Days} hint="Received" />
         <Stat label="Total" value={summary.total} hint="All time" />
@@ -197,6 +230,7 @@ export const FeedbackPage = () => {
           }}
           options={[
             { v: "all", l: "All" },
+            { v: "requests", l: "Requests (no design votes)" },
             ...FEEDBACK_CATEGORIES.map((c) => ({ v: c, l: `${CATEGORY_LABELS[c]} (${summary.byCategory[c]})` })),
           ]}
         />

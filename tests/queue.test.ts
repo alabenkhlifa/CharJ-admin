@@ -11,7 +11,8 @@ const feedback = () => ({
     { id: "f2", device_id: "d", category: "bug", message: "  [email removed]\n", email: "", app_version: "1.2.1", platform: "android", locale: "fr", resolved: false, resolved_at: null, resolved_by: null, created_at: "2026-06-09T21:50:35.687943+00:00" },
   ],
   total: 3,
-  summary: { total: 9, open: 3, resolved: 6, last_7_days: 1, by_category: { bug: 1, suggestion: 1, compliment: 1, charger_data: 0, other: 0 } },
+  // open counts the design votes too; open_requests leaves them out (admin-feedback, category=requests)
+  summary: { total: 11, open: 5, open_requests: 3, resolved: 6, last_7_days: 1, by_category: { bug: 1, suggestion: 1, compliment: 1, charger_data: 0, other: 0, design: 2 } },
 });
 const visits = () => ({
   items: [
@@ -68,7 +69,7 @@ test("the newest items read as one plain line each, newest first", () => {
 
 test("an empty queue is a real zero", () => {
   const q = mergeQueue(settled({
-    feedback: ok({ ...feedback(), items: [], total: 0, summary: { ...feedback().summary, open: 0 } }),
+    feedback: ok({ ...feedback(), items: [], total: 0, summary: { ...feedback().summary, open: 0, open_requests: 0 } }),
     couldNotCharge: ok({ ...visits(), items: [], total: 0, summary: { ...visits().summary, window: { since_days: 7, could_not_charge: 0 } } }),
   }));
   assert.equal(q.total, 0);
@@ -89,6 +90,7 @@ test("a malformed body is an error, not a zero", () => {
   const cases: [QueueKey, unknown][] = [
     ["couldNotCharge", noWindow],
     ["feedback", { items: [], total: 0 }],
+    ["feedback", { ...feedback(), summary: { ...feedback().summary, open_requests: undefined } }],
     ["submissions", { ...submissions(), counts: { approved: 1 } }],
     ["reports", { ...reports(), open: "2" }],
     ["reports", { ...reports(), items: null }],
@@ -100,6 +102,15 @@ test("a malformed body is an error, not a zero", () => {
     assert.equal(q.errors[key], "Unexpected response.");
     assert.equal(q.total, null);
   }
+});
+
+test("design votes never wait in Needs you: they are informational, not requests", () => {
+  assert.match(QUEUE_PATHS.feedback, /category=requests/, "the read leaves design votes out");
+  const vote = { ...feedback().items[0], id: "v-design", category: "design", vote: "up", message: "" };
+  const body = { ...feedback(), items: [vote, ...feedback().items] };
+  const q = mergeQueue(settled({ feedback: ok(body) }));
+  assert.equal(q.feedback?.open, 3, "open requests, not the 5 open rows with the 2 votes");
+  assert.deepEqual(q.feedback?.newest.map((i) => i.id), ["f1", "f2"], "a vote that slips through is not shown");
 });
 
 test("newest keeps at most three items", () => {
