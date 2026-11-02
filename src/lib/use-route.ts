@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { NAV, type RouteKey } from "./routes";
+import { legacyRedirect, type RouteLocation } from "./legacy-redirect";
+import { DEFAULT_ROUTE, type RouteKey } from "./routes";
 
 // ── Hash-based routing ────────────────────────────────────────────────────
 // Deliberately hand-rolled instead of pulling in react-router: the whole
@@ -11,29 +12,23 @@ import { NAV, type RouteKey } from "./routes";
 // 404.html SPA-fallback dance AND a matching `basename`; `#/users` is
 // immune to both and survives a hard refresh untouched.
 
-const VALID_ROUTES = new Set<string>(NAV.map((n) => n.k));
-const DEFAULT_ROUTE: RouteKey = "overview";
-
-export type RouteLocation = {
-  route: RouteKey;
-  params: URLSearchParams;
-};
+export { legacyRedirect };
+export type { RouteLocation };
 
 export type RouteParams = Record<string, string | null | undefined>;
 
 // "#/chargers?id=abc" → { route: "chargers", params: URLSearchParams(id=abc) }
-// Anything unrecognised (empty hash, "#", "#/bogus") falls back to Overview
-// rather than rendering a blank shell.
+// Old routes are redirected first (#/users?user=X → usage?tab=users&user=X);
+// anything still unrecognised (empty hash, "#", "#/bogus") falls back to
+// Summary rather than rendering a blank shell.
 const parseHash = (raw: string): RouteLocation => {
   const withoutHash = raw.startsWith("#") ? raw.slice(1) : raw;
   const path = withoutHash.startsWith("/") ? withoutHash.slice(1) : withoutHash;
   const queryAt = path.indexOf("?");
   const head = (queryAt === -1 ? path : path.slice(0, queryAt)).trim().toLowerCase();
   const query = queryAt === -1 ? "" : path.slice(queryAt + 1);
-  return {
-    route: VALID_ROUTES.has(head) ? (head as RouteKey) : DEFAULT_ROUTE,
-    params: new URLSearchParams(query),
-  };
+  const params = new URLSearchParams(query);
+  return legacyRedirect(head, params) ?? { route: DEFAULT_ROUTE, params };
 };
 
 export const buildHash = (route: RouteKey, params?: RouteParams): string => {
@@ -62,13 +57,15 @@ export const useRoute = (): UseRouteResult => {
     const sync = () => setLocation(parseHash(window.location.hash));
     window.addEventListener("hashchange", sync);
 
-    // Normalise a bare or malformed URL so what's in the address bar always
-    // matches what's rendered — otherwise the first refresh silently moves
-    // the user somewhere else. replaceState doesn't fire `hashchange`, and
-    // the state above already resolved to the same route, so no extra sync.
+    // Normalise a bare, malformed or old-style URL so what's in the address
+    // bar always matches what's rendered — otherwise the first refresh
+    // silently moves the user somewhere else. replaceState doesn't fire
+    // `hashchange`, and the state above already resolved to the same
+    // location, so no extra sync.
     const current = window.location.hash;
-    const normalised = buildHash(parseHash(current).route);
-    if (current !== normalised && !current.includes("?")) {
+    const { route, params } = parseHash(current);
+    const normalised = buildHash(route, Object.fromEntries(params));
+    if (current !== normalised) {
       window.history.replaceState(null, "", normalised);
     }
 

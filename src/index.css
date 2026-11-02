@@ -209,8 +209,7 @@ html[data-theme="dark"] {
   box-sizing: border-box;
 }
 
-/* Base size stays 15px for the legacy pages; kit components set the DESIGN.md
-   ramp themselves (body 17px). Task 12 moves body to 17px. */
+/* Body is the DESIGN.md ramp: 17px / 1.3. */
 html,
 body {
   margin: 0;
@@ -218,8 +217,8 @@ body {
   font-family: var(--font);
   background: var(--ground);
   color: var(--ink);
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 17px;
+  line-height: 1.3;
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
   text-rendering: optimizeLegibility;

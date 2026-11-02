@@ -1,0 +1,220 @@
+/* App shell: tab bar under 768px, sidebar from 768px up (one list feeds both).
+   Logical properties only so Arabic flips cleanly. Tokens: src/index.css. */
+
+.shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-block-size: 100vh;
+  background: var(--ground);
+}
+.shell-main {
+  min-inline-size: 0;
+  padding: 16px 14px calc(88px + env(safe-area-inset-bottom));
+}
+.shell-side {
+  display: none;
+}
+
+/* ---- tab bar (phones) ---- */
+.ui-tabs {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  background: var(--bar);
+  backdrop-filter: var(--bar-blur);
+  -webkit-backdrop-filter: var(--bar-blur);
+  border-block-start: 0.5px solid var(--sep);
+}
+.ui-tabs a {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-block: 2px;
+  font: var(--type-tab);
+  color: var(--c-idle);
+}
+.ui-tabs a[aria-current="page"] {
+  color: var(--c-screens-text);
+}
+
+/* ---- badge (Community queue) ---- */
+.ui-nav-badge {
+  position: absolute;
+  inset-block-start: -2px;
+  inset-inline-start: calc(50% + 6px);
+  min-inline-size: 18px;
+  block-size: 18px;
+  padding-inline: 5px;
+  border-radius: 9px;
+  background: var(--c-alarm);
+  color: #fff;
+  font: 600 12px var(--font);
+  font-variant-numeric: tabular-nums;
+  display: grid;
+  place-items: center;
+}
+
+/* ---- sidebar (768px and up) ---- */
+.ui-side {
+  position: sticky;
+  inset-block-start: 0;
+  block-size: 100vh;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 22px 12px 14px;
+  background: var(--card);
+  border-inline-end: 0.5px solid var(--sep);
+}
+.ui-side-brand {
+  font: 700 22px var(--font);
+  padding: 4px 10px 12px;
+}
+.ui-side nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.ui-side nav a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--r-chip);
+  font: var(--type-body);
+}
+.ui-side nav a:hover {
+  background: var(--fill);
+}
+.ui-side nav a[aria-current="page"] {
+  background: color-mix(in srgb, var(--c-screens) 14%, transparent);
+  color: var(--c-screens-text);
+  font-weight: 600;
+}
+.ui-side .ui-nav-badge {
+  position: static;
+  margin-inline-start: auto;
+}
+.ui-side-search {
+  position: relative;
+  margin-block-end: 10px;
+}
+.ui-side-search svg {
+  position: absolute;
+  inset-inline-start: 10px;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  color: var(--c-idle);
+  pointer-events: none;
+}
+.ui-side-search input {
+  inline-size: 100%;
+  block-size: 36px;
+  box-sizing: border-box;
+  padding-inline: 34px 48px;
+  background: var(--fill);
+  border: 0;
+  border-radius: var(--r-chip);
+  color: var(--ink);
+  font: var(--type-subhead);
+  outline: none;
+}
+.ui-side-search input::placeholder {
+  color: var(--ink-2);
+}
+.ui-side-search input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.ui-side-search .ui-side-key {
+  position: absolute;
+  inset-inline-end: 8px;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  padding: 2px 6px;
+  border-radius: var(--r-square);
+  background: var(--card);
+  color: var(--ink-2);
+  font: var(--type-caption);
+  pointer-events: none;
+}
+.ui-side-search .ui-side-clear {
+  position: absolute;
+  inset-inline-end: 6px;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  inline-size: 24px;
+  block-size: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--ink-2);
+}
+/* The result list is wider than the sidebar; it opens over the page. */
+.ui-side-pop {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: 380px;
+  block-size: 100%;
+  pointer-events: none;
+}
+.ui-side-pop > * {
+  pointer-events: auto;
+}
+.ui-side-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 6px 0;
+  border-block-start: 0.5px solid var(--sep);
+}
+.ui-side-foot .ui-side-mail {
+  flex: 1;
+  min-inline-size: 0;
+  font: var(--type-footnote);
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-side-foot button {
+  inline-size: 32px;
+  block-size: 32px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--fill);
+  color: var(--ink-2);
+}
+.ui-side-foot button:hover {
+  color: var(--ink);
+}
+
+@media (min-width: 768px) {
+  .shell {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+  .shell-main {
+    padding: 28px 32px 48px;
+  }
+  .shell[data-density="compact"] .shell-main {
+    padding: 20px 24px 40px;
+  }
+  .shell-side {
+    display: block;
+  }
+  .ui-tabs {
+    display: none;
+  }
+}

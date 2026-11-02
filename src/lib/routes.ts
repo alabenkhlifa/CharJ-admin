@@ -1,41 +1,28 @@
 import type { IconKey } from "./icons";
 
 export type RouteKey =
-  | "overview"
-  | "analytics"
+  | "summary"
+  | "usage"
+  | "community"
   | "chargers"
-  | "submissions"
   | "notifications"
-  | "feedback"
-  | "reviews"
-  | "visits"
-  | "users"
-  | "vehicles"
-  | "map"
   | "settings";
 
 export type NavItem = {
   k: RouteKey;
   l: string;
   ic: IconKey;
-  shortcut?: string;
-  // `accent` flags items that should glow when their count is > 0
-  // (e.g. pending submissions). The actual count comes from
-  // `useSidebarCounts()` and is plumbed through `<Sidebar counts={...} />`.
-  accent?: boolean;
+  // On the phone tab bar. Notifications is reached from Settings on phones.
+  tab: boolean;
 };
 
 export const NAV: NavItem[] = [
-  { k: "overview", l: "Overview", ic: "Overview", shortcut: "g o" },
-  { k: "analytics", l: "App analytics", ic: "Overview" },
-  { k: "chargers", l: "Chargers", ic: "Charger", shortcut: "g c" },
-  { k: "submissions", l: "Submissions", ic: "Submission", accent: true },
-  { k: "notifications", l: "Notifications", ic: "Bell" },
-  { k: "feedback", l: "Feedback", ic: "Feedback", shortcut: "g f" },
-  { k: "reviews", l: "Reviews", ic: "Reviews" },
-  { k: "visits", l: "Driver visits", ic: "Visit" },
-  { k: "users", l: "Users", ic: "Users" },
-  { k: "vehicles", l: "Vehicles", ic: "Vehicle" },
-  { k: "map", l: "Map", ic: "Map" },
-  { k: "settings", l: "Settings", ic: "Settings" },
+  { k: "summary", l: "Summary", ic: "Overview", tab: true },
+  { k: "usage", l: "Usage", ic: "Phone", tab: true },
+  { k: "community", l: "Community", ic: "Feedback", tab: true },
+  { k: "chargers", l: "Chargers", ic: "Charger", tab: true },
+  { k: "notifications", l: "Notifications", ic: "Bell", tab: false },
+  { k: "settings", l: "Settings", ic: "Settings", tab: true },
 ];
+
+export const DEFAULT_ROUTE: RouteKey = "summary";

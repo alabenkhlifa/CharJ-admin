@@ -186,7 +186,7 @@ try {
   // ── Page renders the fixture ──────────────────────────────────────────
   await page.goto(`${base}/#/notifications`);
   await page.getByRole("heading", { name: "Notifications", exact: true }).waitFor();
-  await page.getByRole("button", { name: "Notifications", exact: true }).waitFor(); // sidebar entry
+  await page.getByRole("link", { name: "Notifications", exact: true }).waitFor(); // sidebar entry
   const mode = await page.getByRole("note", { name: "Mode" }).innerText();
   assert.match(mode, /every 5 min/);
   assert.match(mode, /22:00–08:00 \(Africa\/Tunis\)/);
