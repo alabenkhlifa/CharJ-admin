@@ -19,6 +19,7 @@ colors:
   permissions: "#b84900"
   users: "#d6008b"
   android-auto: "#6f1fd6"
+  design: "#8b5cf6"
   idle: "#8e8e93"
   active-text-light: "#d70f3f"
   came-back-text-light: "#1f7f37"
@@ -37,6 +38,7 @@ colors:
   permissions-text-light: "#b84900"
   users-text-light: "#d10088"
   android-auto-text-light: "#6f1fd6"
+  design-text-light: "#7c3aed"
   onboarding-fill-light: "#a37f00"
   trip-fill-light: "#00807a"
   navigate-fill-light: "#0071a4"
@@ -54,6 +56,7 @@ colors:
   permissions-text-dark: "#e35a00"
   users-text-dark: "#ff00a6"
   android-auto-text-dark: "#b75fe3"
+  design-text-dark: "#ccbbff"
   grouped-ground-light: "#f2f2f7"
   card-light: "#ffffff"
   card-pressed-light: "#f7f7fa"
@@ -242,7 +245,7 @@ A full-saturation category palette (Apple system colours) on a quiet grey ground
 ### Tertiary (Usage categories)
 Each Usage section owns one colour: **Screens Blue** (screens, also charger submissions and the "Show table" link), **Actions Indigo** (actions, also versions and review reports), **Onboarding Yellow** (onboarding), **Trip Teal** (trip), **Navigate Sky** (navigate), **Contributions Purple** (contributions), **Cars Brown** (cars), **Routes Teal-Blue** (routes), **Language Magenta** (languages), **Permission Rust** (permissions), **People Raspberry** (users), **Auto Violet** (Android Auto, once it has data).
 
-On Community, the four queues keep their Needs-you colours (feedback Needs Orange, charger submissions Screens Blue, review reports Actions Indigo, couldn't charge Alarm Red). Its informational cards borrow categories this page doesn't otherwise show: **Contributions Purple** for what drivers contribute that never waits (the Lune design votes and the recent reviews; on Usage the same colour counts reviews posted), and **Navigate Sky** for driver visits (the report a driver sends after going to a charger). A tab shows one of them at a time.
+On Community, the four queues keep their Needs-you colours (feedback Needs Orange, charger submissions Screens Blue, review reports Actions Indigo, couldn't charge Alarm Red). **Design Violet** (design, `#8b5cf6`, the colour the Lune design votes got when they arrived) is the Design votes card: informational, never a queue. The recent reviews borrow **Contributions Purple** (on Usage the same colour counts reviews posted) and driver visits **Navigate Sky** (the report a driver sends after going to a charger); neither is otherwise on Community. Design Violet's text tones were picked for contrast (≥4.5:1 text and bubble digits in both themes) and to stay ΔE ≥ 15 from Needs Orange, the only other category on its tab. The dataviz palette check passes for that pair in light; in dark only Needs Orange's own base sits above the lightness band. Against Actions Indigo (ΔE 7.4) and Screens Blue (deutan ΔE 1.8) it fails as a chart palette: legal here because Design Violet draws no chart and only meets them as tab badges, so the card title and its thumb glyph carry the meaning.
 
 The four added for Usage (languages, permissions, users, android-auto) sit in the hue gaps the Apple system colours leave (magenta, raspberry, violet, rust). Picked by OKLab distance from every tone a Usage page shows (bases, light fills, light and dark text), each at least ΔE 10 from them, and validated as a set with the dataviz palette check in both modes (lightness band, chroma, CVD ≥ 8 pairwise, normal vision ≥ 15, ≥ 3:1 on the card; Auto Violet is under 3:1 on the dark card, which is legal because Android Auto draws no chart). The system was already crowded (Active and Alarm sit ΔE 4.5 apart), so a colour is never the only cue: every card carries its title.
 
@@ -276,6 +279,7 @@ The four added for Usage (languages, permissions, users, android-auto) sit in th
 | Permissions | permissions | permissions-text-light (= base) | base | permissions-text-dark |
 | Users | users | users-text-light | base | users-text-dark |
 | Android Auto | android-auto | android-auto-text-light (= base) | base | android-auto-text-dark |
+| Design votes | design | design-text-light | base | design-text-dark |
 | Idle | idle | ink-secondary-light | base | ink-secondary-dark |
 
 Every coloured text tone meets 4.5:1 on both Card and Grouped Ground in its theme, and so does Secondary Ink (also on Fill over Card, where zero bubbles and chips sit). Idle text is Secondary Ink, like any other secondary text. Count bubbles are filled with the category's **text** tone in both themes, not the fill tone, so their digits in glyph ink reach 4.5:1 too. `tests/tokens.test.ts` checks all of this with the WCAG formula.
@@ -369,11 +373,12 @@ Filled with the category colour (light: the fill tone from the map). The Today c
 Fill track, 9px radius, 2px padding, max width 420px, equal columns. Labels 13px/500, selected 600. A Card-coloured thumb (#636366 in dark) slides under the selected segment over 0.32s on the house curve, sized from the selected button. Buttons use `aria-pressed`. It only switches data (Test phones / Production, All / iOS / Android).
 
 ### Page tabs (Community)
-Pills on the ground, not a segmented track: two by two on a phone, one row once all four fit with their badges (about 600px of page). 15px/500 Ink; the current tab lifts in Card with the segment-thumb shadow at 600, and is `aria-current="page"`. Each tab is a link (`?tab=`). Its badge is a 22px pill, 12px/600 tabular in glyph ink on the queue's text tone; a real zero is plain Secondary Ink with no fill; an unknown count shows no badge. Labels and zero badges sit on Card or Ground, never on Fill, where Secondary Ink drops under 4.5:1.
+Pills on the ground, not a segmented track: two by two on a phone, one row once all four fit with their badges (about 600px of page). 15px/500 Ink; the current tab lifts in Card with the segment-thumb shadow at 600, and is `aria-current="page"`; hover is Card Pressed. Each tab is a link (`?tab=`). Its badge is a 22px pill, 12px/600 tabular in glyph ink on the queue's text tone; a real zero is plain Secondary Ink with no fill; an unknown count shows no badge. Labels and zero badges sit on Card or Ground, never on Fill, where Secondary Ink drops under 4.5:1.
 
 ### Buttons and fields
 - **Button:** Fill, 10px radius, 34px tall, 6px 14px, 15px/600 Ink. **Primary** (one per item: Approve) is filled with Screens Text in glyph ink, like a bubble, so its label keeps 4.5:1 in both themes.
-- **Text action:** 15px/600 Screens Text, no fill ("Try again", "Show review").
+- **Text action:** 15px/600 Screens Text, no fill ("Try again", "Show review", "Refresh" at the end of a list card's filter bar: lists reload by hand or after an action, never on a timer).
+- **Select:** a filter whose labels carry counts ("Resolved (123)") or run long ("Couldn't charge") is a select (Fill, 10px radius, 15px/500), not a segmented control that would clip it on a phone.
 - **Field:** Fill, 10px radius, 8px 10px, 17px Ink, label above in 13px Secondary Ink. Arabic fields write right to left.
 - **Error line:** 15px Alarm Text (something failed); a done or refused action ("Someone already reviewed this") is a 15px Ink line on Fill above the list.
 

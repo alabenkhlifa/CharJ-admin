@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { reviewSubmission } from "../../data/submissions";
 import { connectorLine, mapsUrl, NEARBY_METERS, type NearbyCharger, type Submission } from "../../data/submissions-report";
 import { buildHash } from "../../lib/use-route";
+import { reviewGoneMessage } from "./format";
 import { nf } from "./format";
 
 // Approve one submission: a confirm step that shows what the new charger will
@@ -23,8 +24,8 @@ type Props = {
   onCancel: () => void;
   /** 200: the new charger's id. */
   onApproved: (chargerId: string | null) => void;
-  /** 409: someone else got there first. */
-  onConflict: () => void;
+  /** 409 or 404: someone else got there first, or it is gone. The sentence to show. */
+  onConflict: (message: string) => void;
 };
 
 const coordinates = (s: Submission) => (s.lat === null || s.lng === null ? null : `${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}`);
@@ -73,13 +74,25 @@ export const ApproveDialog = ({ submission: s, nearby, onCancel, onApproved, onC
     if (dialog && !dialog.open) dialog.showModal();
   }, []);
 
+  // A dialog that closed (or a page that moved on) while the POST was out
+  // never acts on its answer: no late navigation, no notice.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
   const approve = async () => {
     setBusy(true);
     setError(null);
     const res = await reviewSubmission(s.id, "approve", undefined, { nameAr, addressAr, operator });
+    if (!mounted.current) return;
     setBusy(false);
     if (res.ok) return onApproved(res.result.chargerId);
-    if (res.status === 409) return onConflict();
+    const gone = reviewGoneMessage(res.status);
+    if (gone) return onConflict(gone);
     setError(res.message);
   };
 

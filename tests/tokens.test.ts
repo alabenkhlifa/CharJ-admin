@@ -52,6 +52,7 @@ const MAP: [string, "light" | "dark" | "both", string][] = [
   ["permissions-text-light", "light", "--c-permissions-text"],
   ["users-text-light", "light", "--c-users-text"],
   ["android-auto-text-light", "light", "--c-android-auto-text"],
+  ["design-text-light", "light", "--c-design-text"],
   ["ink-secondary-light", "light", "--c-idle-text"],
   ["active-text-dark", "dark", "--c-active-text"],
   ["came-back-text-dark", "dark", "--c-came-back-text"],
@@ -66,6 +67,7 @@ const MAP: [string, "light" | "dark" | "both", string][] = [
   ["permissions-text-dark", "dark", "--c-permissions-text"],
   ["users-text-dark", "dark", "--c-users-text"],
   ["android-auto-text-dark", "dark", "--c-android-auto-text"],
+  ["design-text-dark", "dark", "--c-design-text"],
   ["ink-secondary-dark", "dark", "--c-idle-text"],
   // Categories with no dark text tone use their base.
   ["onboarding", "dark", "--c-onboarding-text"],
@@ -90,6 +92,7 @@ const MAP: [string, "light" | "dark" | "both", string][] = [
   ["permissions", "light", "--c-permissions-fill"],
   ["users", "light", "--c-users-fill"],
   ["android-auto", "light", "--c-android-auto-fill"],
+  ["design", "light", "--c-design-fill"],
   ["grouped-ground-light", "light", "--ground"],
   ["card-light", "light", "--card"],
   ["card-pressed-light", "light", "--card-pressed"],
@@ -197,7 +200,8 @@ const deltaE = (a: string, b: string) => {
 
 test("the four Usage-only categories stay apart from every category on the Usage page, in every tone", () => {
   const added = ["languages", "permissions", "users", "android-auto"];
-  const onUsage = CATEGORIES.filter((c) => !["queue", "needs-you", "alarm"].includes(c));
+  // Design (the Lune votes) lives on Community only.
+  const onUsage = CATEGORIES.filter((c) => !["queue", "needs-you", "alarm", "design"].includes(c));
   const tones: [Record<string, string>, string][] = [
     [light, "--c-%"],
     [light, "--c-%-fill"],
@@ -212,6 +216,23 @@ test("the four Usage-only categories stay apart from every category on the Usage
         assert.ok(deltaE(x, y) >= 10, `${a} vs ${b} ${pattern}: ${x} / ${y} ΔE ${deltaE(x, y).toFixed(1)}`);
       }
     }
+  }
+});
+
+// Design votes share the Feedback tab with Needs you only (the tab strip's
+// badges aside): the two stay well apart in every tone they draw.
+test("Design Violet stays apart from Needs Orange, its tab's other category, in every tone", () => {
+  assert.equal(resolve(light, "--c-design"), "#8b5cf6", "the colour the design votes arrived with (af43201's violet)");
+  const tones: [Record<string, string>, string][] = [
+    [light, "--c-%"],
+    [light, "--c-%-fill"],
+    [light, "--c-%-text"],
+    [dark, "--c-%-text"],
+    [dark, "--c-%-fill"],
+  ];
+  for (const [theme, pattern] of tones) {
+    const [x, y] = [resolve(theme, pattern.replace("%", "design")), resolve(theme, pattern.replace("%", "needs-you"))];
+    assert.ok(deltaE(x, y) >= 15, `design vs needs-you ${pattern}: ${x} / ${y} ΔE ${deltaE(x, y).toFixed(1)}`);
   }
 });
 

@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { moderateVisit, useVisits } from "../../data/visits";
 import {
+  flipVisit,
   formatVisitDate,
   REASON_LABELS,
   VISITS_PER_PAGE,
   type Visit,
   type VisitOutcomeFilter,
-  type VisitsPage,
   type VisitVisibility,
 } from "../../data/visits-report";
 import { countOrPercent } from "../../lib/health-format";
@@ -16,7 +16,7 @@ import { HealthCard } from "../../ui/health-card";
 import { Pager } from "../../ui/pager";
 import { Pill } from "../../ui/pill";
 import { Segmented } from "../../ui/segmented";
-import { ComIcon, LOADING, Note, RetryLine, Stats, Waiting, When } from "./bits";
+import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Stats, Waiting, When } from "./bits";
 import { nf, shortId, useClampPage } from "./format";
 import type { CommunityView } from "./params";
 
@@ -147,16 +147,6 @@ const VisitRow = ({ visit, onOpenDriver, onFlip }: RowProps) => {
   );
 };
 
-const flipped = (data: VisitsPage, before: Visit, after: Visit): VisitsPage => {
-  const was = before.hiddenAt !== null;
-  const is = after.hiddenAt !== null;
-  return {
-    ...data,
-    items: data.items.map((v) => (v.id === after.id ? after : v)),
-    summary: { ...data.summary, hidden: Math.max(0, data.summary.hidden + (is === was ? 0 : is ? 1 : -1)) },
-  };
-};
-
 export const VisitsTab = ({ view, onParams, onChanged, onOpenDriver }: Props) => {
   const visits = useVisits(view);
   const data = visits.data;
@@ -183,7 +173,7 @@ export const VisitsTab = ({ view, onParams, onChanged, onOpenDriver }: Props) =>
               visit={v}
               onOpenDriver={onOpenDriver}
               onFlip={(next) => {
-                visits.patch((d) => flipped(d, v, next));
+                visits.patch((d) => flipVisit(d, v, next));
                 onChanged();
               }}
             />
@@ -246,6 +236,13 @@ export const VisitsTab = ({ view, onParams, onChanged, onOpenDriver }: Props) =>
           </label>
           <Segmented label="Shown in the app" value={view.visibility} options={VISIBILITY_OPTIONS} onChange={(v) => onParams({ visibility: v === "visible" ? null : v, page: null })} />
           <Segmented label="Visit date" value={since ? String(since) : "all"} options={WINDOW_OPTIONS} onChange={(v) => onParams({ since: v === "all" ? null : v, page: null })} />
+          <RefreshButton
+            busy={visits.loading}
+            onRefresh={() => {
+              visits.refresh();
+              onChanged();
+            }}
+          />
         </div>
         {body}
         <Note>

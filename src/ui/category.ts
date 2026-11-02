@@ -22,6 +22,7 @@ export const CATEGORIES = [
   "permissions",
   "users",
   "android-auto",
+  "design",
   "idle",
 ] as const;
 

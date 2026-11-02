@@ -39,8 +39,9 @@
   text-align: center;
   transition: background .2s var(--ease);
 }
+/* Card Pressed, not Fill: a label or zero badge on Fill drops under 4.5:1. */
 .com-tabs a:hover {
-  background: var(--fill);
+  background: var(--card-pressed);
 }
 .com-tabs a[aria-current="page"] {
   background: var(--card);
@@ -269,6 +270,13 @@
 .com-link:disabled {
   color: var(--ink-2);
   cursor: default;
+}
+/* Refresh sits at the end of a card's filter bar. */
+.com-refresh {
+  margin-inline-start: auto;
+}
+.com-retry .com-retry-more {
+  margin-inline-start: var(--s-md);
 }
 .com-id {
   padding: 0;

@@ -259,6 +259,21 @@
           "#e9ddf9"
         ]
       },
+      "design": {
+        "role": "tertiary",
+        "displayName": "Design Violet",
+        "canonical": "#8b5cf6",
+        "tonalRamp": [
+          "#2a1c4a",
+          "#462e7b",
+          "#6140ac",
+          "#7a51d8",
+          "#8b5cf6",
+          "#ae8df9",
+          "#d1befb",
+          "#eee7fe"
+        ]
+      },
       "idle": {
         "role": "neutral",
         "displayName": "Idle Grey",
@@ -484,6 +499,16 @@
         "role": "tertiary",
         "displayName": "Auto Violet text tone (dark)",
         "canonical": "#b75fe3"
+      },
+      "design-text-light": {
+        "role": "tertiary",
+        "displayName": "Design Violet text tone (light)",
+        "canonical": "#7c3aed"
+      },
+      "design-text-dark": {
+        "role": "tertiary",
+        "displayName": "Design Violet text tone (dark)",
+        "canonical": "#ccbbff"
       }
     },
     "typographyMeta": {

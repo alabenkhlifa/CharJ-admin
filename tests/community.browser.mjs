@@ -135,7 +135,7 @@ const handle = (name, method, url, body, S) => {
       total: all.length,
       open: all.filter((f) => !f.resolved).length,
       resolved: all.filter((f) => f.resolved).length,
-      last_7_days: all.filter((f) => f.created_at.slice(0, 10) >= isoDaysAgo(7)).length,
+      last_7_days: all.filter((f) => Date.parse(f.created_at) >= NOW.getTime() - 7 * 86_400_000).length,
       by_category: Object.fromEntries(CATS.map((c) => [c, all.filter((f) => f.category === c).length])),
     };
     if (S.feedbackDeployed) summary.open_requests = all.filter((f) => !f.resolved && f.category !== "design").length;
@@ -235,8 +235,9 @@ const open = async ({ width = 390, height = 844, colorScheme = "light", S = stat
     const url = new URL(route.request().url());
     const path = url.pathname.split("/rest/v1/")[1];
     reads.push(path);
+    if (path === "ratings" && S.ratingsFail) return route.fulfill({ status: 500, json: { message: "ratings unavailable", code: "XX000" } });
     const json = path === "rpc/search_chargers" ? S.chargers
-      : path === "ratings" ? S.ratings
+      : path === "ratings" ? (S.ratingsFail ? null : S.ratings)
       : path === "chargers" ? S.chargers.map((c) => ({ id: c.id, name: c.name }))
       : [];
     return route.fulfill({ json, headers: { "content-range": `0-${json.length}/${json.length}` } });
@@ -250,6 +251,7 @@ const open = async ({ width = 390, height = 844, colorScheme = "light", S = stat
     requests.push(`${request.method() === "POST" ? "POST " : ""}${name}${url.search}`);
     assert.equal(request.headers().authorization, "Bearer test.admin.session");
     if (S.delay) await new Promise((r) => setTimeout(r, S.delay));
+    if (S.postDelay && request.method() === "POST") await new Promise((r) => setTimeout(r, S.postDelay));
     const [status, json] = handle(name, request.method(), url, request.method() === "POST" ? request.postDataJSON() : null, S);
     return route.fulfill({ status, json });
   });
@@ -274,6 +276,9 @@ const navBadge = async (page) => {
 };
 const stats = (page, card) => page.$$eval(`${card} .com-stats > div`, (ds) => ds.map((d) => `${d.querySelector("b").textContent} ${d.querySelector("span").textContent.trim()}`));
 const items = (page, card) => page.locator(`${card} .com-list > .com-item`);
+const selectIn = (page, card, label) => page.locator(`${card} .com-select`, { hasText: label }).locator("select");
+const optionsOf = (page, card, label) => selectIn(page, card, label).locator("option").allInnerTexts();
+const square = (page, card) => page.$eval(`${card} .ui-sq`, (q) => q.getAttribute("style") ?? "");
 const ready = (page, card) => page.waitForFunction((c) => {
   const el = document.querySelector(c);
   return el && !el.querySelector("[aria-busy=true]");
@@ -374,7 +379,11 @@ try {
       { label: "Driver visits", badge: "2", zero: false, current: false, href: "#/community?tab=visits" },
     ], "feedback: four tabs, each badge its open count, Feedback current");
     eq(await navBadge(page), "10", "feedback: the nav badge is the queue total (3 + 3 + 2 + 2)");
-    eq(await stats(page, "#com-feedback"), ["3 Open requests", "7 Received, 7 days", "9 Received, all time"], "feedback: stats, votes left out of Open");
+    eq(await stats(page, "#com-feedback"), ["3 Open requests", "1 Resolved", "2 Received, 7 days", "4 Received, all time"], "feedback: stats count requests only (9 rows, 5 of them votes; 7 this week, 5 of them votes)");
+    eq(await optionsOf(page, "#com-feedback", "Status"), ["Open (3)", "Resolved (1)", "All"], "feedback: the status filter carries its counts");
+    eq(await page.locator("#com-feedback .com-refresh").innerText(), "Refresh", "feedback: a Refresh action in the filter bar");
+    ok((await square(page, "#com-votes")).includes("--c-design-fill"), "votes: the card wears the design colour, not Contributions");
+    ok((await square(page, "#com-feedback")).includes("--c-needs-you-fill"), "feedback: Needs Orange");
     eq(await page.locator("#com-feedback .ui-meta").innerText(), "3 open", "feedback: card meta");
     eq(await items(page, "#com-feedback").count(), 3, "feedback: three open requests, no vote among them");
     const first = items(page, "#com-feedback").first();
@@ -401,7 +410,8 @@ try {
     await first.getByRole("button", { name: "Reopen" }).waitFor();
     eq(await first.locator(".ui-pill").allInnerTexts(), ["Bug", "Resolved"], "resolve: the row says Resolved and stays for an undo");
     ok((await first.innerText()).includes("Resolved · by admin@charj.test · just now"), "resolve: who and when");
-    eq(await stats(page, "#com-feedback"), ["2 Open requests", "7 Received, 7 days", "9 Received, all time"], "resolve: Open requests 3 → 2");
+    eq(await stats(page, "#com-feedback"), ["2 Open requests", "2 Resolved", "2 Received, 7 days", "4 Received, all time"], "resolve: Open requests 3 → 2, Resolved 1 → 2");
+    eq(await optionsOf(page, "#com-feedback", "Status"), ["Open (2)", "Resolved (2)", "All"], "resolve: the filter counts follow");
     await page.waitForFunction(() => document.querySelector(".com-tabs a .com-badge")?.textContent === "2");
     ok(count(requests, "admin-feedback?status=open&category=requests&page=1&perPage=3") > before, "resolve: the queue reloads (no timer)");
     eq((await tabs(page))[0].badge, "2", "resolve: the Feedback badge follows");
@@ -410,25 +420,39 @@ try {
     await first.getByRole("button", { name: "Reopen" }).click();
     await first.getByRole("button", { name: "Resolve" }).waitFor();
     await page.waitForFunction(() => document.querySelector(".com-tabs a .com-badge")?.textContent === "3");
-    eq(await stats(page, "#com-feedback"), ["3 Open requests", "7 Received, 7 days", "9 Received, all time"], "reopen: back to 3");
+    eq(await stats(page, "#com-feedback"), ["3 Open requests", "1 Resolved", "2 Received, 7 days", "4 Received, all time"], "reopen: back to 3");
+
+    // Refresh: by hand, reads the list and the queue again and picks up what arrived.
+    S.feedback.push(fb(50, "bug", "Nouveau bug arrivé entre-temps", "2026-11-02T09:30:00Z"));
+    const [lists, queues] = [count(requests, "admin-feedback?status=open&category=requests&page=1&perPage=25"), count(requests, "admin-feedback?status=open&category=requests&page=1&perPage=3")];
+    await page.locator("#com-feedback .com-refresh").click();
+    await page.waitForFunction(() => document.querySelectorAll("#com-feedback .com-list > .com-item").length === 4);
+    ok(count(requests, "admin-feedback?status=open&category=requests&page=1&perPage=25") > lists, "refresh: the list is read again");
+    ok(count(requests, "admin-feedback?status=open&category=requests&page=1&perPage=3") > queues, "refresh: so is the queue");
+    await page.waitForFunction(() => document.querySelector(".com-tabs a .com-badge")?.textContent === "4");
+    eq(await stats(page, "#com-feedback"), ["4 Open requests", "1 Resolved", "3 Received, 7 days", "5 Received, all time"], "refresh: the new request counts");
+    S.feedback.pop();
+    await page.locator("#com-feedback .com-refresh").click();
+    await page.waitForFunction(() => document.querySelectorAll("#com-feedback .com-list > .com-item").length === 3);
     eq(S.feedback.find((f) => f.id === uuid("f", 1)).resolved, false, "reopen: the server row is open again");
 
     // Filters live in the URL.
-    await page.locator("#com-feedback select").selectOption("all");
+    await selectIn(page, "#com-feedback", "Show").selectOption("all");
     await page.waitForFunction(() => location.hash.includes("category=all"));
     await ready(page, "#com-feedback");
     eq(await items(page, "#com-feedback").count(), 8, "filter: All shows the requests and the votes");
     ok((await page.locator("#com-feedback").innerText()).includes("Doesn't like it"), "filter: a vote shows its thumb");
     ok((await page.locator("#com-feedback").innerText()).includes("No comment"), "filter: a vote without words reads No comment");
     ok((await page.locator("#com-feedback").innerText()).includes("Informational: not counted as waiting."), "filter: votes say they don't wait");
-    await page.locator("#com-feedback .ui-seg button", { hasText: "Resolved" }).click();
+    eq(await optionsOf(page, "#com-feedback", "Status"), ["Open (8)", "Resolved (1)", "All"], "filter: with votes, the counts include them");
+    await selectIn(page, "#com-feedback", "Status").selectOption("resolved");
     await page.waitForFunction(() => location.hash.includes("status=resolved"));
     await ready(page, "#com-feedback");
     eq(await items(page, "#com-feedback").count(), 1, "filter: Resolved");
     await page.reload();
     await ready(page, "#com-feedback");
-    eq(await page.locator("#com-feedback .ui-seg button[aria-pressed=true]").innerText(), "Resolved", "filter: survives a reload");
-    eq(await page.locator("#com-feedback select").inputValue(), "all", "filter: the category survives a reload");
+    eq(await selectIn(page, "#com-feedback", "Status").inputValue(), "resolved", "filter: survives a reload");
+    eq(await selectIn(page, "#com-feedback", "Show").inputValue(), "all", "filter: the category survives a reload");
     eq(await hscroll(page), 0, "feedback: no horizontal scroll at 390");
     await context.close();
   }
@@ -449,16 +473,18 @@ try {
     eq((await tabs(page))[0].badge, null, "400: no Feedback badge (unknown, not 0)");
     eq(await navBadge(page), null, "400: no nav badge while a source is unknown");
     eq(await stats(page, "#com-votes"), ["3 Likes it", "2 Doesn't like it"], "400: the design votes still load");
-    await page.locator("#com-feedback select").selectOption("all");
+    await page.locator("#com-feedback").getByRole("button", { name: "Show all" }).click();
+    await page.waitForFunction(() => location.hash.includes("category=all"));
     await ready(page, "#com-feedback");
-    eq(await stats(page, "#com-feedback"), ["— Open requests", "7 Received, 7 days", "9 Received, all time"], "old server: open requests unknown, not the open count with votes in it");
+    ok(true, "400: Show all is one tap away");
+    eq(await stats(page, "#com-feedback"), ["— Open requests", "— Resolved", "2 Received, 7 days", "4 Received, all time"], "old server: open requests unknown, not the open count with votes in it");
     ok((await page.locator("#com-feedback .com-note").first().innerText()).includes("need the updated admin-feedback"), "old server: says why");
-    await page.locator("#com-feedback select").selectOption("requests");
+    await selectIn(page, "#com-feedback", "Show").selectOption("requests");
     await page.locator("#com-feedback .com-retry").waitFor();
     S.feedbackDeployed = true;
     await page.locator("#com-feedback").getByRole("button", { name: "Try again" }).click();
     await page.waitForSelector("#com-feedback .com-stats");
-    eq(await stats(page, "#com-feedback"), ["3 Open requests", "7 Received, 7 days", "9 Received, all time"], "400: Try again loads once deployed");
+    eq(await stats(page, "#com-feedback"), ["3 Open requests", "1 Resolved", "2 Received, 7 days", "4 Received, all time"], "400: Try again loads once deployed");
     ok(count(requests, "admin-feedback?status=open&category=requests&page=1&perPage=25") >= 2, "400: Try again asks again");
     await shot(page, "t9-390-feedback-after-retry.png");
     await context.close();
@@ -596,6 +622,53 @@ try {
     await context.close();
   }
 
+  // ---- 4b. 404 on approve or reject: like 409, the notice and a fresh list ----
+  {
+    const S = state();
+    const { context, page, requests } = await open({ S });
+    await page.goto(`${base}/${LINKS.submissions}`);
+    await ready(page, "#com-submissions");
+    await queueSettled(page);
+    eq(await page.locator("#com-submissions .com-refresh").count(), 1, "submissions: a Refresh action in the filter bar");
+    // Deleted on the server after the list was read.
+    S.submissions = S.submissions.filter((x) => x.id !== S1);
+    await items(page, "#com-submissions").first().getByRole("button", { name: "Approve…" }).click();
+    await page.locator(".com-dialog[open]").getByRole("button", { name: "Approve", exact: true }).click();
+    await page.locator("#com-submissions .com-notice").waitFor();
+    eq(await page.locator("#com-submissions .com-notice").innerText(), "This submission no longer exists. The list now shows where it stands.", "404 approve: said plainly");
+    eq(await page.locator(".com-dialog[open]").count(), 0, "404 approve: the dialog closes");
+    await page.waitForFunction(() => document.querySelectorAll("#com-submissions .com-list > .com-item").length === 2);
+    await page.waitForFunction(() => document.querySelectorAll(".com-tabs a .com-badge")[1]?.textContent === "2");
+    ok(true, "404 approve: the list and the badge are read again");
+    S.submissions = S.submissions.filter((x) => x.id !== S2);
+    const gammarth = items(page, "#com-submissions").first();
+    await gammarth.getByRole("button", { name: "Reject…" }).click();
+    await gammarth.getByRole("button", { name: "Reject", exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll("#com-submissions .com-list > .com-item").length === 1);
+    eq(await page.locator("#com-submissions .com-notice").innerText(), "This submission no longer exists. The list now shows where it stands.", "404 reject: the same");
+    ok(requests.filter((r) => r === "POST admin-submissions").length === 2, "404: two POSTs, nothing else written");
+    await context.close();
+  }
+
+  // ---- 4c. A dialog that closed while approving never navigates later ----
+  {
+    const S = state({ postDelay: 900 });
+    const { context, page } = await open({ S });
+    await page.goto(`${base}/${LINKS.submissions}`);
+    await ready(page, "#com-submissions");
+    await items(page, "#com-submissions").first().getByRole("button", { name: "Approve…" }).click();
+    await page.locator(".com-dialog[open]").getByRole("button", { name: "Approve", exact: true }).click();
+    await page.locator(".com-dialog[open]").getByRole("button", { name: "Approving…" }).waitFor();
+    // Back button / another tab while the POST is out: the dialog goes with the tab.
+    await page.evaluate(() => { location.hash = "#/community?tab=reviews"; });
+    await page.waitForSelector("#com-reports");
+    await page.waitForTimeout(1500);
+    eq(await hashOf(page), "#/community?tab=reviews", "late answer: no navigation to the charger");
+    ok(!(await page.evaluate(() => window.__hashes)).some((h) => h.startsWith("#/chargers")), "late answer: the editor never opened");
+    eq(S.submissions.find((x) => x.id === S1).status, "approved", "late answer: the approval itself went through");
+    await context.close();
+  }
+
   // ---- 5. Reviews: reports open first, Show review, resolve flips the row ----
   {
     const { context, page, requests, S } = await open();
@@ -641,6 +714,23 @@ try {
     await context.close();
   }
 
+  // ---- 5b. Recent reviews that fail: Couldn't load, Try again ----
+  {
+    const S = state({ ratingsFail: true });
+    const { context, page, reads } = await open({ S });
+    await page.goto(`${base}/${LINKS.reviews}`);
+    await page.locator("#com-reviews .com-retry").waitFor();
+    ok((await page.locator("#com-reviews .com-retry").innerText()).startsWith("Couldn't load reviews."), "recent reviews: a failed read says so");
+    eq(await page.locator("#com-reviews .ui-meta").count(), 0, "recent reviews: no count from nothing");
+    eq(await page.locator("#com-reports .com-refresh").count(), 1, "reports: a Refresh action in the filter bar");
+    S.ratingsFail = false;
+    const before = reads.filter((r) => r === "ratings").length;
+    await page.locator("#com-reviews").getByRole("button", { name: "Try again" }).click();
+    await page.waitForFunction(() => document.querySelectorAll("#com-reviews .com-list > .com-item").length === 2);
+    ok(reads.filter((r) => r === "ratings").length > before, "recent reviews: Try again reads again and loads");
+    await context.close();
+  }
+
   // ---- 6. Driver visits: the Needs-you filters, hide with a reason, unhide, open the driver ----
   {
     const { context, page, requests, S } = await open();
@@ -669,11 +759,21 @@ try {
     ok((await marsa.innerText()).includes("Hidden: Doublon"), "hide: the row says why, in place");
     await page.waitForFunction(() => document.querySelectorAll(".com-tabs a .com-badge")[3]?.textContent === "1");
     eq((await tabs(page))[3].badge, "1", "hide: the Driver visits badge follows (hidden reports don't wait)");
+    ok((await page.locator("#com-visits > .com-meta").innerText()).includes("1 couldn't charge in the last 7 days"), "hide: the window line agrees with the badge (2 → 1)");
     await marsa.getByRole("button", { name: "Unhide" }).click();
     await marsa.getByRole("button", { name: "Hide…" }).waitFor();
     eq(S.posts.at(-1).body, { id: V1, hidden: false }, "unhide: the POST");
     await page.waitForFunction(() => document.querySelectorAll(".com-tabs a .com-badge")[3]?.textContent === "2");
     ok(true, "unhide: the badge goes back to 2");
+    ok((await page.locator("#com-visits > .com-meta").innerText()).includes("2 couldn't charge in the last 7 days"), "unhide: the window line goes back to 2 with it");
+
+    // Refresh: a report sent meanwhile shows up, in the list, the line and the badge.
+    S.visits.push(visit(uuid("b", 5), "Shell Lac", "could_not_charge", "2026-11-02", { user_id: U2 }));
+    await page.locator("#com-visits .com-refresh").click();
+    await page.waitForFunction(() => document.querySelectorAll("#com-visits .com-list > .com-item").length === 3);
+    await page.waitForFunction(() => document.querySelectorAll(".com-tabs a .com-badge")[3]?.textContent === "3");
+    ok((await page.locator("#com-visits > .com-meta").innerText()).includes("3 couldn't charge in the last 7 days"), "refresh: list, line and badge all read 3");
+    S.visits.pop();
 
     await page.locator("#com-visits .ui-seg button", { hasText: "All time" }).click();
     await page.waitForFunction(() => !location.hash.includes("since="));
@@ -698,6 +798,7 @@ try {
     S.reports.push({ ...reports()[0], id: uuid("e", 9), notes: long, rating: { ...reports()[0].rating, charger_name: `Borne ${"Longue".repeat(15)}`, comment: long } });
     S.visits.push(visit(uuid("b", 9), `Parking ${"Souterrain".repeat(10)}`, "could_not_charge", "2026-11-02", { charger_city: "Sidi Bou Saïd" }));
     S.reviewAnswer = () => [422, { error: "connectors_invalid" }];
+    for (let i = 0; i < 120; i += 1) S.feedback.push(fb(200 + i, "other", `Ancien message ${i}`, "2026-09-01T10:00:00Z", { resolved: true, resolved_at: "2026-09-02T10:00:00Z" }));
     for (const [width, height] of [[375, 812], [768, 1024], [1024, 900], [1440, 900]]) {
       for (const colorScheme of width === 1440 ? ["light", "dark"] : ["light"]) {
         const { context, page } = await open({ width, height, colorScheme, S, scale: width === 1440 ? 1 : 2 });
@@ -776,6 +877,10 @@ try {
     ok((await page.locator("#com-votes").innerText()).includes("No design votes yet."), "empty: no votes yet");
     await page.waitForFunction(() => document.querySelectorAll(".com-tabs .com-badge-zero").length === 4);
     eq((await tabs(page)).map((t) => [t.badge, t.zero]), [["0", true], ["0", true], ["0", true], ["0", true]], "empty: four real zero badges, none coloured");
+    await page.locator(".com-tabs a:not([aria-current])").first().hover();
+    await page.waitForTimeout(300);
+    const hovered = await contrasts(page, ".com-tabs a:hover > span:first-child, .com-tabs a:hover .com-badge");
+    ok(hovered.length === 2 && hovered.every((c) => c.ratio >= 4.5), "hover: a hovered tab's label and zero badge keep 4.5:1", hovered);
     eq(await navBadge(page), null, "empty: no nav badge at 0");
     for (const [tab, card, text] of [["submissions", "#com-submissions", "Nothing waiting."], ["reviews", "#com-reports", "Nothing waiting."], ["visits", "#com-visits", "No visit reports match."]]) {
       await page.goto(`${base}/#/community?tab=${tab}`);

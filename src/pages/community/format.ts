@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect } from "react";
 import { timeAgo } from "../../data/queue-report";
+import { submissionActionMessage } from "../../data/submissions-report";
 
 export const nf = new Intl.NumberFormat("en-US");
 
@@ -28,4 +29,14 @@ export const useClampPage = (page: number, total: number | null, perPage: number
     if (past) onPage(last);
   }, [past, last, onPage]);
   return past;
+};
+
+/**
+ * 409 (someone already reviewed it) and 404 (it no longer exists) mean the
+ * list is out of date: the notice to show above it once re-read; null otherwise.
+ */
+export const reviewGoneMessage = (status: number): string | null => {
+  if (status === 409) return `${submissionActionMessage(409)}. The list now shows where it stands.`;
+  if (status === 404) return `${submissionActionMessage(404)} The list now shows where it stands.`;
+  return null;
 };

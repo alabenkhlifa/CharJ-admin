@@ -16,8 +16,8 @@ import { HealthCard } from "../../ui/health-card";
 import { Pager } from "../../ui/pager";
 import { Segmented } from "../../ui/segmented";
 import { ApproveDialog, type NearbyState } from "./approve-dialog";
-import { ComIcon, LOADING, Note, RetryLine, Waiting, When } from "./bits";
-import { ago, nf, shortId, useClampPage, useNow } from "./format";
+import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Waiting, When } from "./bits";
+import { ago, nf, reviewGoneMessage, shortId, useClampPage, useNow } from "./format";
 import type { CommunityView } from "./params";
 
 // Charger submissions: chargers drivers propose from the app (the old
@@ -39,14 +39,12 @@ const STATUS_OPTIONS: { v: SubmissionFilter; l: string }[] = [
   { v: "all", l: "All" },
 ];
 
-const CONFLICT = "Someone already reviewed this. The list now shows where it stands.";
-
 type ItemProps = {
   s: Submission;
   nearby: NearbyState;
   onApprove: () => void;
   onRejected: (note: string) => void;
-  onConflict: () => void;
+  onConflict: (message: string) => void;
 };
 
 const ReviewLine = ({ s }: { s: Submission }) => {
@@ -86,7 +84,8 @@ const SubmissionItem = ({ s, nearby, onApprove, onRejected, onConflict }: ItemPr
     const res = await reviewSubmission(s.id, "reject", note);
     setBusy(false);
     if (res.ok) return onRejected(note.trim());
-    if (res.status === 409) return onConflict();
+    const gone = reviewGoneMessage(res.status);
+    if (gone) return onConflict(gone);
     setError(res.message);
   };
   const where = s.lat !== null && s.lng !== null ? `${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}` : null;
@@ -226,9 +225,10 @@ export const SubmissionsTab = ({ view, onParams, onChanged, onOpenCharger }: Pro
     };
   }, [chargers.data, chargers.error, chargers.loading]);
 
-  const conflict = () => {
+  // 409 or 404: the list is out of date. Say so, and read it (and the queue) again.
+  const conflict = (message: string) => {
     setApproving(null);
-    setNotice(CONFLICT);
+    setNotice(message);
     subs.refresh();
     onChanged();
   };
@@ -296,6 +296,15 @@ export const SubmissionsTab = ({ view, onParams, onChanged, onOpenCharger }: Pro
         )}
         <div className="com-bar">
           <Segmented label="Status" value={status} options={STATUS_OPTIONS} onChange={(v) => onParams({ status: v === "pending" ? null : v, page: null })} />
+          <RefreshButton
+            busy={subs.loading}
+            onRefresh={() => {
+              setNotice(null);
+              subs.refresh();
+              void chargers.refetch();
+              onChanged();
+            }}
+          />
         </div>
         {notice && (
           <p className="com-notice" role="status">

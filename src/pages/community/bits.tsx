@@ -74,13 +74,22 @@ export const Waiting = ({ children }: { children: ReactNode }) => (
   </div>
 );
 
-export const RetryLine = ({ children, onRetry }: { children: ReactNode; onRetry: () => void }) => (
+/** "Couldn't load. Try again", with an optional second way out (`more`). */
+export const RetryLine = ({ children, onRetry, more }: { children: ReactNode; onRetry: () => void; more?: ReactNode }) => (
   <p className="com-retry" role="alert">
     {children}{" "}
     <button type="button" onClick={onRetry}>
       Try again
     </button>
+    {more}
   </p>
+);
+
+/** Read the list (and the queue) again, by hand: nothing here reloads on a timer. */
+export const RefreshButton = ({ busy, onRefresh }: { busy: boolean; onRefresh: () => void }) => (
+  <button type="button" className="com-link com-refresh" onClick={onRefresh} disabled={busy}>
+    {busy ? "Refreshing…" : "Refresh"}
+  </button>
 );
 
 /** A 13px note under a card's content. */

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CATEGORY_LABELS, designTally, deviceLine, FEEDBACK_CATEGORIES, feedbackErrorMessage, feedbackPath, isInformational,
-  parseFeedbackResponse, parseFeedbackStrict, VOTE_LABELS,
+  parseFeedbackResponse, parseFeedbackStrict, requestStats, statusCounts, uniqueById, VOTE_LABELS,
 } from '../src/data/feedback-report.ts';
 
 // Shaped like the admin-feedback Edge Function's GET response.
@@ -137,5 +137,57 @@ test('designTally without platforms gives no split, and caps the comments at fiv
   const t = designTally(items, 7);
   assert.equal(t.platforms, null);
   assert.deepEqual(t.comments.map((c) => c.id), ['v6', 'v5', 'v4', 'v3', 'v2']);
-  assert.deepEqual(designTally([], 0), { up: 0, down: 0, votes: 0, total: 0, comments: [], platforms: null });
+  assert.deepEqual(designTally([], 0), { up: 0, down: 0, votes: 0, total: 0, comments: [], platforms: null, rowTimes: [], complete: true });
+});
+
+test('uniqueById keeps the first copy of a row that shifted between pages', () => {
+  const rows = [{ id: 'a', n: 1 }, { id: 'b', n: 2 }, { id: 'a', n: 3 }];
+  assert.deepEqual(uniqueById(rows), [{ id: 'a', n: 1 }, { id: 'b', n: 2 }]);
+});
+
+test('designTally knows every design row it read, and whether that was all of them', () => {
+  const { items } = parseFeedbackResponse({
+    items: [vote('v1', 'up', '2026-11-02T08:00:00Z'), { id: 'x', category: 'design', vote: null, message: '', created_at: '2026-10-01T08:00:00Z' }],
+    total: 2,
+    summary: { total: 2, open: 2, open_requests: 0, resolved: 0, last_7_days: 1, by_category: { design: 2 } },
+  });
+  const t = designTally(items, 2);
+  assert.deepEqual(t.rowTimes, ['2026-11-02T08:00:00Z', '2026-10-01T08:00:00Z'], 'a design row without a thumb still counts as a design row');
+  assert.equal(t.complete, true);
+  assert.equal(designTally(items, 9).complete, false);
+});
+
+// 7 feedback rows: 4 requests (1 resolved) and 3 design votes (2 this week).
+const summary = () => parseFeedbackResponse({
+  items: [], total: 0,
+  summary: { total: 7, open: 6, open_requests: 3, resolved: 1, last_7_days: 4, by_category: { bug: 2, suggestion: 2, design: 3 } },
+}).summary;
+const NOW = Date.parse('2026-11-02T10:00:00Z');
+const tallyOf = (times: string[], total = times.length) =>
+  designTally(times.map((t, i) => parseFeedbackResponse({ items: [vote(`v${i}`, 'up', t)], total: 1, summary: {} }).items[0]), total);
+
+test('requestStats leaves the design votes out of every count', () => {
+  const tally = tallyOf(['2026-11-02T08:00:00Z', '2026-10-30T08:00:00Z', '2026-10-01T08:00:00Z']);
+  assert.deepEqual(requestStats(summary(), tally, NOW), { open: 3, resolved: 1, last7: 2, total: 4 });
+});
+
+test('requestStats: the 7-day count is exact only when the votes read reach back a week', () => {
+  assert.equal(requestStats(summary(), null, NOW).last7, null, 'no tally yet: unknown, never the count with votes in it');
+  const partial = tallyOf(['2026-11-02T08:00:00Z', '2026-11-01T08:00:00Z'], 3);
+  assert.equal(requestStats(summary(), partial, NOW).last7, null, 'the newest votes only, all inside the week: the third may be too');
+  const reachesBack = tallyOf(['2026-11-02T08:00:00Z', '2026-10-01T08:00:00Z'], 3);
+  assert.equal(requestStats(summary(), reachesBack, NOW).last7, 3, 'the oldest vote read is older than a week: the rest are too');
+});
+
+test('requestStats without open_requests: open and resolved unknown, totals still exact', () => {
+  const s = { ...summary(), openRequests: null };
+  assert.deepEqual(requestStats(s, tallyOf([]), NOW), { open: null, resolved: null, last7: 4, total: 4 });
+});
+
+test('statusCounts follow the category shown', () => {
+  const s = summary();
+  const stats = requestStats(s, null, NOW);
+  assert.deepEqual(statusCounts(s, stats, 'requests'), { open: 3, resolved: 1 });
+  assert.deepEqual(statusCounts(s, stats, 'all'), { open: 6, resolved: 1 });
+  assert.equal(statusCounts(s, stats, 'bug'), null, 'per category, the server counts no statuses');
 });

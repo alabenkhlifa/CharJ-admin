@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { SUPABASE_CONFIGURED, supabase } from "../lib/supabase";
+import { supabase } from "../lib/supabase";
+import { useAdminLoad, type AdminLoad } from "./admin-load";
 
 // ── Types matching the `ratings` table ────────────────────────────────────
 // Schema (see supabase/migrations/20260416000012_ratings.sql):
@@ -36,75 +36,39 @@ const shortenRater = (rater: string): string => {
   return `${trimmed.slice(0, 6)}…`;
 };
 
-type UseReviewsState = {
-  data: Review[];
-  loading: boolean;
-  error: string | null;
+/** The latest ratings with their charger's name; throws when either read fails. */
+const loadReviews = async (signal: AbortSignal): Promise<Review[]> => {
+  // Two queries: (a) the latest ratings, (b) a name lookup for chargers.
+  // We don't have `auth.users` access via anon, so we can't enrich the
+  // rater further — just truncate the UID.
+  const [ratingsRes, chargersRes] = await Promise.all([
+    supabase
+      .from("ratings")
+      .select("id, charger_id, rater, rating, comment, created_at")
+      .order("created_at", { ascending: false })
+      .limit(RECENT_LIMIT)
+      .abortSignal(signal),
+    supabase.from("chargers").select("id, name").abortSignal(signal),
+  ]);
+  if (ratingsRes.error) throw new Error(ratingsRes.error.message);
+  if (chargersRes.error) throw new Error(chargersRes.error.message);
+
+  const nameById = new Map<string, string>(
+    ((chargersRes.data ?? []) as { id: string; name: string }[]).map((c) => [c.id, c.name]),
+  );
+  return ((ratingsRes.data ?? []) as RawRatingRow[]).map((r) => ({
+    id: r.id,
+    chargerId: r.charger_id,
+    chargerName: nameById.get(r.charger_id) ?? "Unknown charger",
+    raterShort: shortenRater(r.rater),
+    rating: r.rating,
+    comment: r.comment ?? "",
+    createdAt: r.created_at,
+  }));
 };
 
-export const useReviews = (): UseReviewsState => {
-  const [state, setState] = useState<UseReviewsState>({
-    data: [],
-    loading: true,
-    error: null,
-  });
-
-  useEffect(() => {
-    if (!SUPABASE_CONFIGURED) {
-      setState({ data: [], loading: false, error: "Supabase not configured" });
-      return;
-    }
-
-    let cancelled = false;
-    (async () => {
-      // Two queries: (a) the latest 50 ratings, (b) a name lookup for chargers.
-      // We don't have `auth.users` access via anon, so we can't enrich the
-      // rater further — just truncate the UID.
-      const [ratingsRes, chargersRes] = await Promise.all([
-        supabase
-          .from("ratings")
-          .select("id, charger_id, rater, rating, comment, created_at")
-          .order("created_at", { ascending: false })
-          .limit(RECENT_LIMIT),
-        supabase.from("chargers").select("id, name"),
-      ]);
-
-      if (cancelled) return;
-
-      if (ratingsRes.error) {
-        setState({ data: [], loading: false, error: ratingsRes.error.message });
-        return;
-      }
-      if (chargersRes.error) {
-        setState({ data: [], loading: false, error: chargersRes.error.message });
-        return;
-      }
-
-      const nameById = new Map<string, string>(
-        ((chargersRes.data ?? []) as { id: string; name: string }[]).map((c) => [c.id, c.name]),
-      );
-
-      const rows = (ratingsRes.data ?? []) as RawRatingRow[];
-      const mapped: Review[] = rows.map((r) => ({
-        id: r.id,
-        chargerId: r.charger_id,
-        chargerName: nameById.get(r.charger_id) ?? "Unknown charger",
-        raterShort: shortenRater(r.rater),
-        rating: r.rating,
-        comment: r.comment ?? "",
-        createdAt: r.created_at,
-      }));
-
-      setState({ data: mapped, loading: false, error: null });
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return state;
-};
+/** The latest reviews (anon `ratings`), with a refresh. */
+export const useReviews = (): AdminLoad<Review[]> => useAdminLoad(loadReviews);
 
 // ── Relative-time helper ──────────────────────────────────────────────────
 // Pages already use plain inline strings; keep this co-located so the page

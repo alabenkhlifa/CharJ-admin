@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatVisitDate, parseVisits, REASON_LABELS, visitsPath } from "../src/data/visits-report.ts";
+import { flipVisit, formatVisitDate, parseVisits, REASON_LABELS, visitsPath } from "../src/data/visits-report.ts";
 
 // Shaped like admin-confirmations GET (since_days adds summary.window).
 const body = (window = true) => ({
@@ -49,4 +49,21 @@ test("reasons and visit dates read plainly", () => {
   assert.equal(REASON_LABELS.not_working, "Charger not working");
   assert.equal(formatVisitDate("2026-09-16"), "16 Sep 2026", "a calendar day, no time zone shift");
   assert.equal(formatVisitDate("garbage"), "garbage");
+});
+
+test("flipVisit: hiding a couldn't-charge report takes it out of the window count, unhiding puts it back", () => {
+  const page = parseVisits(body());
+  const [failed, charged] = page.items;
+  const hidden = { ...failed, hiddenAt: "2026-11-02T10:00:00Z", hiddenReason: "Doublon" };
+  const after = flipVisit(page, failed, hidden);
+  assert.equal(after.items[0].hiddenReason, "Doublon");
+  assert.equal(after.summary.hidden, 3);
+  assert.equal(after.windowCouldNotCharge, 0, "1 → 0, as the queue counts it");
+  const back = flipVisit(after, hidden, failed);
+  assert.equal(back.windowCouldNotCharge, 1);
+  assert.equal(back.summary.hidden, 2);
+  // A charged visit is never in the couldn't-charge count; no window asked, none kept.
+  assert.equal(flipVisit(page, charged, { ...charged, hiddenAt: null }).windowCouldNotCharge, 1);
+  const noWindow = parseVisits(body(false));
+  assert.equal(flipVisit(noWindow, failed, hidden).windowCouldNotCharge, null);
 });

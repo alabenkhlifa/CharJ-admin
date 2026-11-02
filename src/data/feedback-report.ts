@@ -157,13 +157,18 @@ export type DesignTally = {
   comments: FeedbackItem[];
   /** Per platform, most votes first; null when no vote says its platform. */
   platforms: { platform: string; up: number; down: number }[] | null;
+  /** created_at of every design row read (a row without a thumb included), newest first. */
+  rowTimes: string[];
+  /** Every design row on the server was read. */
+  complete: boolean;
 };
 
 const LATEST_COMMENTS = 5;
 
 /** Count design votes: thumbs, the latest comments, and a platform split when the rows carry one. */
 export const designTally = (items: readonly FeedbackItem[], total: number): DesignTally => {
-  const votes = items.filter((i) => i.category === "design" && i.vote !== null);
+  const rows = items.filter((i) => i.category === "design");
+  const votes = rows.filter((i) => i.vote !== null);
   const up = votes.filter((v) => v.vote === "up").length;
   const byPlatform = new Map<string, { up: number; down: number }>();
   for (const v of votes) {
@@ -186,7 +191,58 @@ export const designTally = (items: readonly FeedbackItem[], total: number): Desi
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, LATEST_COMMENTS),
     platforms,
+    rowTimes: rows.map((r) => r.createdAt).sort((a, b) => b.localeCompare(a)),
+    complete: rows.length >= total,
   };
+};
+
+/** The first copy of each id: a page read while rows arrive can repeat one. */
+export const uniqueById = <T extends { id: string }>(rows: readonly T[]): T[] => {
+  const seen = new Set<string>();
+  return rows.filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
+};
+
+export type RequestStats = {
+  /** Open requests; null when the server doesn't count them. */
+  open: number | null;
+  resolved: number | null;
+  /** Requests received in the last 7 days; null when the votes read can't say how many of the week's rows were votes. */
+  last7: number | null;
+  total: number;
+};
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * The summary's counts without the design votes: a vote never waits, so the
+ * stats count requests only. All-time and resolved come straight from the
+ * summary; the 7-day count needs the votes' own dates (`tally`), and is exact
+ * only when the votes read reach back past the week (or are all of them).
+ */
+export const requestStats = (summary: FeedbackSummary, tally: DesignTally | null, now: number): RequestStats => {
+  const total = Math.max(0, summary.total - summary.byCategory.design);
+  const open = summary.openRequests;
+  const since = now - WEEK_MS;
+  const oldest = tally?.rowTimes.at(-1);
+  const reachesBack = tally !== null && (tally.complete || (oldest !== undefined && Date.parse(oldest) < since));
+  const votesThisWeek = tally ? tally.rowTimes.filter((t) => Date.parse(t) >= since).length : 0;
+  return {
+    open,
+    resolved: open === null ? null : Math.max(0, total - open),
+    last7: reachesBack ? Math.max(0, summary.last7Days - votesThisWeek) : null,
+    total,
+  };
+};
+
+/** "Open (3)" / "Resolved (1)" for the category shown; null where the server has no per-status count. */
+export const statusCounts = (
+  summary: FeedbackSummary,
+  stats: RequestStats,
+  category: FeedbackCategoryFilter,
+): { open: number | null; resolved: number | null } | null => {
+  if (category === "requests") return { open: stats.open, resolved: stats.resolved };
+  if (category === "all") return { open: summary.open, resolved: summary.resolved };
+  return null;
 };
 
 // "android · 1.3.0 · fr" — whatever the app sent, skipping blanks.

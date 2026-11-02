@@ -118,6 +118,24 @@ export const parseVisits = (raw: unknown): VisitsPage => {
   };
 };
 
+/**
+ * A hide or unhide the server confirmed: the row flips in place, the hidden
+ * count follows, and so does the window's couldn't-charge count (it leaves
+ * hidden reports out, like the queue; every row listed under a window is in it).
+ */
+export const flipVisit = (data: VisitsPage, before: Visit, after: Visit): VisitsPage => {
+  const was = before.hiddenAt !== null;
+  const is = after.hiddenAt !== null;
+  const d = is === was ? 0 : is ? 1 : -1;
+  const inWindow = data.windowCouldNotCharge !== null && after.outcome === "could_not_charge";
+  return {
+    ...data,
+    items: data.items.map((v) => (v.id === after.id ? after : v)),
+    summary: { ...data.summary, hidden: Math.max(0, data.summary.hidden + d) },
+    windowCouldNotCharge: inWindow ? Math.max(0, (data.windowCouldNotCharge ?? 0) - d) : data.windowCouldNotCharge,
+  };
+};
+
 export const visitsPath = ({ outcome, visibility, since, page }: VisitsView): string =>
   `admin-confirmations?page=${page}&perPage=${VISITS_PER_PAGE}&outcome=${outcome}&visibility=${visibility}${since ? `&since_days=${since}` : ""}`;
 

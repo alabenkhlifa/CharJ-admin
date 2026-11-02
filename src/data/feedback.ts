@@ -6,6 +6,7 @@ import {
   feedbackPath,
   parseFeedbackItem,
   parseFeedbackStrict,
+  uniqueById,
   type DesignTally,
   type FeedbackCategoryFilter,
   type FeedbackItem,
@@ -42,7 +43,9 @@ const loadDesignVotes = async (signal: AbortSignal): Promise<DesignTally> => {
     items.push(...body.items);
     if (body.items.length < VOTE_PAGE || items.length >= total) break;
   }
-  return designTally(items, Math.max(total, items.length));
+  // A vote that arrives while paging shifts the pages by one: the same row can come twice.
+  const unique = uniqueById(items);
+  return designTally(unique, Math.max(total, unique.length));
 };
 
 /** Design (Lune) votes as a tally: informational, never part of the queue. */

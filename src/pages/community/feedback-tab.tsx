@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import type { AdminLoad } from "../../data/admin-load";
 import { setFeedbackResolved, useDesignVotes, useFeedback } from "../../data/feedback";
 import {
   CATEGORY_LABELS,
@@ -6,7 +7,10 @@ import {
   FEEDBACK_CATEGORIES,
   FEEDBACK_PER_PAGE,
   isInformational,
+  requestStats,
+  statusCounts,
   VOTE_LABELS,
+  type DesignTally,
   type FeedbackItem,
   type FeedbackResponse,
   type FeedbackStatus,
@@ -17,8 +21,7 @@ import { Empty } from "../../ui/empty";
 import { HealthCard } from "../../ui/health-card";
 import { Pager } from "../../ui/pager";
 import { Pill } from "../../ui/pill";
-import { Segmented } from "../../ui/segmented";
-import { ComIcon, LOADING, Note, RetryLine, Stats, Thumb, Waiting, When } from "./bits";
+import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Stats, Thumb, Waiting, When } from "./bits";
 import { ago, nf, useClampPage, useNow } from "./format";
 import type { CommunityView } from "./params";
 
@@ -32,6 +35,8 @@ type Props = {
   onParams: (patch: RouteParams) => void;
   onChanged: () => void;
 };
+
+type CardProps = Props & { votes: AdminLoad<DesignTally> };
 
 const STATUS_OPTIONS: { v: FeedbackStatus; l: string }[] = [
   { v: "open", l: "Open" },
@@ -130,8 +135,11 @@ const flipCounts = (data: FeedbackResponse, before: FeedbackItem, after: Feedbac
 
 const FILTER_LABEL: Record<"requests" | "all", string> = { requests: "Requests (no design votes)", all: "All, with design votes" };
 
-const FeedbackCard = ({ view, onParams, onChanged }: Props) => {
+const withCount = (label: string, n: number | null | undefined) => (n == null ? label : `${label} (${nf.format(n)})`);
+
+const FeedbackCard = ({ view, onParams, onChanged, votes }: CardProps) => {
   const { status, category, page } = view;
+  const now = useNow();
   const feedback = useFeedback(status, category, page);
   const data = feedback.data;
   const past = useClampPage(page, data?.total ?? null, FEEDBACK_PER_PAGE, (n) => onParams({ page: n > 1 ? String(n) : null }));
@@ -140,7 +148,16 @@ const FeedbackCard = ({ view, onParams, onChanged }: Props) => {
   let body: ReactNode;
   if (feedback.error) {
     body = (
-      <RetryLine onRetry={feedback.refresh}>
+      <RetryLine
+        onRetry={feedback.refresh}
+        more={
+          category === "requests" && (
+            <button type="button" className="com-retry-more" onClick={() => onParams({ category: "all", page: null })}>
+              Show all
+            </button>
+          )
+        }
+      >
         Couldn't load feedback. {feedback.error}
         {category === "requests" && " Requests needs the updated admin-feedback function; All works meanwhile."}
       </RetryLine>
@@ -184,27 +201,46 @@ const FeedbackCard = ({ view, onParams, onChanged }: Props) => {
   }
 
   const s = data?.summary;
+  // Requests only: the design votes never wait, so no stat counts them.
+  const stats = s ? requestStats(s, votes.data, now) : null;
+  const counts = s && stats ? statusCounts(s, stats, category) : null;
+  const statusOptions = STATUS_OPTIONS.map((o) =>
+    o.v === "all" ? o : { ...o, l: withCount(o.l, o.v === "open" ? counts?.open : counts?.resolved) },
+  );
   return (
     <HealthCard
       title="Feedback"
       id="com-feedback"
       color="needs-you"
       icon={<ComIcon name="bell" />}
-      meta={s && s.openRequests !== null ? `${nf.format(s.openRequests)} open` : undefined}
+      meta={stats && stats.open !== null ? `${nf.format(stats.open)} open` : undefined}
       index={0}
     >
-      {s && (
+      {s && stats && (
         <Stats
           items={[
-            { value: s.openRequests, label: "Open requests" },
-            { value: s.last7Days, label: "Received, 7 days" },
-            { value: s.total, label: "Received, all time" },
+            { value: stats.open, label: "Open requests" },
+            { value: stats.resolved, label: "Resolved" },
+            stats.last7 !== null
+              ? { value: stats.last7, label: "Received, 7 days" }
+              : { value: s.last7Days, label: "Received, 7 days, votes included" },
+            { value: stats.total, label: "Received, all time" },
           ]}
         />
       )}
       {s && s.openRequests === null && <Note>Open requests need the updated admin-feedback function, so they aren't counted here yet.</Note>}
       <div className="com-bar">
-        <Segmented label="Status" value={status} options={STATUS_OPTIONS} onChange={(v) => onParams({ status: v === "open" ? null : v, page: null })} />
+        {/* A select, as on the old page: "Resolved (123)" doesn't fit a third of a phone card. */}
+        <label className="com-select">
+          Status
+          <select value={status} onChange={(e) => onParams({ status: e.target.value === "open" ? null : e.target.value, page: null })}>
+            {statusOptions.map((o) => (
+              <option key={o.v} value={o.v}>
+                {o.l}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="com-select">
           Show
           <select
@@ -224,6 +260,14 @@ const FeedbackCard = ({ view, onParams, onChanged }: Props) => {
             ))}
           </select>
         </label>
+        <RefreshButton
+          busy={feedback.loading}
+          onRefresh={() => {
+            feedback.refresh();
+            votes.refresh();
+            onChanged();
+          }}
+        />
       </div>
       {body}
     </HealthCard>
@@ -231,8 +275,7 @@ const FeedbackCard = ({ view, onParams, onChanged }: Props) => {
 };
 
 /** The Lune design card's thumbs: a tally, not a queue. Shares only from 10 votes. */
-const DesignVotesCard = () => {
-  const votes = useDesignVotes();
+const DesignVotesCard = ({ votes }: { votes: AdminLoad<DesignTally> }) => {
   const t = votes.data;
   let body: ReactNode;
   if (votes.error) body = <RetryLine onRetry={votes.refresh}>Couldn't load the design votes. {votes.error}</RetryLine>;
@@ -301,7 +344,7 @@ const DesignVotesCard = () => {
     <HealthCard
       title="Design votes"
       id="com-votes"
-      color="contributions"
+      color="design"
       icon={<ComIcon name="thumb" />}
       meta={t && t.votes ? `${nf.format(t.votes)} ${t.votes === 1 ? "vote" : "votes"}` : undefined}
       index={1}
@@ -312,9 +355,13 @@ const DesignVotesCard = () => {
   );
 };
 
-export const FeedbackTab = (props: Props) => (
-  <div className="com-grid com-grid-split">
-    <FeedbackCard {...props} />
-    <DesignVotesCard />
-  </div>
-);
+export const FeedbackTab = (props: Props) => {
+  // Read once for both cards: the tally, and the votes' dates for an exact 7-day count of requests.
+  const votes = useDesignVotes();
+  return (
+    <div className="com-grid com-grid-split">
+      <FeedbackCard {...props} votes={votes} />
+      <DesignVotesCard votes={votes} />
+    </div>
+  );
+};

@@ -13,7 +13,7 @@ import { HealthCard } from "../../ui/health-card";
 import { Pager } from "../../ui/pager";
 import { Pill } from "../../ui/pill";
 import { Segmented } from "../../ui/segmented";
-import { ComIcon, LOADING, Note, RetryLine, Waiting, When } from "./bits";
+import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Waiting, When } from "./bits";
 import { nf, useClampPage } from "./format";
 import type { CommunityView } from "./params";
 
@@ -166,6 +166,13 @@ const ReportsCard = ({ view, onParams, onChanged }: Props) => {
     >
       <div className="com-bar">
         <Segmented label="Reports" value={status} options={STATUS_OPTIONS} onChange={(v) => onParams({ reports: v === "open" ? null : v, page: null })} />
+        <RefreshButton
+          busy={reports.loading}
+          onRefresh={() => {
+            reports.refresh();
+            onChanged();
+          }}
+        />
       </div>
       {body}
       <Note>Resolving marks the report handled. The review stays as it is: nothing is hidden or deleted from here.</Note>
@@ -174,19 +181,19 @@ const ReportsCard = ({ view, onParams, onChanged }: Props) => {
 };
 
 const RecentReviewsCard = ({ page, onPage }: { page: number; onPage: (n: number) => void }) => {
-  const { data, loading, error } = useReviews();
-  const past = useClampPage(page, loading || error ? null : data.length, REVIEWS_PER_PAGE, onPage);
+  const reviews = useReviews();
+  const data = reviews.data;
+  const past = useClampPage(page, data ? data.length : null, REVIEWS_PER_PAGE, onPage);
   const at = Math.max(1, page);
-  const rows = data.slice((at - 1) * REVIEWS_PER_PAGE, at * REVIEWS_PER_PAGE);
   let body: ReactNode;
-  if (error) body = <Empty size="body">Couldn't load reviews. {error}</Empty>;
-  else if (loading || past) body = <Waiting>{LOADING}</Waiting>;
+  if (reviews.error) body = <RetryLine onRetry={reviews.refresh}>Couldn't load reviews. {reviews.error}</RetryLine>;
+  else if (!data || past) body = <Waiting>{LOADING}</Waiting>;
   else if (!data.length) body = <Empty size="body">No reviews yet. When a driver rates a charger, the review appears here.</Empty>;
   else
     body = (
       <>
         <ul className="com-list" aria-label="Recent reviews">
-          {rows.map((r) => (
+          {data.slice((at - 1) * REVIEWS_PER_PAGE, at * REVIEWS_PER_PAGE).map((r) => (
             <li key={r.id} className="com-item">
               <div className="com-top">
                 <span className="com-tags">
@@ -208,9 +215,7 @@ const RecentReviewsCard = ({ page, onPage }: { page: number; onPage: (n: number)
             </li>
           ))}
         </ul>
-        {data.length > REVIEWS_PER_PAGE && (
-          <Pager label="Reviews" page={at} perPage={REVIEWS_PER_PAGE} total={data.length} onPage={onPage} />
-        )}
+        {data.length > REVIEWS_PER_PAGE && <Pager label="Reviews" page={at} perPage={REVIEWS_PER_PAGE} total={data.length} onPage={onPage} />}
       </>
     );
   return (
@@ -219,9 +224,12 @@ const RecentReviewsCard = ({ page, onPage }: { page: number; onPage: (n: number)
       id="com-reviews"
       color="contributions"
       icon={<ComIcon name="star" />}
-      meta={!loading && !error ? `latest ${nf.format(data.length)}` : undefined}
+      meta={data ? `latest ${nf.format(data.length)}` : undefined}
       index={1}
     >
+      <div className="com-bar">
+        <RefreshButton busy={reviews.loading} onRefresh={reviews.refresh} />
+      </div>
       {body}
     </HealthCard>
   );
