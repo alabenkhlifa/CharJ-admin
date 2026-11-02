@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Charj Admin</title>
+<style>
+:root {
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+  --r: 16px;
+  --active: #ff2d55; --back: #34c759; --queue: #00c7ff; --needs: #ff9500; --alarm: #ff3b30; --screens: #0a84ff; --actions: #5e5ce6; --cars: #a2845e; --routes: #30b0c7; --onb: #ffcc00; --trip: #00c7be; --nav: #32ade6; --contrib: #af52de; --idle: #8e8e93;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+}
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f2f2f7; --card: #ffffff; --card-2: #f7f7fa; --ink: #000000; --ink-2: rgba(60, 60, 67, .62); --sep: rgba(60, 60, 67, .16); --fill: rgba(120, 120, 128, .12);
+  --bar: rgba(249, 249, 249, .86); --track: .16;
+  --t-active: #d70f3f; --t-back: #248a3d; --t-queue: #0071a4; --t-needs: #c93400; --t-alarm: #d70015; --t-screens: #0040dd; --t-actions: #3634a3; --t-cars: #0e7083;
+  --glyph: #ffffff;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #000000; --card: #1c1c1e; --card-2: #2c2c2e; --ink: #ffffff; --ink-2: rgba(235, 235, 245, .62); --sep: rgba(84, 84, 88, .65); --fill: rgba(120, 120, 128, .24);
+  --bar: rgba(22, 22, 24, .86); --track: .24;
+  --t-active: #ff375f; --t-back: #30d158; --t-queue: #64d2ff; --t-needs: #ff9f0a; --t-alarm: #ff453a; --t-screens: #409cff; --t-actions: #7d7aff; --t-cars: #5ac8e0;
+  --glyph: #000000;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); -webkit-text-size-adjust: 100%; }
+body { margin: 0; color: var(--ink); font-family: var(--font); font-size: 17px; line-height: 1.3; -webkit-font-smoothing: antialiased; }
+::selection { background: color-mix(in srgb, var(--screens) 30%, transparent); }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--screens) 70%, transparent); outline-offset: 2px; border-radius: 10px; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+h1, h2, h3, p { margin: 0; }
+.num { font-variant-numeric: tabular-nums; }
+svg.i { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* shell: tab bar on phones, sidebar from tablet up */
+.app { display: grid; grid-template-columns: 1fr; min-height: 100vh; }
+.side { display: none; }
+.tabs { position: fixed; inset-inline: 0; inset-block-end: 0; z-index: 10; display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); background: var(--bar); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-block-start: 0.5px solid var(--sep); }
+.tabs a { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; font-weight: 500; color: var(--idle); position: relative; padding-block: 2px; }
+.tabs a[aria-current="page"] { color: var(--active); }
+.tabs a.off { opacity: .45; pointer-events: none; }
+.badge { position: absolute; inset-block-start: -2px; inset-inline-start: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--alarm); color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center; }
+main { padding: 8px 16px calc(96px + env(safe-area-inset-bottom)); max-width: 1120px; width: 100%; margin-inline: auto; }
+
+/* large title */
+.lt { padding: 18px 4px 14px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.lt h1 { font-size: 34px; font-weight: 700; letter-spacing: .01em; }
+.lt .date { color: var(--ink-2); font-size: 15px; margin-block-start: 2px; }
+.mode { width: 36px; height: 36px; border-radius: 18px; background: var(--fill); display: grid; place-items: center; color: var(--ink-2); flex: none; }
+.mode:hover { color: var(--ink); }
+
+/* segmented control */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; position: relative; background: var(--fill); border-radius: 9px; padding: 2px; margin: 0 0 16px; max-width: 420px; }
+.seg button { position: relative; z-index: 1; font-size: 13px; font-weight: 500; padding: 6px 10px; border-radius: 7px; color: var(--ink); }
+.seg button[aria-pressed="true"] { font-weight: 600; }
+.seg .thumb { position: absolute; inset-block: 2px; border-radius: 7px; background: var(--card); box-shadow: 0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04); transition: inset-inline-start .32s var(--ease), width .32s var(--ease); }
+html[data-theme="dark"] .seg .thumb { background: #636366; }
+
+/* cards */
+.grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+.card { background: var(--card); border-radius: var(--r); padding: 14px 16px 16px; animation: rise .5s var(--ease) both; animation-delay: calc(var(--i, 0) * 60ms); }
+@keyframes rise { from { transform: translateY(14px); opacity: 0; } }
+.ch { display: flex; align-items: center; gap: 8px; }
+.sq { width: 22px; height: 22px; border-radius: 6px; flex: none; display: grid; place-items: center; color: var(--glyph); }
+.sq svg { width: 14px; height: 14px; stroke-width: 2.4; }
+.ch h2 { font-size: 15px; font-weight: 600; flex: 1; }
+.ch .meta { color: var(--ink-2); font-size: 15px; display: flex; align-items: center; gap: 4px; }
+.ch .meta svg { width: 14px; height: 14px; stroke-width: 2.6; }
+a.card { display: block; }
+a.card:hover { background: var(--card-2); }
+.val { display: flex; align-items: baseline; gap: 6px; margin-block-start: 10px; }
+.val b { font-size: 34px; font-weight: 700; letter-spacing: -.01em; line-height: 1; }
+.val span { color: var(--ink-2); font-size: 17px; font-weight: 500; }
+.sub { color: var(--ink-2); font-size: 15px; margin-block-start: 4px; }
+.sec { font-size: 22px; font-weight: 700; margin: 26px 4px 10px; }
+
+/* rings */
+.rings { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; margin-block-start: 6px; }
+.rings svg { width: 148px; height: 148px; transform: rotate(-90deg); overflow: visible; }
+.rings circle { fill: none; stroke-width: 15; stroke-linecap: round; pointer-events: stroke; cursor: pointer; }
+.rings .p { transition: stroke-dashoffset 1.2s var(--ease); }
+.legend { display: grid; gap: 10px; }
+.legend button { text-align: start; display: block; }
+.legend small { display: block; font-size: 15px; font-weight: 600; }
+.legend b { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+.legend b em { font-style: normal; font-size: 15px; font-weight: 500; color: var(--ink-2); margin-inline-start: 4px; }
+
+/* bars */
+.bars { display: flex; gap: 3px; align-items: flex-end; height: 64px; margin-block-start: 12px; }
+.bars i { flex: 1; border-radius: 3px; transform-origin: bottom; animation: grow .7s var(--ease) both; }
+.bars i.z { height: 3px !important; background: var(--fill) !important; animation: none; }
+@keyframes grow { from { transform: scaleY(0); } }
+.ax { display: flex; justify-content: space-between; color: var(--ink-2); font-size: 12px; margin-block-start: 6px; }
+
+/* lists */
+.rows { list-style: none; margin: 8px 0 0; padding: 0; }
+.rows li + li { border-block-start: 0.5px solid var(--sep); }
+.rows a, .rows .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 11px 0; }
+.rows .t { font-size: 17px; }
+.rows .d { display: block; color: var(--ink-2); font-size: 13px; margin-block-start: 2px; }
+.bub { min-width: 30px; height: 30px; padding: 0 9px; border-radius: 15px; color: var(--glyph); font-weight: 700; font-size: 15px; display: grid; place-items: center; }
+.bub.z { background: var(--fill) !important; color: var(--ink-2); }
+.chev { color: var(--idle); width: 14px; height: 14px; stroke-width: 2.6; }
+.vers { list-style: none; margin: 8px 0 0; padding: 0; }
+.vers li { display: flex; justify-content: space-between; padding: 8px 0; font-size: 15px; }
+.vers li + li { border-block-start: 0.5px solid var(--sep); }
+.vers em { font-style: normal; color: var(--ink-2); }
+.pill { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: var(--fill); color: var(--ink-2); margin-inline-start: 6px; }
+
+/* charts (usage) */
+.chart { margin-block-start: 10px; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.tick { fill: var(--ink-2); font-size: 11px; font-family: var(--font); font-variant-numeric: tabular-nums; }
+.lbl { fill: var(--ink); font-size: 13px; font-family: var(--font); }
+.vl { fill: var(--ink); font-size: 13px; font-family: var(--font); font-weight: 600; font-variant-numeric: tabular-nums; }
+.hit { fill: transparent; outline: none; }
+.hit:focus-visible { stroke: var(--ink); stroke-width: 1.5; }
+.key { display: flex; gap: 14px; color: var(--ink-2); font-size: 13px; margin-block-start: 10px; }
+.key span { display: inline-flex; align-items: center; gap: 6px; }
+.key i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.tip { position: fixed; z-index: 20; pointer-events: none; background: var(--card); color: var(--ink); border-radius: 12px; padding: 8px 12px; font-size: 13px; min-width: 130px; display: none; box-shadow: 0 8px 30px rgba(0,0,0,.18); }
+.tip .t { color: var(--ink-2); margin-block-end: 3px; }
+.tip .r { display: flex; justify-content: space-between; gap: 14px; align-items: center; }
+.tip .r span { display: inline-flex; align-items: center; gap: 6px; }
+.tip .r i { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+.tip .r b { font-variant-numeric: tabular-nums; }
+details { margin-block-start: 10px; }
+summary { color: var(--t-screens); font-size: 15px; cursor: pointer; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; margin-block-start: 6px; }
+th { text-align: start; color: var(--ink-2); font-weight: 500; font-size: 13px; padding: 6px 8px 6px 0; }
+td { padding: 9px 8px 9px 0; border-block-start: 0.5px solid var(--sep); vertical-align: baseline; }
+th.r, td.r { text-align: end; padding-inline: 16px 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.na { color: var(--ink-2); font-size: 13px; }
+.nw { white-space: nowrap; }
+.chip .pill { display: inline-block; margin: 4px 0 0; }
+.coh { list-style: none; margin: 8px 0 0; padding: 0; }
+.coh li { padding: 10px 0; }
+.coh li + li { border-block-start: 0.5px solid var(--sep); }
+.coh .who { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.coh .who b { font-weight: 600; }
+.coh .who .d { display: inline; margin-inline-start: 6px; color: var(--ink-2); font-size: 13px; }
+.chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-block-start: 8px; }
+.chip { background: var(--fill); border-radius: 10px; padding: 8px 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip small { display: block; color: var(--ink-2); font-weight: 500; font-size: 12px; margin-block-end: 2px; }
+.coh-table { display: none; }
+td .pill { margin-inline-start: 4px; }
+td .d { display: block; color: var(--ink-2); font-size: 13px; }
+
+/* funnels */
+.lad { list-style: none; margin: 8px 0 0; padding: 0; }
+.lad li { padding: 8px 0; }
+.lad li + li { border-block-start: 0.5px solid var(--sep); }
+.lad .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.lad .nm { font-size: 15px; }
+.lad li.sub .nm { color: var(--ink-2); padding-inline-start: 14px; }
+.lad .v { font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; }
+.lad .v small { color: var(--ink-2); font-weight: 500; font-size: 13px; margin-inline-start: 6px; }
+.lad .tr { height: 6px; border-radius: 3px; background: var(--fill); margin-block-start: 6px; overflow: hidden; }
+.lad .tr i { display: block; height: 100%; border-radius: 3px; transform-origin: left; animation: wide .9s var(--ease) both; }
+@keyframes wide { from { transform: scaleX(0); } }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-block-start: 10px; }
+.pair b { font-size: 28px; font-weight: 700; display: block; }
+.pair span { color: var(--ink-2); font-size: 13px; }
+.note { color: var(--ink-2); font-size: 13px; margin-block-start: 10px; line-height: 1.4; }
+.foot { color: var(--ink-2); font-size: 13px; margin: 22px 4px 0; line-height: 1.45; max-width: 70ch; }
+.foot b { color: var(--ink); }
+.mock { color: var(--ink-2); font-size: 12px; padding: 10px 4px 0; }
+.mock b { color: var(--ink); }
+[hidden] { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+@media (min-width: 768px) {
+  .app { grid-template-columns: 260px 1fr; }
+  .tabs { display: none; }
+  .side { display: block; position: sticky; inset-block-start: 0; height: 100vh; padding: 22px 12px; background: var(--card); border-inline-end: 0.5px solid var(--sep); }
+  .side .brand { font-size: 22px; font-weight: 700; padding: 4px 10px 18px; }
+  .side a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; font-size: 17px; margin-block-end: 2px; position: relative; }
+  .side a:hover { background: var(--fill); }
+  .side a[aria-current="page"] { background: color-mix(in srgb, var(--active) 14%, transparent); color: var(--t-active); font-weight: 600; }
+  .side a.off { opacity: .45; pointer-events: none; }
+  .side .badge { position: static; margin-inline-start: auto; }
+  .side svg.i { width: 22px; height: 22px; }
+  main { padding: 10px 28px 48px; }
+  .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .span2 { grid-column: 1 / -1; }
+  .coh { display: none; }
+  .coh-table { display: block; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Pages">
+    <div class="brand">Charj Admin</div>
+    <nav id="side-nav"></nav>
+  </aside>
+  <main>
+    <section id="home" hidden>
+      <div class="lt"><div><h1>Summary</h1><p class="date" id="date"></p></div><button class="mode" type="button" aria-label="Switch light or dark"><svg class="i" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button></div>
+      <div class="seg" id="env" role="group" aria-label="Data"><span class="thumb"></span><button type="button" data-v="test" aria-pressed="true">Test phones</button><button type="button" data-v="prod" aria-pressed="false">Production</button></div>
+      <div class="grid two">
+        <div class="card" style="--i:0">
+          <div class="ch"><span class="sq" style="background:linear-gradient(135deg,var(--active),var(--queue))"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></span><h2>Today</h2><span class="meta" id="ring-meta"></span></div>
+          <div class="rings">
+            <svg viewBox="0 0 148 148" aria-hidden="true" id="rings"></svg>
+            <div class="legend" id="legend"></div>
+          </div>
+        </div>
+        <div class="card" id="card-needs" style="--i:2">
+          <div class="ch"><span class="sq" data-fill="--needs"><svg class="i" viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21h4"/></svg></span><h2>Needs you</h2><span class="meta num" id="needs-total"></span></div>
+          <ul class="rows" id="needs"></ul>
+        </div>
+        <a class="card" href="#usage" id="card-active" style="--i:1">
+          <div class="ch"><span class="sq" style="background:var(--active)"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span><h2>Active phones</h2><span class="meta">30 days <svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+          <div class="val"><b class="num" id="act-avg"></b><span>avg / day</span></div>
+          <div class="bars" id="act-bars"></div>
+          <div class="ax" id="act-ax"></div>
+        </a>
+        <a class="card" href="#usage" id="card-back" style="--i:3">
+          <div class="ch"><span class="sq" data-fill="--back"><svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></span><h2>Came back</h2><span class="meta">7 days <svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+          <div class="val"><b class="num" id="back-v"></b><span id="back-u"></span></div>
+          <p class="sub" id="back-s"></p>
+        </a>
+        <div class="card" style="--i:4">
+          <div class="ch"><span class="sq" style="background:var(--actions)"><svg class="i" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span><h2>Versions in use</h2><span class="meta" id="vers-meta"></span></div>
+          <ul class="vers" id="vers"></ul>
+        </div>
+      </div>
+      <p class="mock"><b>Mock.</b> Real events from Ala's two test phones, snapshot <span id="snap"></span>. "Needs you" and Production are live data.</p>
+    </section>
+
+    <section id="usage" hidden>
+      <div class="lt"><div><h1>Usage</h1><p class="date">Last 30 days · test phones</p></div><button class="mode" type="button" aria-label="Switch light or dark"><svg class="i" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button></div>
+      <div class="seg" id="plat" role="group" aria-label="Platform"><span class="thumb"></span><button type="button" data-v="all" aria-pressed="true">All</button><button type="button" data-v="ios" aria-pressed="false">iOS</button><button type="button" data-v="android" aria-pressed="false">Android</button></div>
+
+      <h2 class="sec">Is anyone using it?</h2>
+      <div class="grid two">
+        <div class="card"><div class="ch"><span class="sq" style="background:var(--active)"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span><h2>Active phones</h2><span class="meta">per day</span></div><div class="chart" id="c-active"></div><details><summary>Show table</summary><div id="t-active"></div></details></div>
+        <div class="card"><div class="ch"><span class="sq" style="background:var(--active)"><svg class="i" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><h2>Events</h2><span class="meta">by phone</span></div><div class="key" id="k-events"></div><div class="chart" id="c-events"></div><details><summary>Show table</summary><div id="t-events"></div></details></div>
+      </div>
+
+      <h2 class="sec">Do people come back?</h2>
+      <div class="card"><div class="ch"><span class="sq" data-fill="--back"><svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></span><h2>By install week</h2></div><div id="cohorts"></div><p class="note">Installed = the week the anonymous account was created, counting only phones that opened the app. "Within N days" = opened again on any day 1 to N after installing. Under 10 installs it shows counts, not percentages.</p></div>
+
+      <h2 class="sec">Which features get used?</h2>
+      <div class="grid two">
+        <div class="card"><div class="ch"><span class="sq" style="background:var(--screens)"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg></span><h2>Screens</h2><span class="meta">views</span></div><div class="key" id="k-screens"></div><div class="chart" id="c-screens"></div><details><summary>Show table</summary><div id="t-screens"></div></details></div>
+        <div class="card"><div class="ch"><span class="sq" style="background:var(--actions)"><svg class="i" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span><h2>Actions</h2><span class="meta">count</span></div><div id="actions"></div></div>
+      </div>
+
+      <h2 class="sec">Where do people get stuck?</h2>
+      <div class="grid two" id="funnels"></div>
+
+      <h2 class="sec">Cars, routes, Android Auto</h2>
+      <div class="grid two">
+        <div class="card" id="cars"></div>
+        <div class="card" id="routes"></div>
+        <div class="card span2" id="aa"></div>
+      </div>
+      <p class="foot" id="foot"></p>
+    </section>
+  </main>
+</div>
+<nav class="tabs" id="tabs" aria-label="Pages"></nav>
+<div class="tip" id="tip" role="status" aria-live="polite"></div>
+
+<script>
+const DATA = {"generated_at": "2026-11-02T02:23:38.234357+01:00", "tz": "Africa/Tunis", "phones": ["iPhone", "S24U"], "activity": {"days": [{"day": "2026-10-04", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-05", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-06", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-07", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-08", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-09", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-10", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-11", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-12", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-13", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-14", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-15", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-16", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-17", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-18", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-19", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-20", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-21", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-22", "phones_opened": 1, "app_opened": 76, "events": 99, "phones_opened_list": ["S24U"], "events_by_phone": {"S24U": 99}}, {"day": "2026-10-23", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-24", "phones_opened": 1, "app_opened": 4, "events": 4, "phones_opened_list": ["S24U"], "events_by_phone": {"S24U": 4}}, {"day": "2026-10-25", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-26", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-27", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-28", "phones_opened": 0, "app_opened": 0, "events": 0, "phones_opened_list": [], "events_by_phone": {}}, {"day": "2026-10-29", "phones_opened": 1, "app_opened": 9, "events": 11, "phones_opened_list": ["S24U"], "events_by_phone": {"S24U": 11}}, {"day": "2026-10-30", "phones_opened": 1, "app_opened": 171, "events": 291, "phones_opened_list": ["S24U"], "events_by_phone": {"S24U": 291}}, {"day": "2026-10-31", "phones_opened": 1, "app_opened": 62, "events": 81, "phones_opened_list": ["S24U"], "events_by_phone": {"S24U": 81}}, {"day": "2026-11-01", "phones_opened": 2, "app_opened": 165, "events": 267, "phones_opened_list": ["S24U", "iPhone"], "events_by_phone": {"S24U": 256, "iPhone": 11}}, {"day": "2026-11-02", "phones_opened": 2, "app_opened": 29, "events": 408, "phones_opened_list": ["S24U", "iPhone"], "events_by_phone": {"iPhone": 234, "S24U": 174}}], "today": {"day": "2026-11-02", "phones": 2, "list": ["S24U", "iPhone"]}, "avg7_distinct_phones": 1.0, "avg7_note": "mean of distinct phones with app_opened per Tunis day, last 7 days incl. today"}, "cohorts": {"weeks": [{"install_week": "2026-05-18", "installed": 1, "back_1d": 0, "back_7d": 0, "back_30d": 0, "window_1d_finished": true, "window_7d_finished": true, "window_30d_finished": true, "phones": [{"phone": "iPhone", "install_day": "2026-05-19", "install_week": "2026-05-18", "installed": 1, "back_1d": false, "window_1d_finished": true, "back_7d": false, "window_7d_finished": true, "back_30d": false, "window_30d_finished": true, "events_tracked_from": "2026-11-01"}]}, {"install_week": "2026-10-19", "installed": 1, "back_1d": 0, "back_7d": 1, "back_30d": 1, "window_1d_finished": true, "window_7d_finished": true, "window_30d_finished": false, "phones": [{"phone": "S24U", "install_day": "2026-10-22", "install_week": "2026-10-19", "installed": 1, "back_1d": false, "window_1d_finished": true, "back_7d": true, "window_7d_finished": true, "back_30d": true, "window_30d_finished": false, "events_tracked_from": "2026-10-22"}]}], "note": "iPhone auth user dates from 2026-05-19 but analytics events only exist from 2026-11-01, so its return flags only see events since then (day 1..N windows mostly cover pre-tracking days)."}, "versions": [{"platform": "android", "app_version": "1.3.0", "ui": "lune", "phones": ["S24U"], "events": 190, "last_seen_day": "2026-11-02"}, {"platform": "android", "app_version": "1.3.0", "ui": "none (older build)", "phones": ["S24U"], "events": 726, "last_seen_day": "2026-11-01"}, {"platform": "ios", "app_version": "1.3.0", "ui": "classic", "phones": ["iPhone"], "events": 1, "last_seen_day": "2026-11-01"}, {"platform": "ios", "app_version": "1.3.0", "ui": "lune", "phones": ["iPhone"], "events": 244, "last_seen_day": "2026-11-02"}], "screens": [{"screen": "map", "views": 80, "distinct_phones": 2, "by_platform": {"ios": {"views": 45, "distinct_phones": 1}, "android": {"views": 35, "distinct_phones": 1}}, "views_by_phone": {"iPhone": 45, "S24U": 35}}, {"screen": "charger", "views": 56, "distinct_phones": 2, "by_platform": {"android": {"views": 23, "distinct_phones": 1}, "ios": {"views": 33, "distinct_phones": 1}}, "views_by_phone": {"S24U": 23, "iPhone": 33}}, {"screen": "list", "views": 21, "distinct_phones": 2, "by_platform": {"ios": {"views": 12, "distinct_phones": 1}, "android": {"views": 9, "distinct_phones": 1}}, "views_by_phone": {"iPhone": 12, "S24U": 9}}, {"screen": "trip_planner", "views": 21, "distinct_phones": 2, "by_platform": {"android": {"views": 12, "distinct_phones": 1}, "ios": {"views": 9, "distinct_phones": 1}}, "views_by_phone": {"S24U": 12, "iPhone": 9}}, {"screen": "settings", "views": 16, "distinct_phones": 2, "by_platform": {"ios": {"views": 12, "distinct_phones": 1}, "android": {"views": 4, "distinct_phones": 1}}, "views_by_phone": {"iPhone": 12, "S24U": 4}}, {"screen": "saved_plans", "views": 13, "distinct_phones": 2, "by_platform": {"android": {"views": 8, "distinct_phones": 1}, "ios": {"views": 5, "distinct_phones": 1}}, "views_by_phone": {"S24U": 8, "iPhone": 5}}, {"screen": "onboarding", "views": 9, "distinct_phones": 2, "by_platform": {"android": {"views": 5, "distinct_phones": 1}, "ios": {"views": 4, "distinct_phones": 1}}, "views_by_phone": {"S24U": 5, "iPhone": 4}}, {"screen": "add", "views": 8, "distinct_phones": 2, "by_platform": {"android": {"views": 3, "distinct_phones": 1}, "ios": {"views": 5, "distinct_phones": 1}}, "views_by_phone": {"S24U": 3, "iPhone": 5}}, {"screen": "vehicle_search", "views": 6, "distinct_phones": 2, "by_platform": {"android": {"views": 3, "distinct_phones": 1}, "ios": {"views": 3, "distinct_phones": 1}}, "views_by_phone": {"S24U": 3, "iPhone": 3}}, {"screen": "updates", "views": 3, "distinct_phones": 1, "by_platform": {"ios": {"views": 3, "distinct_phones": 1}}, "views_by_phone": {"iPhone": 3}}, {"screen": "feedback", "views": 2, "distinct_phones": 1, "by_platform": {"ios": {"views": 2, "distinct_phones": 1}}, "views_by_phone": {"iPhone": 2}}, {"screen": "charger_alerts", "views": 2, "distinct_phones": 1, "by_platform": {"ios": {"views": 2, "distinct_phones": 1}}, "views_by_phone": {"iPhone": 2}}, {"screen": "charger_reviews", "views": 1, "distinct_phones": 1, "by_platform": {"android": {"views": 1, "distinct_phones": 1}}, "views_by_phone": {"S24U": 1}}], "actions": [{"event_name": "app_opened", "count": 516, "by_platform": {"android": 500, "ios": 16}, "by_phone": {"S24U": 500, "iPhone": 16}}, {"event_name": "screen_viewed", "count": 238, "by_platform": {"android": 103, "ios": 135}, "by_phone": {"S24U": 103, "iPhone": 135}}, {"event_name": "charger_viewed", "count": 162, "by_platform": {"android": 136, "ios": 26}, "by_phone": {"S24U": 136, "iPhone": 26}, "detail_field": "source", "detail": {"None": {"count": 117, "by_platform": {"android": 117}}, "map": {"count": 36, "by_platform": {"android": 15, "ios": 21}}, "list": {"count": 9, "by_platform": {"ios": 5, "android": 4}}}}, {"event_name": "route_requested", "count": 57, "by_platform": {"android": 51, "ios": 6}, "by_phone": {"S24U": 51, "iPhone": 6}}, {"event_name": "route_succeeded", "count": 57, "by_platform": {"android": 51, "ios": 6}, "by_phone": {"S24U": 51, "iPhone": 6}}, {"event_name": "search_completed", "count": 18, "by_platform": {"android": 15, "ios": 3}, "by_phone": {"S24U": 15, "iPhone": 3}}, {"event_name": "regions_updated", "count": 14, "by_platform": {"android": 11, "ios": 3}, "by_phone": {"S24U": 11, "iPhone": 3}}, {"event_name": "region_prompt_shown", "count": 13, "by_platform": {"android": 12, "ios": 1}, "by_phone": {"S24U": 12, "iPhone": 1}}, {"event_name": "list_sorted", "count": 13, "by_platform": {"ios": 8, "android": 5}, "by_phone": {"iPhone": 8, "S24U": 5}, "detail_field": "sort", "detail": {"power": {"count": 2, "by_platform": {"ios": 1, "android": 1}}, "name": {"count": 2, "by_platform": {"ios": 1, "android": 1}}, "distance": {"count": 4, "by_platform": {"ios": 3, "android": 1}}, "reliability": {"count": 5, "by_platform": {"android": 2, "ios": 3}}}}, {"event_name": "favorite_toggled", "count": 10, "by_platform": {"ios": 8, "android": 2}, "by_phone": {"iPhone": 8, "S24U": 2}, "detail_field": "on", "detail": {"True": {"count": 5, "by_platform": {"ios": 4, "android": 1}}, "False": {"count": 5, "by_platform": {"ios": 4, "android": 1}}}}, {"event_name": "region_prompt_responded", "count": 8, "by_platform": {"android": 7, "ios": 1}, "by_phone": {"S24U": 7, "iPhone": 1}}, {"event_name": "navigation_launched", "count": 8, "by_platform": {"android": 3, "ios": 5}, "by_phone": {"S24U": 3, "iPhone": 5}}, {"event_name": "filter_changed", "count": 8, "by_platform": {"ios": 5, "android": 3}, "by_phone": {"iPhone": 5, "S24U": 3}, "detail_field": "filter", "detail": {"Type 2": {"count": 2, "by_platform": {"ios": 1, "android": 1}}, "CCS": {"count": 1, "by_platform": {"ios": 1}}, "CHAdeMO": {"count": 2, "by_platform": {"ios": 1, "android": 1}}, "all": {"count": 2, "by_platform": {"ios": 1, "android": 1}}, "fast": {"count": 1, "by_platform": {"ios": 1}}}}, {"event_name": "trip_saved", "count": 6, "by_platform": {"android": 2, "ios": 4}, "by_phone": {"S24U": 2, "iPhone": 4}}, {"event_name": "theme_changed", "count": 6, "by_platform": {"android": 3, "ios": 3}, "by_phone": {"S24U": 3, "iPhone": 3}, "detail_field": "to", "detail": {"light": {"count": 2, "by_platform": {"android": 1, "ios": 1}}, "dark": {"count": 2, "by_platform": {"android": 1, "ios": 1}}, "auto": {"count": 2, "by_platform": {"android": 1, "ios": 1}}}}, {"event_name": "notification_permission_result", "count": 4, "by_platform": {"android": 3, "ios": 1}, "by_phone": {"S24U": 3, "iPhone": 1}}, {"event_name": "onboarding_finished", "count": 4, "by_platform": {"ios": 2, "android": 2}, "by_phone": {"iPhone": 2, "S24U": 2}}, {"event_name": "vehicle_search_completed", "count": 4, "by_platform": {"android": 3, "ios": 1}, "by_phone": {"S24U": 3, "iPhone": 1}}, {"event_name": "directions_tapped", "count": 4, "by_platform": {"ios": 4}, "by_phone": {"iPhone": 4}, "detail_field": "warning", "detail": {"brand_exclusive": {"count": 2, "by_platform": {"ios": 2}}, "customers_only": {"count": 2, "by_platform": {"ios": 2}}}}, {"event_name": "language_changed", "count": 3, "by_platform": {"ios": 3}, "by_phone": {"iPhone": 3}, "detail_field": "to", "detail": {"fr": {"count": 1, "by_platform": {"ios": 1}}, "en": {"count": 1, "by_platform": {"ios": 1}}, "ar": {"count": 1, "by_platform": {"ios": 1}}}}, {"event_name": "trip_shared", "count": 3, "by_platform": {"android": 2, "ios": 1}, "by_phone": {"S24U": 2, "iPhone": 1}}, {"event_name": "review_started", "count": 3, "by_platform": {"android": 1, "ios": 2}, "by_phone": {"S24U": 1, "iPhone": 2}}, {"event_name": "vehicle_added", "count": 2, "by_platform": {"ios": 1, "android": 1}, "by_phone": {"iPhone": 1, "S24U": 1}, "detail_field": "source", "detail": {"charger": {"count": 2, "by_platform": {"ios": 1, "android": 1}}}}], "funnels": {"onboarding": [{"step": "screen_viewed onboarding", "distinct_phones": 2, "events": 9, "phones": ["S24U", "iPhone"]}, {"step": "onboarding_finished (all)", "distinct_phones": 2, "events": 4, "phones": ["S24U", "iPhone"]}, {"step": "onboarding_finished vehicle=added", "distinct_phones": 1, "events": 1, "phones": ["S24U"]}, {"step": "onboarding_finished vehicle=skipped", "distinct_phones": 2, "events": 3, "phones": ["S24U", "iPhone"]}, {"step": "screen_viewed map", "distinct_phones": 2, "events": 80, "phones": ["S24U", "iPhone"]}], "trip_planner": [{"step": "screen_viewed trip_planner", "distinct_phones": 2, "events": 21, "phones": ["S24U", "iPhone"]}, {"step": "route_requested", "distinct_phones": 2, "events": 57, "phones": ["S24U", "iPhone"]}, {"step": "route_succeeded", "distinct_phones": 2, "events": 57, "phones": ["S24U", "iPhone"]}, {"step": "trip_saved", "distinct_phones": 2, "events": 6, "phones": ["S24U", "iPhone"]}, {"step": "trip_shared", "distinct_phones": 2, "events": 3, "phones": ["S24U", "iPhone"]}, {"step": "navigation_launched source=trip_planner", "distinct_phones": 1, "events": 2, "phones": ["S24U"]}], "navigate": {"steps": [{"step": "directions_tapped", "distinct_phones": 1, "events": 4, "phones": ["iPhone"]}, {"step": "navigation_launched source=charger", "distinct_phones": 2, "events": 6, "phones": ["S24U", "iPhone"]}], "per_warning": {"brand_exclusive": {"taps": 2, "followed_by_launch_2min": 2}, "customers_only": {"taps": 2, "followed_by_launch_2min": 2}}}, "contributions": {"review": [{"step": "review_started", "distinct_phones": 2, "events": 3, "phones": ["S24U", "iPhone"]}, {"step": "ratings rows by these phones (owner_id)", "rows": 0}], "add_charger": [{"step": "add_charger_started", "distinct_phones": 0, "events": 0, "phones": []}, {"step": "charger_submitted", "distinct_phones": 0, "events": 0, "phones": []}]}, "permissions": {"location_permission_result": [], "notification_permission_result": [{"source": "inbox", "result": "granted", "count": 4}]}}, "missing_cars": {"queries": [{"query": "byd seal uu", "count": 1}, {"query": "im 7", "count": 1}], "zero_result_searches_without_query_text": 0, "total_car_searches": 4, "no_result_searches": 2, "no_result_rate": 0.5}, "route_timing": {"succeeded_n": 57, "p50_ms": 496.0, "p95_ms": 9119.8, "max_ms": 164059, "route_failed_by_reason": {}, "route_failed_n": 0}, "ingestion": [{"accepted": 17, "day": "2026-10-20", "dropped": 0, "environment": "production"}, {"accepted": 41, "day": "2026-10-21", "dropped": 0, "environment": "production"}, {"accepted": 105, "day": "2026-10-22", "dropped": 0, "environment": "development"}, {"accepted": 43, "day": "2026-10-22", "dropped": 0, "environment": "production"}, {"accepted": 23, "day": "2026-10-23", "dropped": 0, "environment": "production"}, {"accepted": 85, "day": "2026-10-24", "dropped": 0, "environment": "production"}, {"accepted": 52, "day": "2026-10-25", "dropped": 0, "environment": "production"}, {"accepted": 97, "day": "2026-10-26", "dropped": 0, "environment": "production"}, {"accepted": 7, "day": "2026-10-27", "dropped": 0, "environment": "production"}, {"accepted": 25, "day": "2026-10-28", "dropped": 0, "environment": "production"}, {"accepted": 17, "day": "2026-10-29", "dropped": 0, "environment": "development"}, {"accepted": 31, "day": "2026-10-29", "dropped": 0, "environment": "production"}, {"accepted": 274, "day": "2026-10-30", "dropped": 0, "environment": "development"}, {"accepted": 35, "day": "2026-10-30", "dropped": 0, "environment": "production"}, {"accepted": 84, "day": "2026-10-31", "dropped": 0, "environment": "development"}, {"accepted": 43, "day": "2026-10-31", "dropped": 0, "environment": "production"}, {"accepted": 256, "day": "2026-11-01", "dropped": 0, "environment": "development"}, {"accepted": 239, "day": "2026-11-01", "dropped": 0, "environment": "production"}, {"accepted": 285, "day": "2026-11-02", "dropped": 0, "environment": "development"}], "todo": {"feedback": {"open": 3, "newest": [{"category": "compliment", "created_at": "2026-10-31T20:05:59.794743+00:00", "message_80": "Test du merci - revue Lune"}, {"category": "bug", "created_at": "2026-06-09T21:50:35.687943+00:00", "message_80": "[email removed]"}, {"category": "suggestion", "created_at": "2026-05-16T21:00:09.84724+00:00", "message_80": "This is a test feedback message."}]}, "community_submissions": {"pending": 0, "newest": []}, "review_reports": {"unresolved": 0, "newest": []}, "could_not_charge_7d": {"count": 1, "newest": [{"charger": "Carrefour Marsa", "connector_type": null, "reason": "other", "submitted_at": "2026-10-31T19:32:16.961428+00:00"}], "source": "charging_confirmations outcome=could_not_charge, not hidden"}}, "production_overview": {"dau_30d": [{"day": "2026-10-04", "dau": 0}, {"day": "2026-10-05", "dau": 0}, {"day": "2026-10-06", "dau": 0}, {"day": "2026-10-07", "dau": 0}, {"day": "2026-10-08", "dau": 0}, {"day": "2026-10-09", "dau": 0}, {"day": "2026-10-10", "dau": 0}, {"day": "2026-10-11", "dau": 0}, {"day": "2026-10-12", "dau": 0}, {"day": "2026-10-13", "dau": 0}, {"day": "2026-10-14", "dau": 0}, {"day": "2026-10-15", "dau": 0}, {"day": "2026-10-16", "dau": 6}, {"day": "2026-10-17", "dau": 4}, {"day": "2026-10-18", "dau": 5}, {"day": "2026-10-19", "dau": 4}, {"day": "2026-10-20", "dau": 4}, {"day": "2026-10-21", "dau": 4}, {"day": "2026-10-22", "dau": 5}, {"day": "2026-10-23", "dau": 2}, {"day": "2026-10-24", "dau": 4}, {"day": "2026-10-25", "dau": 6}, {"day": "2026-10-26", "dau": 6}, {"day": "2026-10-27", "dau": 2}, {"day": "2026-10-28", "dau": 5}, {"day": "2026-10-29", "dau": 5}, {"day": "2026-10-30", "dau": 2}, {"day": "2026-10-31", "dau": 5}, {"day": "2026-11-01", "dau": 4}, {"day": "2026-11-02", "dau": 1}], "active_today": 1, "versions": [{"app_version": "1.2.1", "platform": "android", "users": 19}, {"app_version": "1.2.1", "platform": "ios", "users": 19}], "versions_with_ui": [{"app_version": "1.2.1", "platform": "android", "ui": null, "users": 19}, {"app_version": "1.2.1", "platform": "ios", "ui": null, "users": 19}], "note": "production env only, excluded users removed, DAU = distinct users with app_opened per Tunis day; versions = distinct users with any event in last 30 days"}};
+const $ = (q) => document.querySelector(q);
+const NS = 'http://www.w3.org/2000/svg';
+const h = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); for (const k of kids) if (k !== '' && k != null) n.append(k instanceof Node ? k : document.createTextNode(String(k))); return n; };
+const s = (tag, attrs = {}, text) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); if (text != null) n.textContent = text; return n; };
+const icon = (d) => { const v = s('svg', { class: 'i', viewBox: '0 0 24 24', 'aria-hidden': 'true' }); v.innerHTML = d; return v; };
+const fmt = (n) => new Intl.NumberFormat('en-US').format(n);
+const day = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const dayLong = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const LIGHT_FILL = { '--needs': '--t-needs', '--alarm': '--t-alarm', '--back': '--t-back', '--queue': '--t-queue', '--onb': '#a37f00', '--trip': '#00807a', '--nav': '#0071a4', '--routes': '--t-cars', '--cars': '#7a6142' };
+const fill = (v) => { if (document.documentElement.dataset.theme !== 'light' || !LIGHT_FILL[v]) return css(v); const t = LIGHT_FILL[v]; return t.startsWith('--') ? css(t) : t; };
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const ago = (iso) => { const sec = (Date.parse(DATA.generated_at) - Date.parse(iso)) / 1000; const d = Math.floor(sec / 86400); if (d >= 30) return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); if (d >= 1) return d + 'd ago'; const hh = Math.floor(sec / 3600); return hh >= 1 ? hh + 'h ago' : 'just now'; };
+const PHONE = { iPhone: 'ios', S24U: 'android' }, PLAT = { ios: 'iOS', android: 'Android' };
+const SCREEN = { map: 'Map', charger: 'Charger detail', list: 'List', trip_planner: 'Trip planner', settings: 'Settings', saved_plans: 'Saved trips', onboarding: 'Onboarding', add: 'Add a charger', vehicle_search: 'Car picker', updates: 'Station updates', feedback: 'Feedback', charger_alerts: 'Charger alerts', charger_reviews: 'All reviews' };
+const ICONS = {
+  home: '<path d="M12 21s-7-4.4-9.3-9A5.3 5.3 0 0 1 12 6.2 5.3 5.3 0 0 1 21.3 12C19 16.6 12 21 12 21z"/>',
+  usage: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  community: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"/>',
+  chargers: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>',
+};
+let env = 'test', plat = 'all';
+
+/* navigation (tab bar + sidebar from one list) */
+const PAGES = [['home', 'Summary'], ['usage', 'Usage'], ['community', 'Community'], ['chargers', 'Chargers'], ['settings', 'Settings']];
+function waiting() { const t = DATA.todo; return t.feedback.open + t.could_not_charge_7d.count + t.community_submissions.pending + t.review_reports.unresolved; }
+function buildNav() {
+  for (const host of [$('#tabs'), $('#side-nav')]) {
+    host.replaceChildren();
+    for (const [id, label] of PAGES) {
+      const live = id === 'home' || id === 'usage';
+      const a = h('a', live ? { href: '#' + id, 'data-route': id } : { class: 'off', 'aria-disabled': 'true' });
+      a.append(icon(ICONS[id]), h('span', {}, label));
+      if (id === 'community' && waiting()) a.append(h('span', { class: 'badge num', 'aria-label': waiting() + ' waiting' }, String(waiting())));
+      host.append(a);
+    }
+  }
+}
+
+/* segmented controls with a sliding thumb */
+function seg(host, onPick) {
+  const place = () => { const on = host.querySelector('[aria-pressed="true"]'); const th = host.querySelector('.thumb'); th.style.insetInlineStart = on.offsetLeft + 'px'; th.style.width = on.offsetWidth + 'px'; };
+  host.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; host.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); place(); onPick(b.dataset.v); });
+  new ResizeObserver(place).observe(host); place();
+}
+
+/* ticking numbers */
+function tick(el, to, decimals = 0) {
+  const from = parseFloat(el.dataset.v ?? 0); el.dataset.v = to;
+  if (reduce || from === to) { el.textContent = to.toFixed(decimals); return; }
+  const t0 = performance.now(), dur = 700;
+  const step = (t) => { const p = Math.min(1, (t - t0) / dur); const e = 1 - Math.pow(1 - p, 3); el.textContent = (from + (to - from) * e).toFixed(decimals); if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+/* tooltip */
+const tip = $('#tip');
+function showTip(x, y, title, rows) {
+  tip.replaceChildren(h('div', { class: 't' }, title));
+  for (const r of rows) { const k = h('span'); if (r.c) { const i = h('i'); i.style.background = r.c; k.append(i); } k.append(r.n); tip.append(h('div', { class: 'r' }, k, h('b', {}, r.v))); }
+  tip.style.display = 'block';
+  tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, Math.max(8, x + 12)) + 'px';
+  tip.style.top = Math.max(8, y - tip.offsetHeight - 12) + 'px';
+}
+const hideTip = () => { tip.style.display = 'none'; };
+function hover(node, title, rows) {
+  node.setAttribute('tabindex', '0');
+  node.setAttribute('aria-label', title + ': ' + rows.map((r) => r.n + ' ' + r.v).join(', '));
+  node.addEventListener('pointermove', (e) => showTip(e.clientX, e.clientY, title, rows));
+  node.addEventListener('pointerleave', hideTip);
+  node.addEventListener('focus', () => { const b = node.getBoundingClientRect(); showTip(b.left + b.width / 2, b.top, title, rows); });
+  node.addEventListener('blur', hideTip);
+}
+function table(head, rows, right = []) {
+  const t = h('table'); const tr = h('tr'); head.forEach((x, i) => tr.append(h('th', right.includes(i) ? { class: 'r' } : {}, x))); t.append(tr);
+  for (const r of rows) { const row = h('tr'); r.forEach((c, i) => row.append(h('td', right.includes(i) ? { class: 'r' } : {}, c))); t.append(row); }
+  return t;
+}
+function key(host, series) { host.replaceChildren(...series.map((x) => { const i = h('i'); i.style.background = x.c; return h('span', {}, i, x.n); })); }
+const niceMax = (m) => (m <= 2 ? 2 : m <= 5 ? 5 : (() => { const p = 10 ** Math.floor(Math.log10(m)); const f = m / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; })());
+
+/* ---------- HOME ---------- */
+function homeSeries() { return env === 'test' ? DATA.activity.days.map((d) => ({ day: d.day, v: d.phones_opened })) : DATA.production_overview.dau_30d.map((d) => ({ day: d.day, v: d.dau })); }
+function backNumbers() {
+  if (env !== 'test') return null;
+  const done = DATA.cohorts.weeks.filter((w) => w.window_7d_finished && w.phones.every((p) => p.events_tracked_from <= p.install_day));
+  return { n: done.reduce((a, w) => a + w.installed, 0), back: done.reduce((a, w) => a + w.back_7d, 0) };
+}
+function renderRings() {
+  const series = homeSeries(); const today = series[series.length - 1].v;
+  const avg = series.slice(-7).reduce((a, x) => a + x.v, 0) / 7;
+  const goal = env === 'test' ? 2 : Math.max(1, Math.round(avg));
+  const back = backNumbers();
+  const w = waiting();
+  const rings = [
+    { id: 'active', c: '--active', t: '--t-active', label: 'Active', p: Math.min(1, today / goal), v: `${today}`, u: env === 'test' ? `of ${goal} phones` : `goal ${goal} (7-day avg)`, to: '#card-active' },
+    { id: 'back', c: '--back', t: '--t-back', label: 'Came back', p: back && back.n ? back.back / back.n : 0, v: back ? `${back.back}` : '—', u: back ? `of ${back.n} in 7 days` : 'after the Lune OTA', to: '#card-back' },
+    { id: 'queue', c: '--queue', t: '--t-queue', label: 'Queue clear', p: w ? 0 : 1, v: w ? `${w}` : '0', u: w ? 'waiting' : 'nothing waiting', to: '#card-needs' },
+  ];
+  const svg = $('#rings'); const R = [64, 46, 28];
+  if (!svg.childElementCount) {
+    rings.forEach((r, i) => {
+      const c = 2 * Math.PI * R[i];
+      svg.append(s('circle', { cx: 74, cy: 74, r: R[i], stroke: css(r.c), 'stroke-opacity': css('--track') }));
+      const arc = s('circle', { cx: 74, cy: 74, r: R[i], stroke: css(r.c), class: 'p', 'data-ring': r.id, 'stroke-dasharray': c, 'stroke-dashoffset': c });
+        svg.append(arc);
+    });
+  }
+  rings.forEach((r, i) => {
+    const c = 2 * Math.PI * R[i]; const el = svg.querySelector(`[data-ring="${r.id}"]`);
+    el.onclick = el.previousSibling.onclick = () => document.querySelector(r.to)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+    el.setAttribute('stroke', css(r.c)); el.previousSibling.setAttribute('stroke', css(r.c));
+    requestAnimationFrame(() => requestAnimationFrame(() => el.setAttribute('stroke-dashoffset', c * (1 - Math.max(r.p, 0.0001)))));
+  });
+  const lg = $('#legend'); lg.replaceChildren();
+  for (const r of rings) {
+    const b = h('button', { type: 'button', 'aria-label': `${r.label}: ${r.v} ${r.u}. Show the card.` });
+    const sm = h('small', {}, r.label); sm.style.color = css(r.t);
+    b.append(sm, h('b', { class: 'num' }, r.v, h('em', {}, r.u)));
+    b.addEventListener('click', () => document.querySelector(r.to)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' }));
+    lg.append(b);
+  }
+  $('#ring-meta').textContent = env === 'test' ? 'test phones' : 'production';
+}
+function renderHome() {
+  $('#date').textContent = dayLong(DATA.activity.today.day);
+  renderRings();
+  const series = homeSeries();
+  const avg = series.slice(-7).reduce((a, x) => a + x.v, 0) / 7;
+  tick($('#act-avg'), env === 'test' ? DATA.activity.avg7_distinct_phones : avg, 1);
+  const max = Math.max(1, ...series.map((x) => x.v));
+  const bars = $('#act-bars'); bars.replaceChildren();
+  series.forEach((p, i) => { const b = h('i', p.v ? {} : { class: 'z' }); if (p.v) { b.style.height = (p.v / max) * 100 + '%'; b.style.background = css('--active'); b.style.animationDelay = (0.25 + i * 0.012) + 's'; } bars.append(b); });
+  $('#act-ax').replaceChildren(h('span', {}, day(series[0].day)), h('span', {}, 'Today'));
+
+  const back = backNumbers();
+  if (back) { tick($('#back-v'), back.back); $('#back-u').textContent = `of ${back.n}`; $('#back-s').textContent = back.n < 10 ? 'Counts only, since under 10 installs is too few for a percentage. It counts installs tracked from their first day and whose 7 days are over.' : ''; }
+  else { $('#back-v').textContent = '—'; $('#back-v').dataset.v = 0; $('#back-u').textContent = ''; $('#back-s').textContent = 'Production return rates fill in after the Lune OTA.'; }
+
+  const t = DATA.todo; const ul = $('#needs'); ul.replaceChildren();
+  const rows = [
+    { n: t.feedback.open, c: '--needs', title: 'Open feedback', d: t.feedback.newest[0] ? `“${t.feedback.newest[0].message_80}” · ${ago(t.feedback.newest[0].created_at)}` : '' },
+    { n: t.could_not_charge_7d.count, c: '--alarm', title: "Couldn't charge", d: t.could_not_charge_7d.newest[0] ? `${t.could_not_charge_7d.newest[0].charger} · ${ago(t.could_not_charge_7d.newest[0].submitted_at)}` : '' },
+    { n: t.community_submissions.pending, c: '--screens', title: 'Charger submissions', d: 'Nothing waiting' },
+    { n: t.review_reports.unresolved, c: '--actions', title: 'Review reports', d: 'Nothing waiting' },
+  ];
+  for (const r of rows) {
+    const a = h('div', { class: 'row', 'aria-label': `${r.title}: ${r.n} waiting` });
+    const bub = h('span', { class: 'bub num' + (r.n ? '' : ' z') }, fmt(r.n)); if (r.n) bub.style.background = fill(r.c);
+    a.append(h('span', {}, h('span', { class: 't' }, r.title), r.n || r.d ? h('span', { class: 'd' }, r.n ? r.d : 'Nothing waiting') : ''), bub);
+    ul.append(h('li', {}, a));
+  }
+  $('#needs-total').textContent = `${fmt(waiting())} waiting`;
+
+  const vers = env === 'test'
+    ? DATA.versions.map((v) => ({ n: `${PLAT[v.platform]} ${v.app_version}`, ui: v.ui.startsWith('none') ? 'no label' : v.ui, c: v.phones.length }))
+    : DATA.production_overview.versions.map((v) => ({ n: `${PLAT[v.platform]} ${v.app_version}`, ui: '', c: v.users }));
+  $('#vers').replaceChildren(...vers.map((v) => h('li', {}, h('span', {}, v.n, v.ui ? h('span', { class: 'pill' }, v.ui) : ''), h('em', { class: 'num' }, `${fmt(v.c)} ${env === 'test' ? (v.c === 1 ? 'phone' : 'phones') : (v.c === 1 ? 'user' : 'users')}`))));
+  $('#vers-meta').textContent = `${new Set(vers.map((v) => v.n)).size} versions`;
+}
+
+/* ---------- USAGE ---------- */
+const ok = (p) => plat === 'all' || plat === p;
+function columns(host, labels, series, { H = 170, yMax } = {}) {
+  host.replaceChildren();
+  const W = Math.max(280, Math.round(host.clientWidth || 600)), L = 30, B = 22, T = 6, n = labels.length, band = (W - L) / n, bw = Math.max(4, band - 4);
+  const tot = labels.map((_, i) => series.reduce((a, x) => a + x.v[i], 0));
+  const top = yMax ?? niceMax(Math.max(1, ...tot));
+  const y = (v) => H - B - (v / top) * (H - B - T);
+  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' });
+  for (const t of (top <= 2 ? [0, 1, 2] : [0, top / 2, top])) { svg.append(s('line', { x1: L, x2: W, y1: y(t), y2: y(t), stroke: css('--sep'), 'stroke-width': 1 })); svg.append(s('text', { x: L - 8, y: y(t) + 4, 'text-anchor': 'end', class: 'tick' }, fmt(t))); }
+  labels.forEach((lab, i) => {
+    const x = L + band * i + (band - bw) / 2; let base = 0;
+    series.forEach((se, si) => {
+      const v = se.v[i]; if (!v) return; const y0 = y(base), y1 = y(base + v); const isTop = series.slice(si + 1).every((o) => !o.v[i]);
+      const hgt = Math.max(1, y0 - y1 - (base ? 2 : 0)); const r = isTop ? Math.min(4, bw / 2, hgt) : 0;
+      svg.append(s('path', { d: `M${x},${y1 + hgt} V${y1 + r} Q${x},${y1} ${x + r},${y1} H${x + bw - r} Q${x + bw},${y1} ${x + bw},${y1 + r} V${y1 + hgt} Z`, fill: se.c }));
+      base += v;
+    });
+    if ((n - 1 - i) % 7 === 0) svg.append(s('text', { x: x + bw / 2, y: H - 5, 'text-anchor': 'middle', class: 'tick' }, day(lab)));
+    const hit = s('rect', { x: L + band * i, y: T, width: band, height: H - B - T, class: 'hit' });
+    hover(hit, day(lab), series.map((se) => ({ n: se.n, v: fmt(se.v[i]), c: se.c }))); svg.append(hit);
+  });
+  host.append(svg);
+}
+function hbars(host, rows, series) {
+  host.replaceChildren();
+  const W = Math.max(280, Math.round(host.clientWidth || 600)), rh = 32, L = W < 420 ? 112 : 128, R = 40, Hh = rows.length * rh;
+  const max = Math.max(1, ...rows.map((r) => series.reduce((a, x) => a + (r[x.k] || 0), 0)));
+  const x = (v) => (v / max) * (W - L - R);
+  const svg = s('svg', { viewBox: `0 0 ${W} ${Hh}`, role: 'img' });
+  rows.forEach((r, i) => {
+    const yy = i * rh + 8, bh = 16; let off = 0;
+    svg.append(s('text', { x: L - 10, y: yy + 12, 'text-anchor': 'end', class: 'lbl' }, r.name));
+    series.forEach((se, si) => { const v = r[se.k] || 0; if (!v) return; const end = series.slice(si + 1).every((o) => !(r[o.k] || 0)); const xx = L + x(off) + (off ? 2 : 0), w = Math.max(1, x(v) - (off ? 2 : 0)), rr = end ? Math.min(4, w, bh / 2) : 0; svg.append(s('path', { d: `M${xx},${yy} H${xx + w - rr} Q${xx + w},${yy} ${xx + w},${yy + rr} V${yy + bh - rr} Q${xx + w},${yy + bh} ${xx + w - rr},${yy + bh} H${xx} Z`, fill: se.c })); off += v; });
+    svg.append(s('text', { x: L + x(off) + 8, y: yy + 12, class: 'vl' }, fmt(off)));
+    const hit = s('rect', { x: 0, y: i * rh, width: W, height: rh, class: 'hit' }); hover(hit, r.name, series.map((se) => ({ n: se.n, v: fmt(r[se.k] || 0), c: se.c }))); svg.append(hit);
+  });
+  host.append(svg);
+}
+function renderUsage() {
+  const days = DATA.activity.days, labels = days.map((d) => d.day);
+  const shown = DATA.phones.filter((p) => ok(PHONE[p]));
+  const tone = (p) => (PHONE[p] === 'ios' ? css('--active') : css('--idle'));
+  const active = days.map((d) => d.phones_opened_list.filter((p) => shown.includes(p)).length);
+  columns($('#c-active'), labels, [{ n: 'Active phones', c: css('--active'), v: active }], { yMax: 2, H: 150 });
+  $('#t-active').replaceChildren(table(['Day', 'Phones'], days.map((d, i) => [day(d.day), fmt(active[i])]).filter((r) => r[1] !== '0'), [1]));
+  const ev = shown.map((p) => ({ n: `${p} (${PLAT[PHONE[p]]})`, c: tone(p), v: days.map((d) => d.events_by_phone[p] || 0) }));
+  columns($('#c-events'), labels, ev, { H: 150 }); key($('#k-events'), ev);
+  $('#t-events').replaceChildren(table(['Day', ...shown], days.filter((d) => shown.some((p) => d.events_by_phone[p])).map((d) => [day(d.day), ...shown.map((p) => fmt(d.events_by_phone[p] || 0))]), shown.map((_, i) => i + 1)));
+
+  const untracked = (w, n) => w.phones.every((p) => { const end = new Date(p.install_day + 'T12:00:00'); end.setDate(end.getDate() + n); return p.events_tracked_from > end.toISOString().slice(0, 10); });
+  const cell = (w, n) => untracked(w, n) ? h('span', { class: 'na' }, 'not tracked') : h('span', {}, h('span', { class: 'nw' }, `${w[`back_${n}d`]} of ${w.installed}`), w[`window_${n}d_finished`] ? '' : h('span', { class: 'pill' }, 'open'));
+  const weeks = DATA.cohorts.weeks.filter((w) => w.phones.some((p) => shown.includes(p.phone)));
+  const who = (w) => { const p = w.phones[0]; return h('span', {}, p.phone, p.events_tracked_from > p.install_day ? h('span', { class: 'd' }, 'tracked from ' + day(p.events_tracked_from)) : ''); };
+  const list = h('ul', { class: 'coh' }, ...weeks.map((w) => h('li', {}, h('div', { class: 'who' }, h('b', {}, 'Week of ' + day(w.install_week)), who(w)), h('div', { class: 'chips' }, ...[1, 7, 30].map((n) => h('span', { class: 'chip' }, h('small', {}, n === 1 ? 'within 1 day' : `within ${n} days`), cell(w, n)))))));
+  $('#cohorts').replaceChildren(list, h('div', { class: 'coh-table' }, table(['Install week', 'Phone', 'Within 1 day', 'Within 7 days', 'Within 30 days'], weeks.map((w) => [day(w.install_week), who(w), cell(w, 1), cell(w, 7), cell(w, 30)]), [2, 3, 4])));
+
+  const ss = DATA.screens.map((x) => ({ name: SCREEN[x.screen] || x.screen, ios: ok('ios') ? x.by_platform.ios?.views || 0 : 0, android: ok('android') ? x.by_platform.android?.views || 0 : 0 })).filter((r) => r.ios + r.android).sort((a, b) => b.ios + b.android - (a.ios + a.android));
+  const ser = [{ k: 'ios', n: 'iOS', c: css('--screens') }, { k: 'android', n: 'Android', c: css('--idle') }].filter((x) => ok(x.k));
+  hbars($('#c-screens'), ss, ser); key($('#k-screens'), ser);
+  $('#t-screens').replaceChildren(table(['Screen', 'iOS', 'Android', 'Total'], ss.map((r) => [r.name, fmt(r.ios), fmt(r.android), fmt(r.ios + r.android)]), [1, 2, 3]));
+
+  const pick = ['charger_viewed', 'favorite_toggled', 'filter_changed', 'list_sorted', 'trip_saved', 'trip_shared', 'directions_tapped', 'navigation_launched', 'review_started', 'vehicle_added', 'vehicle_search_completed', 'theme_changed', 'language_changed'];
+  const NAME = { charger_viewed: 'Charger opened', favorite_toggled: 'Favorite on or off', filter_changed: 'Map filter changed', list_sorted: 'List sort changed', trip_saved: 'Trip saved', trip_shared: 'Trip shared', navigation_launched: 'Navigation opened', directions_tapped: 'Navigate tapped', review_started: 'Review started', vehicle_added: 'Car added', vehicle_search_completed: 'Car searched', theme_changed: 'Theme changed', language_changed: 'Language changed' };
+  const DET = { None: 'no source (older build)', True: 'on', False: 'off', brand_exclusive: 'brand-only warning', customers_only: 'customers warning', charger: 'from a charger' };
+  const nOf = (bp) => (ok('ios') ? bp.ios || 0 : 0) + (ok('android') ? bp.android || 0 : 0);
+  $('#actions').replaceChildren(table(['Action', ''], DATA.actions.filter((a) => pick.includes(a.event_name) && nOf(a.by_platform)).sort((x, y) => pick.indexOf(x.event_name) - pick.indexOf(y.event_name)).map((a) => {
+    const split = a.detail ? Object.entries(a.detail).filter(([, v]) => nOf(v.by_platform)).sort((p, q) => nOf(q[1].by_platform) - nOf(p[1].by_platform)).map(([k, v]) => `${DET[k] || k} ${nOf(v.by_platform)}`).join(' · ') : '';
+    return [h('span', {}, NAME[a.event_name], split ? h('span', { class: 'd' }, split) : ''), fmt(nOf(a.by_platform))];
+  }), [1]));
+
+  const f = DATA.funnels; const st = (arr, nm) => arr.find((x) => x.step === nm) || { events: 0, distinct_phones: 0 };
+  const lad = (title, color, svgPath, steps) => {
+    const c = h('div', { class: 'card' }); const sq = h('span', { class: 'sq' }, icon(svgPath)); sq.style.background = fill(color);
+    c.append(h('div', { class: 'ch' }, sq, h('h2', {}, title)));
+    const ul = h('ul', { class: 'lad' }); const max = Math.max(1, ...steps.map((x) => x.v));
+    steps.forEach((x, i) => { const bar = h('i'); bar.style.width = (x.v / max) * 100 + '%'; bar.style.background = css(x.sub ? '--idle' : color); bar.style.animationDelay = (0.1 + i * 0.08) + 's';
+      ul.append(h('li', { class: x.sub ? 'sub' : '' }, h('div', { class: 'top' }, h('span', { class: 'nm' }, x.name), h('span', { class: 'v' }, fmt(x.v), x.note ? h('small', {}, x.note) : x.p != null ? h('small', {}, x.p === 1 ? '1 phone' : `${x.p} phones`) : '')), h('div', { class: 'tr' }, bar))); });
+    c.append(ul); return c;
+  };
+  const fs = (arr, list) => list.map(([nm, k]) => { const x = st(arr, k); return { name: nm, v: x.events, p: x.distinct_phones }; });
+  $('#funnels').replaceChildren(
+    lad('Onboarding', '--onb', '<path d="M5 12l5 5L20 7"/>', [...fs(f.onboarding, [['Onboarding shown', 'screen_viewed onboarding'], ['Finished', 'onboarding_finished (all)']]), { name: 'with a car', v: st(f.onboarding, 'onboarding_finished vehicle=added').events, sub: true }, { name: 'car skipped', v: st(f.onboarding, 'onboarding_finished vehicle=skipped').events, sub: true }]),
+    lad('Trip planner', '--trip', '<path d="M3 17l6-6 4 4 8-8"/>', fs(f.trip_planner, [['Planner opened', 'screen_viewed trip_planner'], ['Route asked', 'route_requested'], ['Route found', 'route_succeeded'], ['Trip saved', 'trip_saved'], ['Trip shared', 'trip_shared'], ['Navigation opened', 'navigation_launched source=trip_planner']])),
+    lad('Navigate from a charger', '--nav', '<path d="M3 11l18-8-8 18-2-8z"/>', [{ name: 'Navigate tapped', v: st(f.navigate.steps, 'directions_tapped').events, p: st(f.navigate.steps, 'directions_tapped').distinct_phones }, ...Object.entries(f.navigate.per_warning).map(([k, v]) => ({ name: (DET[k] || k).replace(' warning', ''), v: v.taps, sub: true, note: `${v.followed_by_launch_2min} went` })), { name: 'Navigation opened', v: st(f.navigate.steps, 'navigation_launched source=charger').events, p: st(f.navigate.steps, 'navigation_launched source=charger').distinct_phones }]),
+    lad('Contributions', '--contrib', '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>', [{ name: 'Review started', v: st(f.contributions.review, 'review_started').events, p: st(f.contributions.review, 'review_started').distinct_phones }, { name: 'posted', v: (f.contributions.review.find((x) => x.rows != null) || {}).rows || 0, sub: true }, { name: 'Add charger started', v: st(f.contributions.add_charger, 'add_charger_started').events }, { name: 'sent', v: st(f.contributions.add_charger, 'charger_submitted').events, sub: true }]),
+  );
+
+  const mc = DATA.missing_cars, rt = DATA.route_timing;
+  const head = (title, color, path) => { const sq = h('span', { class: 'sq' }, icon(path)); sq.style.background = fill(color); return h('div', { class: 'ch' }, sq, h('h2', {}, title)); };
+  $('#cars').replaceChildren(head('Cars not in the catalog', '--cars', '<path d="M5 17h14l-1.5-6.5A2 2 0 0 0 15.6 9H8.4a2 2 0 0 0-1.9 1.5z"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/>'), h('div', { class: 'pair' }, h('div', {}, h('b', { class: 'num' }, `${mc.no_result_searches} of ${mc.total_car_searches}`), h('span', {}, 'searches found nothing')), h('div', {}, h('b', { class: 'num' }, mc.queries.length), h('span', {}, 'names to look at'))), table(['Searched for', ''], mc.queries.map((x) => [x.query, fmt(x.count)]), [1]));
+  $('#routes').replaceChildren(head('Routes', '--routes', '<path d="M3 17l6-6 4 4 8-8"/>'), h('div', { class: 'pair' }, h('div', {}, h('b', { class: 'num' }, (rt.p50_ms / 1000).toFixed(1) + ' s'), h('span', {}, 'typical answer')), h('div', {}, h('b', { class: 'num' }, (rt.p95_ms / 1000).toFixed(1) + ' s'), h('span', {}, 'slowest 5%'))), h('p', { class: 'note' }, `${fmt(rt.succeeded_n)} found, ${fmt(rt.route_failed_n)} failed. The clock keeps running while the app is in the background, so the slowest are mostly people leaving mid-request.`));
+  $('#aa').replaceChildren(head('Android Auto', '--idle', '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 18v2M17 18v2"/>'), h('p', { class: 'note', style: 'margin-top:8px;font-size:15px' }, 'No car events yet. They arrive with the next native build.'));
+  $('#foot').replaceChildren(h('b', {}, 'Reading test data. '), 'Dev builds start a new visit on every reload, so the S24U shows about 500 app opens. Charger opens with no source come from builds made before the source label existed.');
+}
+
+/* ---------- shell ---------- */
+function paintSquares() { document.querySelectorAll('[data-fill]').forEach((el) => { el.style.background = fill(el.dataset.fill); }); }
+function route() {
+  const r = (location.hash || '#home').slice(1) === 'usage' ? 'usage' : 'home';
+  for (const id of ['home', 'usage']) $('#' + id).hidden = id !== r;
+  document.querySelectorAll('[data-route]').forEach((a) => (a.dataset.route === r ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
+  (r === 'usage' ? renderUsage : renderHome)(); paintSquares(); hideTip(); scrollTo(0, 0);
+}
+document.querySelectorAll('.mode').forEach((b) => b.addEventListener('click', () => { const d = document.documentElement; d.dataset.theme = d.dataset.theme === 'light' ? 'dark' : 'light'; $('#rings').replaceChildren(); route(); }));
+seg($('#env'), (v) => { env = v; renderHome(); });
+seg($('#plat'), (v) => { plat = v; renderUsage(); });
+addEventListener('hashchange', route);
+let rw = innerWidth; addEventListener('resize', () => { if (Math.abs(innerWidth - rw) > 40 && !$('#usage').hidden) { rw = innerWidth; renderUsage(); } });
+$('#snap').textContent = new Date(DATA.generated_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark';
+buildNav(); route();
+</script>
+</body>
+</html>

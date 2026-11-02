@@ -1,0 +1,626 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-02T02:40:49.872116+00:00",
+  "title": "Design System: Charj Admin",
+  "extensions": {
+    "colorMeta": {
+      "active": {
+        "role": "primary",
+        "displayName": "Ring Red",
+        "canonical": "#ff2d55",
+        "tonalRamp": [
+          "#4d0e1a",
+          "#80162a",
+          "#b21f3b",
+          "#e0284b",
+          "#ff2d55",
+          "#ff6c88",
+          "#ffabbb",
+          "#ffe0e6"
+        ]
+      },
+      "came-back": {
+        "role": "primary",
+        "displayName": "Ring Green",
+        "canonical": "#34c759",
+        "tonalRamp": [
+          "#103c1b",
+          "#1a642c",
+          "#248b3e",
+          "#2eaf4e",
+          "#34c759",
+          "#71d88b",
+          "#aee9bd",
+          "#e1f7e6"
+        ]
+      },
+      "queue": {
+        "role": "primary",
+        "displayName": "Ring Cyan",
+        "canonical": "#00c7ff",
+        "tonalRamp": [
+          "#003c4d",
+          "#006480",
+          "#008bb2",
+          "#00afe0",
+          "#00c7ff",
+          "#4cd8ff",
+          "#99e9ff",
+          "#d9f7ff"
+        ]
+      },
+      "needs-you": {
+        "role": "secondary",
+        "displayName": "Needs Orange",
+        "canonical": "#ff9500",
+        "tonalRamp": [
+          "#4d2d00",
+          "#804a00",
+          "#b26800",
+          "#e08300",
+          "#ff9500",
+          "#ffb54c",
+          "#ffd599",
+          "#ffefd9"
+        ]
+      },
+      "alarm": {
+        "role": "secondary",
+        "displayName": "Alarm Red",
+        "canonical": "#ff3b30",
+        "tonalRamp": [
+          "#4d120e",
+          "#801e18",
+          "#b22922",
+          "#e0342a",
+          "#ff3b30",
+          "#ff766e",
+          "#ffb1ac",
+          "#ffe2e0"
+        ]
+      },
+      "screens": {
+        "role": "tertiary",
+        "displayName": "Screens Blue",
+        "canonical": "#0a84ff",
+        "tonalRamp": [
+          "#03284d",
+          "#054280",
+          "#075cb2",
+          "#0974e0",
+          "#0a84ff",
+          "#54a9ff",
+          "#9dceff",
+          "#daedff"
+        ]
+      },
+      "actions": {
+        "role": "tertiary",
+        "displayName": "Actions Indigo",
+        "canonical": "#5e5ce6",
+        "tonalRamp": [
+          "#1c1c45",
+          "#2f2e73",
+          "#4240a1",
+          "#5351ca",
+          "#5e5ce6",
+          "#8e8dee",
+          "#bfbef5",
+          "#e7e7fb"
+        ]
+      },
+      "cars": {
+        "role": "tertiary",
+        "displayName": "Cars Brown",
+        "canonical": "#a2845e",
+        "tonalRamp": [
+          "#31281c",
+          "#51422f",
+          "#715c42",
+          "#8f7453",
+          "#a2845e",
+          "#bea98e",
+          "#dacebf",
+          "#f1ede7"
+        ]
+      },
+      "routes": {
+        "role": "tertiary",
+        "displayName": "Routes Teal-Blue",
+        "canonical": "#30b0c7",
+        "tonalRamp": [
+          "#0e353c",
+          "#185864",
+          "#227b8b",
+          "#2a9baf",
+          "#30b0c7",
+          "#6ec8d8",
+          "#acdfe9",
+          "#e0f3f7"
+        ]
+      },
+      "onboarding": {
+        "role": "tertiary",
+        "displayName": "Onboarding Yellow",
+        "canonical": "#ffcc00",
+        "tonalRamp": [
+          "#4d3d00",
+          "#806600",
+          "#b28f00",
+          "#e0b400",
+          "#ffcc00",
+          "#ffdb4c",
+          "#ffeb99",
+          "#fff7d9"
+        ]
+      },
+      "trip": {
+        "role": "tertiary",
+        "displayName": "Trip Teal",
+        "canonical": "#00c7be",
+        "tonalRamp": [
+          "#003c39",
+          "#00645f",
+          "#008b85",
+          "#00afa7",
+          "#00c7be",
+          "#4cd8d2",
+          "#99e9e5",
+          "#d9f7f5"
+        ]
+      },
+      "navigate": {
+        "role": "tertiary",
+        "displayName": "Navigate Sky",
+        "canonical": "#32ade6",
+        "tonalRamp": [
+          "#0f3445",
+          "#195673",
+          "#2379a1",
+          "#2c98ca",
+          "#32ade6",
+          "#70c6ee",
+          "#addef5",
+          "#e0f3fb"
+        ]
+      },
+      "contributions": {
+        "role": "tertiary",
+        "displayName": "Contributions Purple",
+        "canonical": "#af52de",
+        "tonalRamp": [
+          "#351943",
+          "#58296f",
+          "#7a399b",
+          "#9a48c3",
+          "#af52de",
+          "#c786e8",
+          "#dfbaf2",
+          "#f3e5fa"
+        ]
+      },
+      "idle": {
+        "role": "neutral",
+        "displayName": "Idle Grey",
+        "canonical": "#8e8e93",
+        "tonalRamp": [
+          "#2b2b2c",
+          "#47474a",
+          "#636367",
+          "#7d7d81",
+          "#8e8e93",
+          "#b0b0b3",
+          "#d2d2d4",
+          "#eeeeef"
+        ]
+      },
+      "grouped-ground-light": {
+        "role": "neutral",
+        "displayName": "Grouped Ground (light)",
+        "canonical": "#f2f2f7",
+        "tonalRamp": [
+          "#49494a",
+          "#79797c",
+          "#a9a9ad",
+          "#d5d5d9",
+          "#f2f2f7",
+          "#f6f6f9",
+          "#fafafc",
+          "#fdfdfe"
+        ]
+      },
+      "card-dark": {
+        "role": "neutral",
+        "displayName": "Card (dark)",
+        "canonical": "#1c1c1e",
+        "tonalRamp": [
+          "#080809",
+          "#0e0e0f",
+          "#141415",
+          "#19191a",
+          "#1c1c1e",
+          "#606062",
+          "#a4a4a5",
+          "#dddddd"
+        ]
+      },
+      "card-pressed-dark": {
+        "role": "neutral",
+        "displayName": "Card Pressed (dark)",
+        "canonical": "#2c2c2e",
+        "tonalRamp": [
+          "#0d0d0e",
+          "#161617",
+          "#1f1f20",
+          "#272728",
+          "#2c2c2e",
+          "#6b6b6d",
+          "#ababab",
+          "#dfdfe0"
+        ]
+      },
+      "segment-thumb-dark": {
+        "role": "neutral",
+        "displayName": "Segment Thumb (dark)",
+        "canonical": "#636366",
+        "tonalRamp": [
+          "#1e1e1f",
+          "#323233",
+          "#454547",
+          "#57575a",
+          "#636366",
+          "#929294",
+          "#c1c1c2",
+          "#e8e8e8"
+        ]
+      },
+      "active-text-light": {
+        "role": "primary",
+        "displayName": "Ring Red text tone (light)"
+      },
+      "came-back-text-light": {
+        "role": "primary",
+        "displayName": "Ring Green text tone (light)"
+      },
+      "queue-text-light": {
+        "role": "primary",
+        "displayName": "Ring Cyan text tone (light)"
+      },
+      "needs-you-text-light": {
+        "role": "secondary",
+        "displayName": "Needs Orange text tone (light)"
+      },
+      "alarm-text-light": {
+        "role": "secondary",
+        "displayName": "Alarm Red text tone (light)"
+      },
+      "screens-text-light": {
+        "role": "tertiary",
+        "displayName": "Screens Blue text tone (light)"
+      },
+      "actions-text-light": {
+        "role": "tertiary",
+        "displayName": "Actions Indigo text tone (light)"
+      },
+      "routes-text-light": {
+        "role": "tertiary",
+        "displayName": "Routes Teal-Blue text tone (light)"
+      },
+      "onboarding-fill-light": {
+        "role": "tertiary",
+        "displayName": "Onboarding Yellow fill tone (light)"
+      },
+      "trip-fill-light": {
+        "role": "tertiary",
+        "displayName": "Trip Teal fill tone (light)"
+      },
+      "navigate-fill-light": {
+        "role": "tertiary",
+        "displayName": "Navigate Sky fill tone (light)"
+      },
+      "cars-fill-light": {
+        "role": "tertiary",
+        "displayName": "Cars Brown fill tone (light)"
+      },
+      "active-text-dark": {
+        "role": "primary",
+        "displayName": "Ring Red text tone (dark)"
+      },
+      "came-back-text-dark": {
+        "role": "primary",
+        "displayName": "Ring Green text tone (dark)"
+      },
+      "queue-text-dark": {
+        "role": "primary",
+        "displayName": "Ring Cyan text tone (dark)"
+      },
+      "needs-you-text-dark": {
+        "role": "secondary",
+        "displayName": "Needs Orange text tone (dark)"
+      },
+      "alarm-text-dark": {
+        "role": "secondary",
+        "displayName": "Alarm Red text tone (dark)"
+      },
+      "screens-text-dark": {
+        "role": "tertiary",
+        "displayName": "Screens Blue text tone (dark)"
+      },
+      "actions-text-dark": {
+        "role": "tertiary",
+        "displayName": "Actions Indigo text tone (dark)"
+      },
+      "routes-text-dark": {
+        "role": "tertiary",
+        "displayName": "Routes Teal-Blue text tone (dark)"
+      }
+    },
+    "typographyMeta": {
+      "large-title": {
+        "displayName": "Large title",
+        "purpose": "Page title with the date under it."
+      },
+      "hero-number": {
+        "displayName": "Hero number",
+        "purpose": "The one value of a card."
+      },
+      "stat-number": {
+        "displayName": "Stat number",
+        "purpose": "Ring legend values and stat pairs (28px in pairs)."
+      },
+      "section-title": {
+        "displayName": "Section title",
+        "purpose": "Usage question headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Row titles, sidebar links."
+      },
+      "card-title": {
+        "displayName": "Card title",
+        "purpose": "Card header title, bubble numerals."
+      },
+      "subhead": {
+        "displayName": "Subhead",
+        "purpose": "Meta, descriptions, version rows."
+      },
+      "footnote": {
+        "displayName": "Footnote",
+        "purpose": "Row details, notes (70ch), chart labels, tooltips."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Pills, chip labels, badges, x-axis."
+      },
+      "chart-tick": {
+        "displayName": "Chart tick",
+        "purpose": "Y-axis ticks."
+      },
+      "tab-label": {
+        "displayName": "Tab label",
+        "purpose": "Phone tab bar only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "segment-thumb",
+        "value": "0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04)",
+        "purpose": "Selected segment lifting off its track."
+      },
+      {
+        "name": "tooltip",
+        "value": "0 8px 30px rgba(0,0,0,.18)",
+        "purpose": "Chart tooltip floating over a card."
+      },
+      {
+        "name": "bar-material",
+        "value": "backdrop-filter: saturate(180%) blur(20px)",
+        "purpose": "Frosted phone tab bar (and the future inline title bar)."
+      },
+      {
+        "name": "focus-ring",
+        "value": "outline: 3px solid color-mix(in srgb, #0a84ff 70%, transparent); outline-offset: 2px",
+        "purpose": "Every focusable element."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(.2, .8, .2, 1)",
+        "purpose": "The only curve."
+      },
+      {
+        "name": "ring-fill",
+        "value": "1.2s",
+        "purpose": "Ring stroke-dashoffset fill and refill."
+      },
+      {
+        "name": "card-rise",
+        "value": "0.5s, translateY(14px) + fade, 60ms stagger",
+        "purpose": "Card entry."
+      },
+      {
+        "name": "bars-grow",
+        "value": "0.7s scaleY from bottom",
+        "purpose": "Sparkline bars."
+      },
+      {
+        "name": "funnel-widen",
+        "value": "0.9s scaleX, 0.1s + 80ms stagger",
+        "purpose": "Funnel progress bars."
+      },
+      {
+        "name": "segment-slide",
+        "value": "0.32s",
+        "purpose": "Segmented thumb."
+      },
+      {
+        "name": "number-tick",
+        "value": "700ms cubic ease-out",
+        "purpose": "Numbers count from previous value."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "all animation and transition off; numbers jump; scroll instant",
+        "purpose": "prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "phone",
+        "value": "0-767px"
+      },
+      {
+        "name": "sidebar",
+        "value": "768px"
+      }
+    ],
+    "themes": {
+      "light": {
+        "--track": ".16",
+        "--glyph": "#ffffff"
+      },
+      "dark": {
+        "--track": ".24",
+        "--glyph": "#000000"
+      }
+    }
+  },
+  "components": [
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat 16px card on the grouped ground: colour square, bold title, meta, one bold number.",
+      "html": "<div class=\"ds-ground\"><a class=\"ds-card\" href=\"#\"><div class=\"ds-ch\"><span class=\"ds-sq\" style=\"background:var(--active)\"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\"><path d=\"M3 12h4l3-8 4 16 3-8h4\"/></svg></span><h2>Active phones</h2><span class=\"ds-meta\">30 days ›</span></div><div class=\"ds-val\"><b>1.0</b><span>avg / day</span></div></a></div>",
+      "css": ":root{--active:#ff2d55;--back:#34c759;--queue:#00c7ff;--needs:#ff9500;--alarm:#ff3b30;--screens:#0a84ff;--actions:#5e5ce6;--idle:#8e8e93;--bg:#f2f2f7;--card:#fff;--card-2:#f7f7fa;--ink:#000;--ink-2:rgba(60,60,67,.62);--sep:rgba(60,60,67,.16);--fill:rgba(120,120,128,.12);--t-active:#d70f3f;--t-back:#248a3d;--t-queue:#0071a4;--t-needs:#c93400;--t-alarm:#d70015;--glyph:#fff;--ease:cubic-bezier(.2,.8,.2,1);font-family:-apple-system,BlinkMacSystemFont,\"SF Pro Text\",\"Segoe UI\",Roboto,system-ui,sans-serif}.ds-ground{background:var(--bg);padding:16px}.ds-card{display:block;background:var(--card);color:var(--ink);text-decoration:none;border-radius:16px;padding:14px 16px 16px;transition:background .2s var(--ease)}.ds-card:hover{background:var(--card-2)}.ds-card:focus-visible{outline:3px solid color-mix(in srgb,var(--screens) 70%,transparent);outline-offset:2px}.ds-ch{display:flex;align-items:center;gap:8px}.ds-ch h2{margin:0;flex:1;font-size:15px;font-weight:600}.ds-sq{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;color:var(--glyph)}.ds-meta{color:var(--ink-2);font-size:15px}.ds-val{display:flex;align-items:baseline;gap:6px;margin-block-start:10px}.ds-val b{font-size:34px;font-weight:700;line-height:1;letter-spacing:-.01em;font-variant-numeric:tabular-nums}.ds-val span{color:var(--ink-2);font-size:17px;font-weight:500}"
+    },
+    {
+      "name": "Needs-you list row with count bubble",
+      "kind": "custom",
+      "refersTo": "list-row",
+      "description": "Title and detail on the start side, category-filled count bubble at the end; zero goes to Fill.",
+      "html": "<ul class=\"ds-rows\"><li><a href=\"#\"><span><span class=\"ds-t\">Open feedback</span><span class=\"ds-d\">\"Test du merci\" · 1d ago</span></span><span class=\"ds-bub\" style=\"background:var(--t-needs)\">3</span></a></li><li><a href=\"#\"><span><span class=\"ds-t\">Review reports</span><span class=\"ds-d\">Nothing waiting</span></span><span class=\"ds-bub ds-z\">0</span></a></li></ul>",
+      "css": ":root{--active:#ff2d55;--back:#34c759;--queue:#00c7ff;--needs:#ff9500;--alarm:#ff3b30;--screens:#0a84ff;--actions:#5e5ce6;--idle:#8e8e93;--bg:#f2f2f7;--card:#fff;--card-2:#f7f7fa;--ink:#000;--ink-2:rgba(60,60,67,.62);--sep:rgba(60,60,67,.16);--fill:rgba(120,120,128,.12);--t-active:#d70f3f;--t-back:#248a3d;--t-queue:#0071a4;--t-needs:#c93400;--t-alarm:#d70015;--glyph:#fff;--ease:cubic-bezier(.2,.8,.2,1);font-family:-apple-system,BlinkMacSystemFont,\"SF Pro Text\",\"Segoe UI\",Roboto,system-ui,sans-serif}.ds-rows{list-style:none;margin:0;padding:0 16px;background:var(--card);border-radius:16px}.ds-rows li+li{border-block-start:.5px solid var(--sep)}.ds-rows a{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px 0;color:var(--ink);text-decoration:none}.ds-rows a:hover .ds-t{color:var(--t-active)}.ds-rows a:focus-visible{outline:3px solid color-mix(in srgb,var(--screens) 70%,transparent)}.ds-t{font-size:17px}.ds-d{display:block;color:var(--ink-2);font-size:13px;margin-block-start:2px}.ds-bub{min-width:30px;height:30px;padding:0 9px;border-radius:15px;color:var(--glyph);font-weight:700;font-size:15px;display:grid;place-items:center;font-variant-numeric:tabular-nums}.ds-bub.ds-z{background:var(--fill);color:var(--ink-2)}"
+    },
+    {
+      "name": "Segmented control",
+      "kind": "chip",
+      "refersTo": "segmented-control",
+      "description": "Fill track with a sliding card-coloured thumb; switches the data source.",
+      "html": "<div class=\"ds-seg\" role=\"group\"><button aria-pressed=\"true\">Test phones</button><button aria-pressed=\"false\">Production</button></div>",
+      "css": ":root{--active:#ff2d55;--back:#34c759;--queue:#00c7ff;--needs:#ff9500;--alarm:#ff3b30;--screens:#0a84ff;--actions:#5e5ce6;--idle:#8e8e93;--bg:#f2f2f7;--card:#fff;--card-2:#f7f7fa;--ink:#000;--ink-2:rgba(60,60,67,.62);--sep:rgba(60,60,67,.16);--fill:rgba(120,120,128,.12);--t-active:#d70f3f;--t-back:#248a3d;--t-queue:#0071a4;--t-needs:#c93400;--t-alarm:#d70015;--glyph:#fff;--ease:cubic-bezier(.2,.8,.2,1);font-family:-apple-system,BlinkMacSystemFont,\"SF Pro Text\",\"Segoe UI\",Roboto,system-ui,sans-serif}.ds-seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--fill);border-radius:9px;padding:2px;max-width:420px}.ds-seg button{font:inherit;font-size:13px;font-weight:500;padding:6px 10px;border:0;border-radius:7px;background:none;color:var(--ink);cursor:pointer;transition:background .32s var(--ease),box-shadow .32s var(--ease)}.ds-seg button[aria-pressed=\"true\"]{font-weight:600;background:var(--card);box-shadow:0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04)}.ds-seg button:hover{color:var(--ink-2)}.ds-seg button:focus-visible{outline:3px solid color-mix(in srgb,var(--screens) 70%,transparent)}"
+    },
+    {
+      "name": "Rings",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Three concentric Activity rings (r 64/46/28, stroke 15) with a legend; arcs scroll to their card.",
+      "html": "<div class=\"ds-rings\"><svg viewBox=\"0 0 148 148\"><circle cx=\"74\" cy=\"74\" r=\"64\" stroke=\"#ff2d55\" stroke-opacity=\".16\"/><circle class=\"ds-p\" cx=\"74\" cy=\"74\" r=\"64\" stroke=\"#ff2d55\" stroke-dasharray=\"402\" stroke-dashoffset=\"0\"/><circle cx=\"74\" cy=\"74\" r=\"46\" stroke=\"#34c759\" stroke-opacity=\".16\"/><circle class=\"ds-p\" cx=\"74\" cy=\"74\" r=\"46\" stroke=\"#34c759\" stroke-dasharray=\"289\" stroke-dashoffset=\"0\"/><circle cx=\"74\" cy=\"74\" r=\"28\" stroke=\"#00c7ff\" stroke-opacity=\".16\"/><circle class=\"ds-p\" cx=\"74\" cy=\"74\" r=\"28\" stroke=\"#00c7ff\" stroke-dasharray=\"176\" stroke-dashoffset=\"175.9\"/></svg><div class=\"ds-leg\"><button><small style=\"color:var(--t-active)\">Active</small><b>2<em>of 2 phones</em></b></button><button><small style=\"color:var(--t-back)\">Came back</small><b>1<em>of 1 in 7 days</em></b></button><button><small style=\"color:var(--t-queue)\">Queue clear</small><b>4<em>waiting</em></b></button></div></div>",
+      "css": ":root{--active:#ff2d55;--back:#34c759;--queue:#00c7ff;--needs:#ff9500;--alarm:#ff3b30;--screens:#0a84ff;--actions:#5e5ce6;--idle:#8e8e93;--bg:#f2f2f7;--card:#fff;--card-2:#f7f7fa;--ink:#000;--ink-2:rgba(60,60,67,.62);--sep:rgba(60,60,67,.16);--fill:rgba(120,120,128,.12);--t-active:#d70f3f;--t-back:#248a3d;--t-queue:#0071a4;--t-needs:#c93400;--t-alarm:#d70015;--glyph:#fff;--ease:cubic-bezier(.2,.8,.2,1);font-family:-apple-system,BlinkMacSystemFont,\"SF Pro Text\",\"Segoe UI\",Roboto,system-ui,sans-serif}.ds-rings{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center;background:var(--card);border-radius:16px;padding:16px;color:var(--ink)}.ds-rings svg{width:148px;height:148px;transform:rotate(-90deg)}.ds-rings circle{fill:none;stroke-width:15;stroke-linecap:round;cursor:pointer}.ds-p{transition:stroke-dashoffset 1.2s var(--ease)}.ds-leg{display:grid;gap:10px}.ds-leg button{font:inherit;text-align:start;background:none;border:0;padding:0;color:inherit;cursor:pointer}.ds-leg button:focus-visible{outline:3px solid color-mix(in srgb,var(--screens) 70%,transparent)}.ds-leg small{display:block;font-size:15px;font-weight:600}.ds-leg b{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}.ds-leg em{font-style:normal;font-size:15px;font-weight:500;color:var(--ink-2);margin-inline-start:4px}"
+    },
+    {
+      "name": "Sparkline bars",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "30 Active-colour columns from the bottom; empty days are 3px Fill stubs.",
+      "html": "<div class=\"ds-bars\"><i class=\"z\"></i><i class=\"z\"></i><i style=\"height:50%\"></i><i class=\"z\"></i><i style=\"height:50%\"></i><i style=\"height:50%\"></i><i style=\"height:100%\"></i></div>",
+      "css": ":root{--active:#ff2d55;--back:#34c759;--queue:#00c7ff;--needs:#ff9500;--alarm:#ff3b30;--screens:#0a84ff;--actions:#5e5ce6;--idle:#8e8e93;--bg:#f2f2f7;--card:#fff;--card-2:#f7f7fa;--ink:#000;--ink-2:rgba(60,60,67,.62);--sep:rgba(60,60,67,.16);--fill:rgba(120,120,128,.12);--t-active:#d70f3f;--t-back:#248a3d;--t-queue:#0071a4;--t-needs:#c93400;--t-alarm:#d70015;--glyph:#fff;--ease:cubic-bezier(.2,.8,.2,1);font-family:-apple-system,BlinkMacSystemFont,\"SF Pro Text\",\"Segoe UI\",Roboto,system-ui,sans-serif}.ds-bars{display:flex;gap:3px;align-items:flex-end;height:64px;padding:12px;background:var(--card);border-radius:16px}.ds-bars i{flex:1;border-radius:3px;background:var(--active);transform-origin:bottom;animation:ds-grow .7s var(--ease) both}.ds-bars i.z{height:3px;background:var(--fill);animation:none}@keyframes ds-grow{from{transform:scaleY(0)}}@media (prefers-reduced-motion:reduce){.ds-bars i{animation:none}}"
+    },
+    {
+      "name": "Funnel progress row",
+      "kind": "custom",
+      "refersTo": "list-row",
+      "description": "Step name, bold count with phone count, 6px track in the funnel colour.",
+      "html": "<ul class=\"ds-lad\"><li><div class=\"ds-top\"><span>Route asked</span><b>12<small>2 phones</small></b></div><div class=\"ds-tr\"><i style=\"width:100%;background:#00807a\"></i></div></li><li><div class=\"ds-top\"><span>Trip saved</span><b>3<small>1 phone</small></b></div><div class=\"ds-tr\"><i style=\"width:25%;background:#00807a\"></i></div></li></ul>",
+      "css": ":root{--active:#ff2d55;--back:#34c759;--queue:#00c7ff;--needs:#ff9500;--alarm:#ff3b30;--screens:#0a84ff;--actions:#5e5ce6;--idle:#8e8e93;--bg:#f2f2f7;--card:#fff;--card-2:#f7f7fa;--ink:#000;--ink-2:rgba(60,60,67,.62);--sep:rgba(60,60,67,.16);--fill:rgba(120,120,128,.12);--t-active:#d70f3f;--t-back:#248a3d;--t-queue:#0071a4;--t-needs:#c93400;--t-alarm:#d70015;--glyph:#fff;--ease:cubic-bezier(.2,.8,.2,1);font-family:-apple-system,BlinkMacSystemFont,\"SF Pro Text\",\"Segoe UI\",Roboto,system-ui,sans-serif}.ds-lad{list-style:none;margin:0;padding:8px 16px;background:var(--card);border-radius:16px;color:var(--ink)}.ds-lad li{padding:8px 0}.ds-lad li+li{border-block-start:.5px solid var(--sep)}.ds-top{display:flex;justify-content:space-between;align-items:baseline;font-size:15px}.ds-top b{font-size:17px;font-variant-numeric:tabular-nums}.ds-top small{color:var(--ink-2);font-weight:500;font-size:13px;margin-inline-start:6px}.ds-tr{height:6px;border-radius:3px;background:var(--fill);margin-block-start:6px;overflow:hidden}.ds-tr i{display:block;height:100%;border-radius:3px;transform-origin:left;animation:ds-wide .9s var(--ease) both}.ds-tr i:dir(rtl){transform-origin:right}@keyframes ds-wide{from{transform:scaleX(0)}}"
+    },
+    {
+      "name": "Stat chips and label pill",
+      "kind": "chip",
+      "refersTo": "stat-chip",
+      "description": "Per-phone cohort chips under 768px; small Fill pills for tags.",
+      "html": "<div class=\"ds-chips\"><div class=\"ds-chip\"><small>1 day</small>1 of 1</div><div class=\"ds-chip\"><small>7 days</small>1 of 1</div><div class=\"ds-chip\"><small>30 days</small><span class=\"ds-na\">not tracked</span></div></div><p class=\"ds-v\">iOS 1.3.0 <span class=\"ds-pill\">lune</span></p>",
+      "css": ":root{--active:#ff2d55;--back:#34c759;--queue:#00c7ff;--needs:#ff9500;--alarm:#ff3b30;--screens:#0a84ff;--actions:#5e5ce6;--idle:#8e8e93;--bg:#f2f2f7;--card:#fff;--card-2:#f7f7fa;--ink:#000;--ink-2:rgba(60,60,67,.62);--sep:rgba(60,60,67,.16);--fill:rgba(120,120,128,.12);--t-active:#d70f3f;--t-back:#248a3d;--t-queue:#0071a4;--t-needs:#c93400;--t-alarm:#d70015;--glyph:#fff;--ease:cubic-bezier(.2,.8,.2,1);font-family:-apple-system,BlinkMacSystemFont,\"SF Pro Text\",\"Segoe UI\",Roboto,system-ui,sans-serif}.ds-chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.ds-chip{background:var(--fill);border-radius:10px;padding:8px 10px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink)}.ds-chip small{display:block;color:var(--ink-2);font-weight:500;font-size:12px;margin-block-end:2px}.ds-na{color:var(--ink-2);font-size:13px;font-weight:400}.ds-v{font-size:15px;color:var(--ink)}.ds-pill{font-size:12px;font-weight:600;padding:2px 8px;border-radius:6px;background:var(--fill);color:var(--ink-2);margin-inline-start:6px}"
+    },
+    {
+      "name": "Tab bar",
+      "kind": "nav",
+      "refersTo": "tab-bar",
+      "description": "Phone navigation: frosted bar, five tabs, Active for the current page, Alarm count badge.",
+      "html": "<nav class=\"ds-tabs\"><a href=\"#\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\"><path d=\"M12 21s-7-4.4-9.3-9A5.3 5.3 0 0 1 12 6.2 5.3 5.3 0 0 1 21.3 12C19 16.6 12 21 12 21z\"/></svg>Summary</a><a href=\"#\"><svg viewBox=\"0 0 24 24\"><path d=\"M4 20V10M10 20V4M16 20v-7M22 20H2\"/></svg>Usage</a><a href=\"#\"><svg viewBox=\"0 0 24 24\"><path d=\"M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z\"/></svg>Community<span class=\"ds-badge\">4</span></a></nav>",
+      "css": ":root{--active:#ff2d55;--back:#34c759;--queue:#00c7ff;--needs:#ff9500;--alarm:#ff3b30;--screens:#0a84ff;--actions:#5e5ce6;--idle:#8e8e93;--bg:#f2f2f7;--card:#fff;--card-2:#f7f7fa;--ink:#000;--ink-2:rgba(60,60,67,.62);--sep:rgba(60,60,67,.16);--fill:rgba(120,120,128,.12);--t-active:#d70f3f;--t-back:#248a3d;--t-queue:#0071a4;--t-needs:#c93400;--t-alarm:#d70015;--glyph:#fff;--ease:cubic-bezier(.2,.8,.2,1);font-family:-apple-system,BlinkMacSystemFont,\"SF Pro Text\",\"Segoe UI\",Roboto,system-ui,sans-serif}.ds-tabs{display:grid;grid-template-columns:repeat(3,1fr);padding:6px 4px;background:rgba(249,249,249,.86);backdrop-filter:saturate(180%) blur(20px);border-block-start:.5px solid var(--sep)}.ds-tabs a{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;font-weight:500;color:var(--idle);text-decoration:none}.ds-tabs a:hover{color:var(--ink-2)}.ds-tabs a[aria-current=\"page\"]{color:var(--active)}.ds-tabs a:focus-visible{outline:3px solid color-mix(in srgb,var(--screens) 70%,transparent)}.ds-tabs svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ds-badge{position:absolute;inset-block-start:-2px;inset-inline-start:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--alarm);color:#fff;font-size:12px;font-weight:600;display:grid;place-items:center}"
+    },
+    {
+      "name": "Sidebar link",
+      "kind": "nav",
+      "refersTo": "sidebar-link-active",
+      "description": "768px and up: 17px links, Fill on hover, Active tint and text for the current page.",
+      "html": "<nav class=\"ds-side\"><a href=\"#\" aria-current=\"page\">Summary</a><a href=\"#\">Usage</a><a href=\"#\">Community<span class=\"ds-b\">4</span></a></nav>",
+      "css": ":root{--active:#ff2d55;--back:#34c759;--queue:#00c7ff;--needs:#ff9500;--alarm:#ff3b30;--screens:#0a84ff;--actions:#5e5ce6;--idle:#8e8e93;--bg:#f2f2f7;--card:#fff;--card-2:#f7f7fa;--ink:#000;--ink-2:rgba(60,60,67,.62);--sep:rgba(60,60,67,.16);--fill:rgba(120,120,128,.12);--t-active:#d70f3f;--t-back:#248a3d;--t-queue:#0071a4;--t-needs:#c93400;--t-alarm:#d70015;--glyph:#fff;--ease:cubic-bezier(.2,.8,.2,1);font-family:-apple-system,BlinkMacSystemFont,\"SF Pro Text\",\"Segoe UI\",Roboto,system-ui,sans-serif}.ds-side{background:var(--card);padding:12px;width:236px}.ds-side a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;font-size:17px;color:var(--ink);text-decoration:none;margin-block-end:2px}.ds-side a:hover{background:var(--fill)}.ds-side a[aria-current=\"page\"]{background:color-mix(in srgb,var(--active) 14%,transparent);color:var(--t-active);font-weight:600}.ds-side a:focus-visible{outline:3px solid color-mix(in srgb,var(--screens) 70%,transparent)}.ds-b{margin-inline-start:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--alarm);color:#fff;font-size:12px;font-weight:600;display:grid;place-items:center}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Health Rings",
+    "overview": "Charj Admin reads like Apple Health's Summary tab turned on an app's own health. A grouped grey ground carries white cards (near-black cards on pure black in dark mode) with gently rounded corners. Each card opens with a small colour square and a bold title, then gives one number in large bold type. At the top, three Activity-style rings close as the day goes well: active phones against their goal, phones that came back, and a clear queue. Colour is lively and plentiful, but it is never decoration: every colour is a category, and the same category keeps the same colour on every page.\n\nDensity is calm. One idea per card, generous padding, hairline separators instead of boxes inside boxes. The phone is the primary device: a large title, a frosted tab bar, one column. From 768px a sidebar replaces the tab bar and cards pair up in two columns; desktop gets more columns, not more stuff. Motion is part of the world: rings fill, cards rise in a short stagger, numbers tick up, and all of it stops under reduced motion.\n\nThe system rejects the dark KPI-card row of generic admin templates, neutral Swiss grids, and any number that cannot be acted on. Data honesty is visual: under 10 a count shows, never a percentage, and missing data is written as \"not tracked\", never drawn as zero.",
+    "keyCharacteristics": [
+      "Grouped ground with flat 16px cards, no shadows on cards.",
+      "One colour per category, with darker text and fill tones for light mode.",
+      "System sans, large bold titles, bold tabular numbers.",
+      "Three rings as the signature, each arc a tap target to its card.",
+      "Hairline (0.5px) separators, logical properties throughout.",
+      "Ease-out motion on one curve, all disabled under reduced motion."
+    ],
+    "rules": [
+      {
+        "name": "The One Colour Per Category Rule",
+        "body": "A category's colour is fixed everywhere it appears (ring, square, bubble, bars, legend label). Never reuse a category colour for a different meaning on the same page, and never colour something that is not a category.",
+        "section": "colors"
+      },
+      {
+        "name": "The Light Tone Rule",
+        "body": "On light surfaces, coloured text and filled squares or bubbles carrying glyphs use the darker accessible tone from the map. Base tones are for strokes and bars only.",
+        "section": "colors"
+      },
+      {
+        "name": "The Alarm Is Earned Rule",
+        "body": "Alarm Red appears only when something is broken or waiting with a count above zero. A zero is drawn in Fill and Secondary Ink, never in a category colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Bold Number Rule",
+        "body": "The number is the loudest thing in a card, bold and tabular; its unit sits beside it smaller and in Secondary Ink.",
+        "section": "typography"
+      },
+      {
+        "name": "The Plain Sentence Rule",
+        "body": "Labels and notes are plain sentences in sentence case. No uppercase labels, no letter-spaced kickers above titles.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tone Not Shadow Rule",
+        "body": "Cards never carry a shadow or border. Separation comes from the ground/card tone step and 0.5px separators inside cards.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do give every category one colour from the map and keep it on every page, ring to bubble to bars.",
+      "Do use the darker light-mode tone for coloured text and for squares and bubbles carrying glyphs; flip glyph ink to black in dark mode.",
+      "Do put one bold tabular number per card, unit beside it in Secondary Ink.",
+      "Do draw charts at the container's real pixel width and give every bar or row a focusable hit area with a tooltip.",
+      "Do write \"not tracked\" for unmeasured windows and show counts only under 10.",
+      "Do swap layouts at 768px (chips to table, tab bar to sidebar, one column to two) instead of shrinking.",
+      "Do use logical properties for every inline position, including chart grow origins and tooltip placement.",
+      "Do run all motion on the house curve and switch it all off under reduced motion."
+    ],
+    "donts": [
+      "Don't put shadows or borders on cards; depth is tone.",
+      "Don't colour a zero, or use Alarm Red for anything that is not broken or waiting.",
+      "Don't draw a missing value as 0 or show a percentage of fewer than 10.",
+      "Don't ship a row, card or tab that looks tappable but goes nowhere; leave out controls that cannot work yet.",
+      "Don't add uppercase or letter-spaced kickers above titles; the colour square and title are the header.",
+      "Don't scale a chart SVG to fit (no fixed viewBox stretched to 100%), so ticks and labels keep their real size.",
+      "Don't use a dark KPI-card row or a neutral monochrome grid; this world is grouped, coloured and calm."
+    ]
+  }
+}
