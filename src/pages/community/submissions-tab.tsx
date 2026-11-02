@@ -5,11 +5,14 @@ import {
   connectorLine,
   mapsUrl,
   nearbyChargers,
+  otherPhotosLine,
+  splitPhotos,
   SUBMISSIONS_PER_PAGE,
   type Submission,
   type SubmissionFilter,
   type SubmissionsPage,
 } from "../../data/submissions-report";
+import { SUPABASE_URL } from "../../lib/supabase";
 import { buildHash, type RouteParams } from "../../lib/use-route";
 import { Empty } from "../../ui/empty";
 import { HealthCard } from "../../ui/health-card";
@@ -90,6 +93,9 @@ const SubmissionItem = ({ s, nearby, onApprove, onRejected, onConflict }: ItemPr
   };
   const where = s.lat !== null && s.lng !== null ? `${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}` : null;
   const dupes = s.status === "pending" && nearby.state === "done" ? nearby.chargers : [];
+  // Only the app's own uploads load; any other URL is counted, never fetched or linked.
+  const photos = splitPhotos(s.photos, SUPABASE_URL);
+  const others = otherPhotosLine(photos.other);
   return (
     <li className="com-item">
       <div className="com-top">
@@ -135,15 +141,23 @@ const SubmissionItem = ({ s, nearby, onApprove, onRejected, onConflict }: ItemPr
           <bdi>{s.notes}</bdi>
         </p>
       )}
-      {s.photos.length > 0 && (
+      {photos.app.length > 0 && (
         <div className="com-photos">
-          {s.photos.map((src, i) => (
-            <a key={src} href={src} target="_blank" rel="noopener noreferrer" aria-label={`Photo ${i + 1} of ${s.photos.length}, opens in a new tab`}>
-              <img src={src} alt="" loading="lazy" />
+          {photos.app.map((src, i) => (
+            <a
+              key={i}
+              href={src}
+              target="_blank"
+              rel="noopener noreferrer"
+              referrerPolicy="no-referrer"
+              aria-label={`Photo ${i + 1} of ${photos.app.length}, opens in a new tab`}
+            >
+              <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" />
             </a>
           ))}
         </div>
       )}
+      {others && <p className="com-meta">{others}</p>}
       <p className="com-meta">
         Sent by <bdi title={s.submittedBy}>{s.submittedBy ? shortId(s.submittedBy) : "anonymous"}</bdi>
         {s.appVersion && ` · app ${s.appVersion}`}

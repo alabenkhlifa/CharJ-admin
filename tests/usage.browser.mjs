@@ -374,7 +374,9 @@ try {
         eq(await hero(page, "#usage-activity"), `${(Math.round(avg * 10) / 10).toFixed(1)} phones a day`, "activity: the average of the measured days");
         eq(await page.locator("#usage-activity .ui-bars i").count(), 30, "activity: 30 daily slots");
         eq(await page.locator("#usage-activity .ui-bars i.ui-bar-na").count(), 13, "activity: 4–16 Oct hatched as not tracked, not drawn as 0");
-        ok((await cardText(page, "usage-activity")).includes("Not tracked: 4–16 Oct, when the app's events didn't reach the server. Hatched, and left out of the average."), "activity: the card says which days and why");
+        ok((await cardText(page, "usage-activity")).includes("Hatched days weren't tracked, and are left out of the average."), "activity: the card says what its hatching means");
+        eq(await page.locator(".use-measured").innerText(), "Measured on 17 of these 30 days (not tracked: 4–16 Oct, when the app's events didn't reach the server).", "overview: the window's totals say how many days were measured, and which weren't");
+        ok(!(await cardText(page, "usage-activity")).includes("Not tracked: 4–16 Oct"), "overview: the untracked days are named once, not again in Activity");
         ok((await square(page, "#usage-languages")).includes("--c-languages-fill"), "languages: its own colour");
         ok((await square(page, "#usage-users")).includes("--c-users-fill"), "users: its own colour");
         ok(!(await page.locator(".use-foot").innerText()).includes("counts once per design"), "foot: no double-count caveat any more");
@@ -522,7 +524,8 @@ try {
     // A filter that matches nothing: an honest empty state, not zeros.
     await page.goto(`${base}/#/usage?env=development&platform=ios&ui=classic`);
     await ready(page);
-    eq(await cardText(page, "usage-activity").then((t) => t.split("\n").slice(-1)[0]), "No iOS phones on the classic design opened the app in the last 30 days. Not tracked: 4–16 Oct, when the app's events didn't reach the server.", "empty filter: Activity says so, and which days weren't measured");
+    eq(await cardText(page, "usage-activity").then((t) => t.split("\n").slice(-1)[0]), "No iOS phones on the classic design opened the app in the last 30 days.", "empty filter: Activity says so");
+    ok((await page.locator(".use-measured").innerText()).startsWith("Measured on 17 of these 30 days (not tracked: 4–16 Oct"), "empty filter: the page says which days weren't measured");
     eq(await page.locator("#usage-activity .ui-bars, #usage-activity .ui-val").count(), 0, "empty filter: no zero bars or hero");
     ok((await cardText(page, "usage-screens")).includes("Only the Lune design sends these events."), "empty filter: Lune-only charts say why under Classic");
     eq(await page.locator("#usage-funnels .use-lines li").nth(3).innerText().then((t) => t.replace(/\s+/g, " ")), "Contributions 0 reviews posted", "classic: no Lune-only contribution counts");
@@ -733,6 +736,19 @@ try {
     await page.goto(`${base}/#/usage?env=development&days=90&section=activity`);
     await ready(page);
     eq(await page.locator(".use .ui-card").first().locator(".ui-meta").innerText(), "a day, by week", "90 days: the drill-in says each column is a week");
+    eq(await page.locator(".use-measured").count(), 0, "90 days: Activity names its untracked days in its cards, not twice");
+    const NINETY = "Measured on 19 of these 90 days (not tracked: 5 Aug – 13 Sep, before analytics shipped on 14 Sep 2026; and 16 Sep – 16 Oct, when the app's events didn't reach the server).";
+    for (const section of ["languages", "screens", "actions", "funnels", "cars", "routes"]) {
+      await page.goto(`${base}/#/usage?env=development&days=90&section=${section}`);
+      await ready(page);
+      eq(await page.locator(".use-measured").innerText(), NINETY, `90 days: ${section} says its totals cover 19 measured days of 90`);
+    }
+    await page.goto(`${base}/#/usage?env=development&days=7&section=screens`);
+    await ready(page);
+    eq(await page.locator(".use-measured").count(), 0, "7 days: every day measured, no note");
+    await page.goto(`${base}/#/usage?env=development&days=90&section=coming-back`);
+    await ready(page);
+    eq(await page.locator(".use-measured").count(), 0, "coming back: every install week, no window note");
     await context.close();
 
     const failing = { ...devServer(), usageStatus: 503 };

@@ -79,3 +79,40 @@ export const untrackedNote = (days: string[]): string | null => {
   const runs = untrackedRuns(days);
   return runs.length ? `Not tracked: ${runs.map((r) => r.text).join("; and ")}.` : null;
 };
+
+const TUNIS_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Tunis", year: "numeric", month: "2-digit", day: "2-digit" });
+
+/** The Tunis day (YYYY-MM-DD) of an instant, as the server counts days; null for an unreadable one. */
+export const tunisDay = (at: string | number | Date): string | null => {
+  const d = new Date(at);
+  return Number.isFinite(d.getTime()) ? TUNIS_DAY.format(d) : null;
+};
+
+/** The `m` days ending on `end` (inclusive), oldest first: a report's window. */
+export const windowDays = (end: string, m: number): string[] => Array.from({ length: Math.max(0, m) }, (_, i) => addDays(end, i - m + 1));
+
+export type WindowCoverage = {
+  /** Days in the window that were measured. */
+  measured: number;
+  /** Days in the window. */
+  of: number;
+  /** The untracked runs inside it, each with its reason; empty when every day was measured. */
+  runs: { from: string; to: string; text: string }[];
+};
+
+/** How much of an `m`-day window ending on `end` was measured. */
+export const windowCoverage = (end: string, m: number, spans: readonly UntrackedSpan[] = UNTRACKED): WindowCoverage => {
+  const days = windowDays(end, m);
+  return { measured: days.filter((d) => isTracked(d, spans)).length, of: days.length, runs: untrackedRuns(days, spans) };
+};
+
+/**
+ * For totals summed over a window: "Measured on 17 of these 30 days (not
+ * tracked: 4–16 Oct, when the app's events didn't reach the server)." Null
+ * when every day in the window was measured.
+ */
+export const measuredNote = (end: string, m: number, spans: readonly UntrackedSpan[] = UNTRACKED): string | null => {
+  const c = windowCoverage(end, m, spans);
+  if (!c.runs.length) return null;
+  return `Measured on ${c.measured} of these ${c.of} days (not tracked: ${c.runs.map((r) => r.text).join("; and ")}).`;
+};

@@ -224,3 +224,37 @@ export const nearbyChargers = (
 /** The pin on Google Maps (a link, not a second live map). */
 export const mapsUrl = (lat: number, lng: number): string =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`;
+
+// ── Photos ──
+// Anyone can send a submission, so its photo URLs are untrusted: an outside
+// URL would load from the admin's browser (a tracking pixel: their IP and the
+// time) or be a link dressed as "Photo 1". Only the app's own uploads are
+// shown: this project's public charger-photos bucket, the same rule
+// admin_review_submission uses before it copies photos onto a charger
+// (../charj/supabase/migrations/20261102000008_submission_reviews_private.sql).
+
+/** Where the app uploads a submission's photos: `<project URL>/storage/v1/object/public/charger-photos/`. */
+export const appPhotoPrefix = (supabaseUrl: string): string => `${supabaseUrl.replace(/\/+$/, "")}/storage/v1/object/public/charger-photos/`;
+
+const isAppPhoto = (url: string, prefix: string): boolean => {
+  if (!url.startsWith(prefix) || url.length === prefix.length) return false;
+  // Belt and braces: the parsed URL must still be that host and bucket.
+  try {
+    const at = new URL(url);
+    const base = new URL(prefix);
+    return at.origin === base.origin && at.pathname.startsWith(base.pathname);
+  } catch {
+    return false;
+  }
+};
+
+/** A submission's photos split into the app's own uploads (safe to load) and how many point anywhere else. */
+export const splitPhotos = (photos: string[], supabaseUrl: string): { app: string[]; other: number } => {
+  const prefix = supabaseUrl ? appPhotoPrefix(supabaseUrl) : null;
+  const app = prefix ? photos.filter((p) => isAppPhoto(p, prefix)) : [];
+  return { app, other: photos.length - app.length };
+};
+
+/** "1 photo not from the app", "2 photos not from the app"; null when there are none. */
+export const otherPhotosLine = (n: number): string | null =>
+  n > 0 ? `${n.toLocaleString("en-US")} ${n === 1 ? "photo" : "photos"} not from the app` : null;

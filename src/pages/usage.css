@@ -31,6 +31,14 @@
   flex: 1 1 max(300px, calc(50% - var(--s-md)));
 }
 
+/* "Measured on 17 of these 30 days (not tracked: …)": under the filters, before the cards. */
+.use-measured {
+  margin: calc(-1 * var(--s-sm)) var(--s-xs) var(--s-lg);
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+
 /* Section titles are the Usage questions (DESIGN.md "Section title"). */
 .use-sec {
   margin: 26px var(--s-xs) 10px;

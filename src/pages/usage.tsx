@@ -36,7 +36,7 @@ import {
   ScreensPreview,
   UsersPreview,
 } from "./usage-overview";
-import { makeScope, scopeLine, type UsageFilters } from "./usage-scope";
+import { makeScope, scopeLine, windowNote, type UsageFilters } from "./usage-scope";
 import {
   ActionsDetail,
   ActivityDetail,
@@ -75,6 +75,9 @@ const Filters = ({ keys, f, onParams }: { keys: FilterKey[]; f: UsageFilters; on
       {keys.includes("env") && <Segmented<UsageEnvironment> label="Data" value={f.env} options={ENV_OPTIONS} onChange={(v) => onParams({ env: v })} />}
     </div>
   ) : null;
+
+/** Under the filters: how much of the window was measured, for every total summed over it. */
+const Measured = ({ children }: { children: string | null }) => (children ? <p className="use-measured">{children}</p> : null);
 
 const Group = ({ title, children }: { title: string; children: ReactNode }) => (
   <section className="use-group" aria-label={title}>
@@ -131,6 +134,9 @@ export const UsagePage = ({ params, onParams }: Props) => {
   // Null while loading another window or environment: never the previous numbers.
   const scope = useMemo(() => (usage.data ? makeScope(usage.data, shown) : null), [usage.data, shown]);
   const waiting = usage.error ? "Couldn't load." : LOADING;
+  // Views that sum over ?days= say how many of those days were measured.
+  // Activity's own cards hatch and name the untracked days, so it isn't said twice.
+  const measured = usage.data && keys.includes("days") && section !== "activity" ? windowNote(usage.data) : null;
 
   // Links keep the filters exactly as the URL has them.
   const keep = { days: params.get("days"), platform: params.get("platform"), ui: params.get("ui"), env: params.get("env") };
@@ -151,6 +157,7 @@ export const UsagePage = ({ params, onParams }: Props) => {
       <div className="use">
         <LargeTitle title="Usage" subtitle={scopeLine(filters, keys)} />
         <Filters keys={keys} f={filters} onParams={onParams} />
+        <Measured>{measured}</Measured>
         {failed}
         <Group title="Is anyone using it?">
           <ActivityPreview {...card} index={0} />
@@ -204,6 +211,7 @@ export const UsagePage = ({ params, onParams }: Props) => {
       <Back href={href()} />
       <LargeTitle title={SECTION_TITLE[section]} subtitle={scopeLine(filters, keys) || undefined} />
       <Filters keys={keys} f={filters} onParams={onParams} />
+      <Measured>{measured}</Measured>
       {failed}
       <div className="use-grid">{content}</div>
       {section !== "users" && <Foot />}

@@ -8,7 +8,7 @@
 |---|---|---|
 | Sign-in card | `src/lib/auth-gate.tsx` | `supabase.auth.signInWithPassword`. Shows the dashboard once signed in. UX only — not the security boundary. |
 | Session | `src/lib/supabase.ts` | `persistSession: true`, `autoRefreshToken: true`, `localStorage` under `charj-admin-auth`, `detectSessionInUrl: false` (the hash belongs to the router). Survives reloads and new tabs. |
-| `adminFetch` | `src/lib/admin-fetch.ts` | Calls `${VITE_SUPABASE_URL}/functions/v1/<path>` with `Authorization: Bearer <session access token>` + `apikey: <anon key>`. 401 → sign out ("session expired"). 403 → sign out ("This account is not an admin."). |
+| `adminFetch` | `src/lib/admin-fetch.ts` | Calls `${VITE_SUPABASE_URL}/functions/v1/<path>` with `Authorization: Bearer <session access token>` + `apikey: <anon key>`. No session, or the server refused the refresh token → sign out ("session expired"); a refresh that can't reach the server keeps the session and throws "Can't reach the server." (the caller shows its error and retry; `src/lib/session-token.ts`). 401 → sign out ("session expired"). 403 → sign out ("This account is not an admin."). |
 | Admin gate | `../charj/supabase/functions/_shared/admin-auth.ts` | `authorizeAdmin(req)`: validates the JWT with a service-role client (`auth.getUser(token)`), refuses anonymous users, requires a row in `public.admins`. |
 | Allowlist | `public.admins (user_id uuid primary key references auth.users on delete cascade, created_at timestamptz default now())` | Service-role only (RLS on, no policies). Only the Edge Functions read it. |
 

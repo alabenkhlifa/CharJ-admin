@@ -20,7 +20,18 @@ import {
   tapRows,
   type UsageReport,
 } from "../src/data/usage-report.ts";
-import { cohortWindowUntracked, isTracked, rangeText, untrackedNote, untrackedRuns, UNTRACKED } from "../src/lib/tracking.ts";
+import {
+  cohortWindowUntracked,
+  isTracked,
+  measuredNote,
+  rangeText,
+  tunisDay,
+  untrackedNote,
+  untrackedRuns,
+  UNTRACKED,
+  windowCoverage,
+  windowDays,
+} from "../src/lib/tracking.ts";
 
 // The usage view as admin-usage returns it (Task 1 + 1b + 8b keys), small
 // enough to reason about: two days, production-style 'unknown' rows, a few
@@ -370,6 +381,39 @@ test("tracking: before 14 Sep and 16 Sep–16 Oct (both edge days) were not meas
   assert.deepEqual(untrackedRuns(thirtyDays).map((x) => [x.from, x.to]), [["2026-10-04", "2026-10-16"]]);
   assert.equal(untrackedNote(thirtyDays), "Not tracked: 4–16 Oct, when the app's events didn't reach the server.");
   assert.equal(untrackedNote(thirtyDays.slice(-7)), null);
+});
+
+test("windowCoverage: a window's measured days and its untracked runs", () => {
+  // Today's windows (they end on 2 Nov): 30 days from 4 Oct, 90 from 5 Aug.
+  assert.deepEqual(windowDays("2026-11-02", 3), ["2026-10-31", "2026-11-01", "2026-11-02"]);
+  assert.equal(windowDays("2026-11-02", 30)[0], "2026-10-04");
+  assert.equal(windowDays("2026-11-02", 90)[0], "2026-08-05");
+  // 30 days: 4–16 Oct (13 days) not tracked, 17 Oct – 2 Nov measured.
+  const thirty = windowCoverage("2026-11-02", 30);
+  assert.equal(thirty.measured, 17);
+  assert.equal(thirty.of, 30);
+  assert.deepEqual(thirty.runs.map((r) => [r.from, r.to]), [["2026-10-04", "2026-10-16"]]);
+  assert.equal(measuredNote("2026-11-02", 30), "Measured on 17 of these 30 days (not tracked: 4–16 Oct, when the app's events didn't reach the server).");
+  // 90 days: only 14–15 Sep and 17 Oct – 2 Nov were measured.
+  const ninety = windowCoverage("2026-11-02", 90);
+  assert.equal(ninety.measured, 19);
+  assert.equal(ninety.of, 90);
+  assert.deepEqual(ninety.runs.map((r) => [r.from, r.to]), [["2026-08-05", "2026-09-13"], ["2026-09-16", "2026-10-16"]]);
+  assert.equal(
+    measuredNote("2026-11-02", 90),
+    "Measured on 19 of these 90 days (not tracked: 5 Aug – 13 Sep, before analytics shipped on 14 Sep 2026; and 16 Sep – 16 Oct, when the app's events didn't reach the server).",
+  );
+  // 7 days were all measured: no note.
+  assert.deepEqual(windowCoverage("2026-11-02", 7), { measured: 7, of: 7, runs: [] });
+  assert.equal(measuredNote("2026-11-02", 7), null);
+});
+
+test("tunisDay: the server's day for an instant (UTC+1)", () => {
+  assert.equal(tunisDay("2026-11-02T01:23:38Z"), "2026-11-02");
+  assert.equal(tunisDay("2026-11-01T23:30:00Z"), "2026-11-02"); // 00:30 in Tunis
+  assert.equal(tunisDay("2026-11-02T02:23:38.234357+01:00"), "2026-11-02");
+  assert.equal(tunisDay("2026-11-02T22:59:59Z"), "2026-11-02");
+  assert.equal(tunisDay("not a date"), null);
 });
 
 test("languageTable reads FR, AR, EN as users per language, with real zeros", () => {

@@ -208,6 +208,9 @@ const handle = (name, method, url, body, S) => {
   return [200, {}];
 };
 
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+const APP_PHOTO = (name) => `{SUPA}/storage/v1/object/public/charger-photos/${name}`;
+
 // ---- harness ----
 const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || "chrome" });
 let checks = 0;
@@ -253,12 +256,17 @@ const open = async ({ width = 390, height = 844, colorScheme = "light", S = stat
     if (S.delay) await new Promise((r) => setTimeout(r, S.delay));
     if (S.postDelay && request.method() === "POST") await new Promise((r) => setTimeout(r, S.postDelay));
     const [status, json] = handle(name, request.method(), url, request.method() === "POST" ? request.postDataJSON() : null, S);
-    return route.fulfill({ status, json });
+    // "{SUPA}" in a fixture is the project URL the dev server was started with (the app's own photo uploads).
+    return route.fulfill({ status, json: JSON.parse(JSON.stringify(json).replaceAll("{SUPA}", url.origin)) });
   });
+  // The app's own uploads: a 1×1 PNG. Every other photo host stays unrouted, so a request to one would show in `urls`.
+  await context.route("**/storage/v1/object/public/charger-photos/**", (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
+  const urls = [];
+  context.on("request", (r) => urls.push(r.url()));
   const page = await context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
-  return { context, page, requests, reads, S };
+  return { context, page, requests, reads, urls, S };
 };
 
 const hscroll = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -676,6 +684,36 @@ try {
     await context.close();
   }
 
+  // ---- 4d. Photos: only the app's own uploads load; any other URL is counted, never fetched or linked ----
+  {
+    const S = state();
+    S.submissions[0].photos = [APP_PHOTO("s1/1.jpg"), "https://tracker.example/pixel.gif", APP_PHOTO("s1/2.jpg"), "https://x.supabase.co/storage/v1/object/public/charger-photos/a.jpg"];
+    S.submissions[1].photos = ["https://tracker.example/only.gif"];
+    const { context, page, urls } = await open({ S });
+    await page.goto(`${base}/${LINKS.submissions}`);
+    await ready(page, "#com-submissions");
+    const lac = items(page, "#com-submissions").first();
+    await page.waitForFunction(() => [...document.querySelectorAll("#com-submissions .com-photos img")].every((i) => i.complete));
+    const imgs = await lac.locator(".com-photos img").evaluateAll((is) => is.map((i) => ({ src: i.getAttribute("src"), ref: i.getAttribute("referrerpolicy"), loaded: i.naturalWidth > 0 })));
+    eq(imgs.length, 2, "photos: the two app uploads are shown");
+    ok(imgs.every((i) => /^https?:\/\/[^/]+\/storage\/v1\/object\/public\/charger-photos\/s1\/[12]\.jpg$/.test(i.src) && i.ref === "no-referrer" && i.loaded), "photos: from this project's charger-photos bucket, loaded, no referrer", imgs);
+    const links = await lac.locator(".com-photos a").evaluateAll((as) => as.map((a) => ({ label: a.getAttribute("aria-label"), ref: a.getAttribute("referrerpolicy"), rel: a.getAttribute("rel") })));
+    eq(links.map((l) => l.label), ["Photo 1 of 2, opens in a new tab", "Photo 2 of 2, opens in a new tab"], "photos: numbered among the app's own");
+    ok(links.every((l) => l.ref === "no-referrer" && l.rel.includes("noreferrer")), "photos: links send no referrer", links);
+    const line = lac.locator(".com-meta", { hasText: "not from the app" });
+    eq(await line.innerText(), "2 photos not from the app", "photos: the others are counted in a plain line");
+    eq(await line.locator("a").count(), 0, "photos: that line is not a link");
+    const gammarth = items(page, "#com-submissions").nth(1);
+    eq(await gammarth.locator(".com-photos").count(), 0, "photos: no strip when none is the app's");
+    eq(await gammarth.locator(".com-meta", { hasText: "not from the app" }).innerText(), "1 photo not from the app", "photos: one, singular");
+    ok(!(await page.locator("#com-submissions").innerHTML()).includes("tracker.example"), "photos: an outside URL is nowhere in the page");
+    const outside = urls.filter((u) => /tracker\.example|x\.supabase\.co/.test(u));
+    eq(outside, [], "photos: no request goes to an outside photo host");
+    const appPhotos = urls.filter((u) => u.includes("/storage/v1/object/public/charger-photos/s1/"));
+    eq(appPhotos.length, 2, "photos: the two app uploads were the only photos fetched");
+    await context.close();
+  }
+
   // ---- 5. Reviews: reports open first, Show review, resolve flips the row ----
   {
     const { context, page, requests, S } = await open();
@@ -705,6 +743,21 @@ try {
     await page.waitForFunction(() => document.querySelectorAll(".com-tabs a .com-badge")[2]?.textContent === "1");
     eq((await tabs(page))[2].badge, "1", "resolve: the Reviews badge follows");
     eq(await navBadge(page), "9", "resolve: the nav badge follows");
+    // While a reopen is on its way, Refresh waits: a read started then could land after it with the old row.
+    S.postDelay = 800;
+    await spam.getByRole("button", { name: "Reopen" }).click();
+    await spam.getByRole("button", { name: "Reopening…" }).waitFor();
+    ok(await page.locator("#com-reports .com-refresh").isDisabled(), "reopen report: Refresh is off while the change is on its way");
+    await spam.getByRole("button", { name: "Resolve" }).waitFor();
+    S.postDelay = 0;
+    await page.waitForFunction(() => !document.querySelector("#com-reports .com-refresh")?.disabled);
+    ok(true, "reopen report: Refresh is back once the change landed");
+    eq(S.posts.at(-1).body, { id: R1, resolved: false }, "reopen report: the POST");
+    await page.waitForFunction(() => document.querySelectorAll(".com-tabs a .com-badge")[2]?.textContent === "2");
+    eq(await page.locator("#com-reports .ui-meta").innerText(), "2 open", "reopen report: back to 2 open");
+    await spam.getByRole("button", { name: "Resolve" }).click();
+    await spam.getByRole("button", { name: "Reopen" }).waitFor();
+    await page.waitForFunction(() => document.querySelectorAll(".com-tabs a .com-badge")[2]?.textContent === "1");
 
     // Recent reviews (anon ratings) below.
     eq(await items(page, "#com-reviews").count(), 2, "recent reviews: listed");
@@ -807,7 +860,7 @@ try {
     const long = "Super".repeat(60);
     const S = state();
     S.feedback.push(fb(9, "other", `Un mot sans fin ${long} et la suite du message, avec une adresse https://example.tn/${long}`, "2026-11-02T09:00:00Z", { email: `${"tres.long".repeat(8)}@example.tn` }));
-    S.submissions.push(sub(uuid("5", 9), `Station ${"Électrique".repeat(12)}`, 36.8, 10.18, { address: `Avenue ${"Habib".repeat(20)}`, notes: long, photos: ["https://x.supabase.co/a.jpg", "https://x.supabase.co/b.jpg"] }));
+    S.submissions.push(sub(uuid("5", 9), `Station ${"Électrique".repeat(12)}`, 36.8, 10.18, { address: `Avenue ${"Habib".repeat(20)}`, notes: long, photos: [APP_PHOTO("w/a.jpg"), APP_PHOTO("w/b.jpg"), "https://x.supabase.co/a.jpg"] }));
     S.reports.push({ ...reports()[0], id: uuid("e", 9), notes: long, rating: { ...reports()[0].rating, charger_name: `Borne ${"Longue".repeat(15)}`, comment: long } });
     S.visits.push(visit(uuid("b", 9), `Parking ${"Souterrain".repeat(10)}`, "could_not_charge", "2026-11-02", { charger_city: "Sidi Bou Saïd" }));
     S.reviewAnswer = () => [422, { error: "connectors_invalid" }];

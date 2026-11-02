@@ -37,16 +37,25 @@ Admin access is not a build secret any more: admins sign in with Supabase Auth a
 
 ## Vite base path
 
-`vite.config.ts` sets `base: "/CharJ-admin/"` only in production:
+`vite.config.ts` sets `base: "/CharJ-admin/"` only in production, and bakes the build info Settings shows into the bundle:
 
 ```ts
+// version: package.json's "version" ('dev' if unreadable)
+// commit:  git describe --always --dirty=+dirty --exclude=* (the short hash,
+//          "+dirty" for a build of uncommitted changes, 'dev' without git)
 export default defineConfig(({ command }) => ({
   plugins: [react()],
   base: command === 'build' ? '/CharJ-admin/' : '/',
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+    __APP_COMMIT__: JSON.stringify(commit),
+  },
 }))
 ```
 
 Because GitHub Pages serves project pages at `username.github.io/<repo>/`, the bundled assets need that subpath prefix. Local dev keeps `/` so paths work at `http://localhost:5173/`.
+
+`src/lib/build-info.ts` reads the two constants (`BUILD_VERSION`, `BUILD_COMMIT`). `--exclude=*` leaves tags out, so the commit is always the plain hash; the CI checkout is shallow, which `--always` handles.
 
 ## SPA fallback
 

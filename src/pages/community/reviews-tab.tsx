@@ -16,6 +16,7 @@ import { Segmented } from "../../ui/segmented";
 import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Waiting, When } from "./bits";
 import { nf, useClampPage } from "./format";
 import type { CommunityView } from "./params";
+import { useSaving } from "./use-saving";
 
 // Reviews: reports drivers file against a review, open first, each with
 // Resolve (admin-review-reports; nothing is hidden or deleted), and below
@@ -43,13 +44,20 @@ export const Stars = ({ n }: { n: number }) => (
   </span>
 );
 
-const ReportRow = ({ report, onFlip }: { report: ReviewReport; onFlip: (next: ReviewReport) => void }) => {
+type RowProps = {
+  report: ReviewReport;
+  onFlip: (next: ReviewReport) => void;
+  /** Wraps the POST so the card's Refresh waits for it (useSaving). */
+  track: <T>(work: Promise<T>) => Promise<T>;
+};
+
+const ReportRow = ({ report, onFlip, track }: RowProps) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const toggle = async () => {
     setBusy(true);
     setError(null);
-    const res = await setReportResolved(report.id, !report.resolved);
+    const res = await track(setReportResolved(report.id, !report.resolved));
     setBusy(false);
     if (!res.ok) return setError(res.message);
     onFlip(res.item ?? { ...report, resolved: !report.resolved });
@@ -116,6 +124,7 @@ const flipped = (data: ReviewReportsPage, before: ReviewReport, after: ReviewRep
 const ReportsCard = ({ view, onParams, onChanged }: Props) => {
   const { reports: status, page } = view;
   const reports = useReviewReports(status, page);
+  const { saving, track } = useSaving();
   const data = reports.data;
   const past = useClampPage(page, data?.total ?? null, REPORTS_PER_PAGE, (n) => onParams({ page: n > 1 ? String(n) : null }));
   let body: ReactNode;
@@ -136,6 +145,7 @@ const ReportsCard = ({ view, onParams, onChanged }: Props) => {
             <ReportRow
               key={r.id}
               report={r}
+              track={track}
               onFlip={(next) => {
                 reports.patch((d) => flipped(d, r, next));
                 onChanged();
@@ -168,6 +178,7 @@ const ReportsCard = ({ view, onParams, onChanged }: Props) => {
         <Segmented label="Reports" value={status} options={STATUS_OPTIONS} onChange={(v) => onParams({ reports: v === "open" ? null : v, page: null })} />
         <RefreshButton
           busy={reports.loading}
+          saving={saving}
           onRefresh={() => {
             reports.refresh();
             onChanged();

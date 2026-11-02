@@ -76,15 +76,12 @@ export const ActivityPreview = ({ scope: s, waiting, href, index, wide }: CardPr
   } else if (s) {
     const from = s.ui === "lune" ? s.firstLune : null;
     const a = activitySeries(s.report, { from });
+    // The overview names the untracked days once, under the filters; the card only says what its hatching means.
     const missing = untrackedNote(a.days);
     if (a.avgActive === null) {
-      body = <Empty size="body">{missing ?? "Not tracked."}</Empty>;
+      body = <Empty size="body">Not tracked.</Empty>;
     } else if (!a.totalActive.some(Boolean)) {
-      body = (
-        <Empty size="body">
-          No {who(s)} opened the app in {windowText(s.days)}.{missing && ` ${missing}`}
-        </Empty>
-      );
+      body = <Empty size="body">No {who(s)} opened the app in {windowText(s.days)}.</Empty>;
     } else {
       const week = a.grain === "week";
       const peak = Math.max(...a.totalActive.map((v) => v ?? 0));
@@ -98,7 +95,7 @@ export const ActivityPreview = ({ scope: s, waiting, href, index, wide }: CardPr
             label={`Phones that opened the app ${week ? "a day, averaged by week" : "per day"}, ${windowText(s.days)}: ${a.avgActive.toLocaleString("en-US")} a day on the measured days, peak ${nf.format(peak)}.${missing ? ` ${missing}` : ""}`}
           />
           {from && <Note>Starts on {shortDay(from)}, the first day with the Lune design.</Note>}
-          {missing && <Note>{missing} Hatched, and left out of the average.</Note>}
+          {missing && <Note>Hatched days weren't tracked, and are left out of the average.</Note>}
         </>
       );
     }

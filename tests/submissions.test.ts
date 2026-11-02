@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  appPhotoPrefix,
   connectorLine,
   distanceMeters,
   mapsUrl,
   nearbyChargers,
+  otherPhotosLine,
   parseReviewResult,
   parseSubmissions,
+  splitPhotos,
   submissionActionMessage,
   submissionsPath,
 } from "../src/data/submissions-report.ts";
@@ -175,4 +178,31 @@ test("nearbyChargers lists chargers within 100 m, nearest first", () => {
 
 test("mapsUrl opens the pin on Google Maps", () => {
   assert.equal(mapsUrl(36.8321, 10.2345), "https://www.google.com/maps/search/?api=1&query=36.8321%2C10.2345");
+});
+
+test("photos: only the app's own uploads load; anything else is counted, never fetched", () => {
+  const url = "https://abc.supabase.co";
+  const own = "https://abc.supabase.co/storage/v1/object/public/charger-photos/sub/1.jpg";
+  assert.equal(appPhotoPrefix(url), "https://abc.supabase.co/storage/v1/object/public/charger-photos/");
+  assert.equal(appPhotoPrefix(`${url}//`), appPhotoPrefix(url), "a trailing slash on the project URL is trimmed, as the RPC does");
+  const photos = [
+    own,
+    "https://tracker.example/pixel.gif", // another host
+    "http://abc.supabase.co/storage/v1/object/public/charger-photos/1.jpg", // not https
+    "https://abc.supabase.co.evil.test/storage/v1/object/public/charger-photos/1.jpg", // a look-alike host
+    "https://abc.supabase.co/storage/v1/object/public/other-bucket/1.jpg", // another bucket
+    "https://abc.supabase.co/storage/v1/object/public/charger-photos/", // the bucket itself
+    "https://abc.supabase.co/storage/v1/object/public/charger-photos/../../../../evil", // walks out of the bucket
+    "https://abc.supabase.co/storage/v1/object/public/charger-photos/%2e%2e/%2e%2e/x", // the same, encoded
+    "javascript:alert(1)",
+    "/storage/v1/object/public/charger-photos/1.jpg", // relative
+  ];
+  assert.deepEqual(splitPhotos(photos, url), { app: [own], other: photos.length - 1 });
+  assert.deepEqual(splitPhotos([own, own], `${url}/`), { app: [own, own], other: 0 });
+  assert.deepEqual(splitPhotos([], url), { app: [], other: 0 });
+  // Without a configured project nothing is trusted.
+  assert.deepEqual(splitPhotos([own], ""), { app: [], other: 1 });
+  assert.equal(otherPhotosLine(0), null);
+  assert.equal(otherPhotosLine(1), "1 photo not from the app");
+  assert.equal(otherPhotosLine(2), "2 photos not from the app");
 });

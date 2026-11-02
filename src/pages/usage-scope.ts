@@ -16,6 +16,7 @@ import {
   type UsageUi,
 } from "../data/usage-report";
 import { plural } from "../lib/health-format";
+import { measuredNote, tunisDay } from "../lib/tracking";
 import { ENV_LABEL, platformName, UI_NAME, type FilterKey } from "./usage-labels";
 
 export type UsageFilters = { days: UsageDays; platform: UsagePlatform; ui: UsageUi; env: UsageEnvironment };
@@ -91,12 +92,21 @@ export const scopeLine = (f: UsageFilters, keys: FilterKey[]) =>
     .filter(Boolean)
     .join(" · ");
 
+/**
+ * The report's window (`days` Tunis days ending on the day it was made) when
+ * some of it wasn't measured: "Measured on 17 of these 30 days (not tracked:
+ * …)". Totals summed over the window carry it; null when every day was measured.
+ */
+export const windowNote = (r: Pick<UsageReport, "generated_at" | "days">): string | null => {
+  const end = tunisDay(r.generated_at);
+  return end ? measuredNote(end, r.days) : null;
+};
+
 /** "0.4 s" for a route answer; "—" when there is none. */
 export const seconds = (ms: number | null) => (ms == null ? "—" : `${(ms / 1000).toFixed(1)} s`);
 
 export type FunnelKey = "onboarding" | "trip" | "navigate" | "contributions" | "permissions";
 
-/** One line per funnel for the overview card: its first and last step, as counts. */
 /** What the Funnels card can't narrow: contributions (any filter), permissions (platform). */
 export const funnelsUnsplitNote = (s: UsageScope): string | null => {
   const parts = [
@@ -106,6 +116,7 @@ export const funnelsUnsplitNote = (s: UsageScope): string | null => {
   return parts.length ? `${parts.join(", and ")}: they count every phone.` : null;
 };
 
+/** One line per funnel for the overview card: its first and last step, as counts. */
 export const funnelSummaries = (s: UsageScope): { key: FunnelKey; name: string; text: string }[] => {
   const f = s.report.funnels;
   const pending = lunePending(s);

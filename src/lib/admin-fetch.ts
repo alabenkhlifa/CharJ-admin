@@ -3,6 +3,7 @@ import {
   NOT_ADMIN_NOTICE,
   SESSION_EXPIRED_NOTICE,
 } from "./admin-session";
+import { OFFLINE_MESSAGE, sessionToken } from "./session-token";
 import { SUPABASE_ANON_KEY, SUPABASE_CONFIGURED, SUPABASE_URL, supabase } from "./supabase";
 
 // Calls an admin Edge Function (`../charj/supabase/functions/admin-*`) as the
@@ -13,6 +14,9 @@ import { SUPABASE_ANON_KEY, SUPABASE_CONFIGURED, SUPABASE_URL, supabase } from "
 //   adminFetch("admin-users?page=1")
 //   adminFetch("admin-verify-charger", { method: "POST", body })
 //
+// No session, or the server refused its refresh token → sign out.
+// A refresh that couldn't reach the server keeps the session: it throws
+// "Can't reach the server." and the caller shows its usual error and retry.
 // 401 → the session is no longer valid: sign out.
 // 403 → signed in, but not an admin (or an anonymous user): sign out with
 //       that notice.
@@ -22,12 +26,13 @@ export const adminFetch = async (path: string, init: RequestInit = {}): Promise<
     throw new Error("Admin API not configured. Set VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY.");
   }
   // getSession refreshes an expired access token before handing it back.
-  const { data, error } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (error || !token) {
+  const session = sessionToken(await supabase.auth.getSession());
+  if (session.kind === "offline") throw new Error(OFFLINE_MESSAGE);
+  if (session.kind === "signed-out") {
     await forceSignOut(SESSION_EXPIRED_NOTICE);
     throw new Error("Not signed in.");
   }
+  const { token } = session;
 
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);

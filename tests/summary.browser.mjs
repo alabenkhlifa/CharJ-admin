@@ -225,6 +225,7 @@ try {
     ok((await page.locator("#card-back").innerText()).includes("Fills in once an install week has had its 7 days"), "zero: Came back explains when it fills in");
     ok((await square(page, "#card-back")).includes("--c-idle-fill"), "zero: the Came back square goes Idle Grey with no cohort");
     ok((await page.getByText("No one opened the app in the last 30 days.").count()) === 1, "zero: Versions empty state");
+    ok((await page.locator(".ui-card", { hasText: "Versions in use" }).innerText()).includes("Measured on 17 of these 30 days (not tracked: 4–16 Oct, when the app's events didn't reach the server)."), "zero: the empty Versions card says 13 of its 30 days weren't measured");
     eq(await page.locator(".sum-warn").count(), 0, "zero: no dropped warning");
     eq(await page.locator(".ui-nav-badge").count(), 0, "zero: no Community badge");
     eq(await hscroll(page), 0, "zero: no horizontal scroll at 390");
@@ -274,6 +275,8 @@ try {
         eq(await page.$$eval(".sum-vers li", (li) => li.map((l) => `${l.querySelector("span").firstChild.textContent} [${l.querySelector(".ui-pill").textContent}] ${l.querySelector("em").textContent}`)), ["Android 1.2.1 [no label] 19 users", "iOS 1.2.1 [no label] 19 users"], "snapshot: versions");
         eq(await page.locator(".ui-card", { hasText: "Versions in use" }).locator(".ui-meta").innerText(), "2 versions", "snapshot: 2 versions");
         eq((await page.locator(".sum-lang").innerText()).replace(/\s+/g, " "), "Users per language FR 25 · AR 0 · EN 13", "snapshot: users per language, counts only");
+        eq(await page.locator(".ui-card", { hasText: "Versions in use" }).locator(".ui-empty").innerText(), "Measured on 17 of these 30 days (not tracked: 4–16 Oct, when the app's events didn't reach the server).", "snapshot: versions and languages say which of their 30 days were measured");
+        eq(await page.locator(".ui-card").nth(0).locator(".ui-meta").innerText(), "Production", "snapshot: the Today card names the data as the switch does");
         ok(!/%/.test(await page.locator(".sum").innerText()), "snapshot: no percentage anywhere (every group is under 10 or a count)");
       }
       if (width === 1440) {
@@ -298,7 +301,7 @@ try {
     await settle(page);
     const tall = await page.evaluate(() => document.querySelector(".sum-grid").offsetHeight);
     await page.locator(".ui-seg button", { hasText: "Development" }).click();
-    await page.waitForFunction(() => document.querySelector(".ui-card .ui-meta")?.textContent === "development");
+    await page.waitForFunction(() => document.querySelector(".ui-card .ui-meta")?.textContent === "Development");
     // While the development report loads: the same five cards, no numbers from production.
     eq(await page.locator(".sum-grid > .ui-card").count(), 5, "env: the card shells stay while the report loads");
     eq(await page.$$eval("#card-active .sum-wait, #card-back .sum-wait", (w) => w.map((x) => x.textContent)), ["Loading…", "Loading…"], "env: the cards say Loading…");

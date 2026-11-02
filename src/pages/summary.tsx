@@ -18,7 +18,7 @@ import {
   ringSegments,
   shortDay,
 } from "../lib/health-format";
-import { isTracked, untrackedNote, untrackedRuns } from "../lib/tracking";
+import { isTracked, measuredNote, tunisDay, untrackedNote, untrackedRuns } from "../lib/tracking";
 import { buildHash } from "../lib/use-route";
 import { Bars } from "../ui/bars";
 import { Bubble } from "../ui/bubble";
@@ -33,6 +33,7 @@ import { scrollToId } from "../ui/motion";
 import { Pill } from "../ui/pill";
 import { Rings, type Ring } from "../ui/rings";
 import { Segmented } from "../ui/segmented";
+import { ENV_LABEL } from "./usage-labels";
 import "./summary.css";
 
 // Home: is the app healthy, and what needs Ala (DESIGN.md, docs/mockups/admin-dashboard.html).
@@ -45,11 +46,6 @@ type Props = {
   queue: QueueState;
 };
 
-const ENV_LABEL: Record<UsageEnvironment, string> = {
-  production: "Production",
-  preview: "Preview",
-  development: "Development",
-};
 const ENV_OPTIONS = USAGE_ENVIRONMENTS.map((v) => ({ v, l: ENV_LABEL[v] }));
 const LANGUAGE_NAME: Record<string, string> = { fr: "French", ar: "Arabic", en: "English" };
 
@@ -281,11 +277,19 @@ const CameBackCard = ({ report, waiting, href }: { report: SummaryReport | null;
 
 const VersionsCard = ({ report, waiting }: { report: SummaryReport | null; waiting: string }) => {
   const { rows, versions } = versionRows(report?.versions ?? []);
+  // Versions and languages count the last 30 days: say when some weren't measured.
+  const end = report ? tunisDay(report.generated_at) : null;
+  const measured = end ? measuredNote(end, 30) : null;
   let body: ReactNode;
   if (!report) {
     body = <Waiting size="versions">{waiting}</Waiting>;
   } else if (!rows.length) {
-    body = <Empty size="body">No one opened the app in the last 30 days.</Empty>;
+    body = (
+      <>
+        <Empty size="body">No one opened the app in the last 30 days.</Empty>
+        {measured && <Empty>{measured}</Empty>}
+      </>
+    );
   } else {
     body = (
       <>
@@ -311,6 +315,7 @@ const VersionsCard = ({ report, waiting }: { report: SummaryReport | null; waiti
             ))}
           </em>
         </p>
+        {measured && <Empty>{measured}</Empty>}
       </>
     );
   }
@@ -362,7 +367,7 @@ export const SummaryPage = ({ env, onEnv, queue }: Props) => {
       {report && report.dropped_7d > 0 && <Dropped n={report.dropped_7d} />}
       {/* The card shells stay mounted while the report loads, so the page keeps its shape. */}
       <div className="sum-grid">
-        <HealthCard title="Today" color="rings" icon={ICON.rings} meta={env} index={0}>
+        <HealthCard title="Today" color="rings" icon={ICON.rings} meta={ENV_LABEL[env]} index={0}>
           {report ? (
             // Keyed by environment so the rings refill when the data switches.
             <TodayRings key={env} report={report} queue={queue} />
