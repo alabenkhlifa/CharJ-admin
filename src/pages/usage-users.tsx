@@ -206,7 +206,7 @@ export const UsersSection = ({ params, onParams }: Props) => {
   return (
     <HealthCard
       title="Users"
-      color="active"
+      color="users"
       icon={<UsageIcon name="person" />}
       meta={!loading && !error ? `${nf.format(total)} ${lookup ? (total === 1 ? "driver" : "drivers") : total === 1 ? "session" : "sessions"}` : undefined}
       index={0}

@@ -620,6 +620,7 @@ try {
     eq(await page.locator(".use-users li").count(), 1, "users: one driver");
     eq(await page.locator(".use-chip").innerText().then((t) => t.replace(/\s+/g, " ").trim()), `Driver ${target.slice(0, 8)}… ×`, "users: the lookup chip");
     eq(await page.locator(".use .ui-card .ui-meta").innerText(), "1 driver", "users: meta says one driver");
+    ok((await square(page, ".use .ui-card")).includes("--c-users-fill"), "users: the detail card wears the users tone, as its overview card does");
     eq(await hscroll(page), 0, "users: no horizontal scroll at 390");
     let fit = await fits(page);
     ok(fit.bad.length === 0, "users: rows fit at 390", fit);
