@@ -1,14 +1,26 @@
 <!doctype html>
-<html lang="en" data-theme="dark" data-num="tabular">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230BD8B6'%3E%3Cpath d='M13 2 4 14h7l-1 8 9-12h-7Z'/%3E%3C/svg%3E" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0a0a0b" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
     <title>Charj Admin</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <script>
+      // Theme before first paint, so a dark system never flashes light.
+      // Mirrors parseTweaks + resolveTheme in src/lib/theme-prefs.ts.
+      (function () {
+        var t = null;
+        try {
+          var p = JSON.parse(localStorage.getItem("charj-admin:tweaks") || "null");
+          if (p && (p.v === 2 ? p.theme === "light" || p.theme === "dark" : p.theme === "light")) t = p.theme;
+        } catch (e) {}
+        if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", t);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

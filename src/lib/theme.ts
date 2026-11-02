@@ -1,58 +1,69 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import {
+  parseTweaks,
+  resolveTheme,
+  STORAGE_KEY,
+  THEME_COLOR,
+  type ResolvedTheme,
+  type ThemePref,
+  type Tweaks,
+} from "./theme-prefs";
 
-export type Theme = "dark" | "light";
-export type Density = "comfortable" | "compact";
-export type NumStyle = "tabular" | "mono";
+export type { Density, ResolvedTheme, ThemePref, Tweaks } from "./theme-prefs";
 
-export type Tweaks = {
-  theme: Theme;
-  density: Density;
-  accent: string;
-  numStyle: NumStyle;
+const DARK = "(prefers-color-scheme: dark)";
+
+const subscribeSystem = (onChange: () => void) => {
+  const mq = window.matchMedia(DARK);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
 };
+const systemIsDark = () => window.matchMedia(DARK).matches;
 
-const STORAGE_KEY = "charj-admin:tweaks";
-
-const DEFAULTS: Tweaks = {
-  theme: "dark",
-  density: "comfortable",
-  accent: "#0BD8B6",
-  numStyle: "tabular",
-};
+/** The OS colour scheme, live. */
+export const useSystemDark = () => useSyncExternalStore(subscribeSystem, systemIsDark, () => false);
 
 const loadInitial = (): Tweaks => {
-  if (typeof window === "undefined") return DEFAULTS;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULTS;
-    return { ...DEFAULTS, ...(JSON.parse(raw) as Partial<Tweaks>) };
+    return parseTweaks(window.localStorage.getItem(STORAGE_KEY));
   } catch {
-    return DEFAULTS;
+    return parseTweaks(null);
   }
 };
 
-const hexToRgba = (hex: string, a: number) => {
-  const h = hex.replace("#", "");
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
+// <html data-theme> drives every token (and useCurrentTheme() for the maps).
+// theme-color: with 'system' each media-scoped meta keeps its own scheme; an
+// override paints both with the chosen ground.
+const applyTheme = (pref: ThemePref, resolved: ResolvedTheme) => {
+  document.documentElement.setAttribute("data-theme", resolved);
+  document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((meta) => {
+    const scheme: ResolvedTheme =
+      pref === "system" ? (meta.media.includes("dark") ? "dark" : "light") : resolved;
+    meta.content = THEME_COLOR[scheme];
+  });
 };
 
-export const useTweaks = (): [Tweaks, <K extends keyof Tweaks>(key: K, val: Tweaks[K]) => void] => {
+/**
+ * Dashboard preferences in localStorage["charj-admin:tweaks"]. `theme` is
+ * 'system' | 'light' | 'dark'; the third tuple item is the theme in effect.
+ */
+export const useTweaks = (): [
+  Tweaks,
+  <K extends keyof Tweaks>(key: K, val: Tweaks[K]) => void,
+  ResolvedTheme,
+] => {
   const [tweaks, setTweaks] = useState<Tweaks>(loadInitial);
+  const resolved = resolveTheme(tweaks.theme, useSystemDark());
 
   useEffect(() => {
-    const root = document.documentElement;
-    root.setAttribute("data-theme", tweaks.theme);
-    root.setAttribute("data-num", tweaks.numStyle);
-    root.style.setProperty("--accent", tweaks.accent);
-    root.style.setProperty("--accent-soft", hexToRgba(tweaks.accent, 0.12));
-    root.style.setProperty("--accent-border", hexToRgba(tweaks.accent, 0.28));
+    applyTheme(tweaks.theme, resolved);
+  }, [tweaks.theme, resolved]);
+
+  useEffect(() => {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tweaks));
     } catch {
-      // ignore
+      // private mode / storage full: the choice just won't persist
     }
   }, [tweaks]);
 
@@ -60,5 +71,5 @@ export const useTweaks = (): [Tweaks, <K extends keyof Tweaks>(key: K, val: Twea
     setTweaks((prev) => ({ ...prev, [key]: val }));
   };
 
-  return [tweaks, setTweak];
+  return [tweaks, setTweak, resolved];
 };

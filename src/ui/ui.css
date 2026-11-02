@@ -1,0 +1,601 @@
+/* Health Rings UI kit (DESIGN.md). Tokens: src/index.css.
+   Inline positions are logical everywhere so Arabic flips cleanly.
+   The `font` shorthand resets font-variant-numeric, so tabular-nums always
+   comes after it. Reduced motion is switched off globally in index.css. */
+
+.ui-sr {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.ui-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- card ---- */
+.ui-card {
+  display: block;
+  min-inline-size: 0;
+  background: var(--card);
+  color: var(--ink);
+  border-radius: var(--r-card);
+  padding: 14px 16px 16px;
+  animation: ui-rise var(--dur-rise) var(--ease) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger));
+}
+a.ui-card {
+  text-decoration: none;
+  transition: background .2s var(--ease);
+}
+a.ui-card:hover {
+  background: var(--card-pressed);
+}
+.ui-card-wide {
+  grid-column: 1 / -1;
+}
+@keyframes ui-rise {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}
+.ui-ch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ui-ch h2 {
+  margin: 0;
+  flex: 1;
+  min-inline-size: 0;
+  font: var(--type-card-title);
+}
+.ui-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-2);
+  font: var(--type-subhead);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ui-chev {
+  inline-size: 14px;
+  block-size: 14px;
+  flex: none;
+}
+.ui-chev:dir(rtl) {
+  transform: scaleX(-1);
+}
+
+/* ---- category square ---- */
+.ui-sq {
+  inline-size: 22px;
+  block-size: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-square);
+  color: var(--glyph);
+}
+.ui-sq svg {
+  inline-size: 14px;
+  block-size: 14px;
+  stroke-width: 2.4;
+}
+
+/* ---- hero value ---- */
+.ui-val {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-block-start: 10px;
+}
+.ui-val b {
+  font: var(--type-hero);
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+}
+.ui-val > span {
+  color: var(--ink-2);
+  font: 500 17px var(--font);
+}
+
+/* ---- bubble ---- */
+.ui-bub {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 30px;
+  block-size: 30px;
+  padding-inline: 9px;
+  border-radius: var(--r-bubble);
+  color: var(--glyph);
+  font: 700 15px var(--font);
+  font-variant-numeric: tabular-nums;
+}
+.ui-bub-zero {
+  background: var(--fill);
+  color: var(--ink-2);
+}
+
+/* ---- pill ---- */
+.ui-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  margin-inline-start: 6px;
+  border-radius: var(--r-square);
+  background: var(--fill);
+  color: var(--ink-2);
+  font: var(--type-caption);
+  white-space: nowrap;
+}
+
+/* ---- segmented control ---- */
+.ui-seg {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  max-inline-size: 420px;
+  padding: 2px;
+  border-radius: var(--r-segment);
+  background: var(--fill);
+}
+.ui-seg button {
+  position: relative;
+  z-index: 1;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--r-thumb);
+  background: none;
+  color: var(--ink);
+  font: 500 13px var(--font);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.ui-seg button[aria-pressed="true"] {
+  font-weight: 600;
+}
+/* Equal columns, so the thumb is placed from the index: no measuring, and
+   inset-inline-start flips by itself in RTL. */
+.ui-seg-thumb {
+  position: absolute;
+  inset-block: 2px;
+  inline-size: calc((100% - 4px) / var(--n));
+  inset-inline-start: calc(2px + (100% - 4px) / var(--n) * var(--at));
+  border-radius: var(--r-thumb);
+  background: var(--thumb);
+  box-shadow: var(--shadow-thumb);
+  transition: inset-inline-start var(--dur-thumb) var(--ease);
+}
+
+/* ---- rings ---- */
+.ui-rings {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  margin-block-start: 6px;
+}
+.ui-rings svg {
+  inline-size: 148px;
+  block-size: 148px;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+.ui-rings circle {
+  fill: none;
+  stroke-width: 15;
+  stroke-linecap: round;
+}
+.ui-rings circle.ui-pick {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.ui-ring-arc {
+  transition: stroke-dashoffset var(--dur-ring) var(--ease);
+}
+.ui-ring-tick {
+  transition: opacity .4s var(--ease);
+}
+.ui-legend {
+  display: grid;
+  gap: 10px;
+  min-inline-size: 0;
+}
+.ui-legend > * {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+}
+.ui-legend button {
+  cursor: pointer;
+  border-radius: 10px;
+}
+.ui-legend small {
+  display: block;
+  font: var(--type-card-title);
+}
+.ui-legend b {
+  font: var(--type-stat);
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+}
+.ui-legend em {
+  margin-inline-start: 4px;
+  color: var(--ink-2);
+  font: 500 15px var(--font);
+  font-style: normal;
+}
+
+/* ---- sparkline bars ---- */
+.ui-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  block-size: 64px;
+  margin-block-start: 12px;
+}
+.ui-bars i {
+  flex: 1;
+  min-inline-size: 0;
+  border-radius: var(--r-bar);
+  transform-origin: 50% 100%;
+  animation: ui-grow var(--dur-bars) var(--ease) both;
+}
+.ui-bars i.ui-bar-zero {
+  block-size: 3px;
+  background: var(--fill);
+  animation: none;
+}
+@keyframes ui-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+.ui-ax {
+  display: flex;
+  justify-content: space-between;
+  margin-block-start: 6px;
+  color: var(--ink-2);
+  font: 400 12px var(--font);
+}
+
+/* ---- ladder (funnel progress rows) ---- */
+.ui-lad {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.ui-lad li {
+  padding-block: 8px;
+}
+.ui-lad li + li {
+  border-block-start: .5px solid var(--sep);
+}
+.ui-lad-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.ui-lad-name {
+  min-inline-size: 0;
+  font: var(--type-subhead);
+}
+.ui-lad-sub .ui-lad-name {
+  padding-inline-start: 14px;
+  color: var(--ink-2);
+}
+.ui-lad-v {
+  font: 700 17px var(--font);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ui-lad-v small {
+  margin-inline-start: 6px;
+  color: var(--ink-2);
+  font: 500 13px var(--font);
+}
+.ui-lad-tr {
+  block-size: 6px;
+  margin-block-start: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--fill);
+}
+/* Grows from the inline start: the bar sits at the start edge in either
+   direction, so only the transform origin needs flipping. */
+.ui-lad-tr i {
+  display: block;
+  block-size: 100%;
+  border-radius: 3px;
+  transform-origin: 0 50%;
+  animation: ui-wide var(--dur-funnel) var(--ease) both;
+}
+.ui-lad-tr i:dir(rtl) {
+  transform-origin: 100% 50%;
+}
+@keyframes ui-wide {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* ---- large title + folded inline bar ---- */
+.ui-lt {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 18px 4px 14px;
+}
+.ui-lt > div {
+  min-inline-size: 0;
+}
+.ui-lt h1 {
+  margin: 0;
+  font: var(--type-large-title);
+  letter-spacing: .01em;
+  overflow-wrap: anywhere;
+}
+.ui-lt p {
+  margin: 2px 0 0;
+  color: var(--ink-2);
+  font: var(--type-subhead);
+}
+.ui-lt-trailing {
+  flex: none;
+}
+.ui-lt-pin {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 5;
+  block-size: 0;
+}
+.ui-lt-bar {
+  position: absolute;
+  inset-inline: calc(-1 * var(--page-pad-inline));
+  inset-block-start: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  block-size: calc(44px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) 16px 0;
+  background: var(--bar);
+  -webkit-backdrop-filter: var(--bar-blur);
+  backdrop-filter: var(--bar-blur);
+  border-block-end: .5px solid var(--sep);
+  font: 600 17px var(--font);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s var(--ease);
+}
+.ui-lt-bar span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ui-lt-bar[data-on="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ---- empty / not tracked ---- */
+.ui-empty {
+  margin: 8px 0 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.ui-empty-body {
+  font: var(--type-subhead);
+}
+.ui-na {
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.ui-nw {
+  white-space: nowrap;
+}
+
+/* ---- tables ---- */
+.ui-table-wrap {
+  overflow-x: auto;
+}
+.ui-table {
+  inline-size: 100%;
+  margin-block-start: 6px;
+  border-collapse: collapse;
+  font: 400 15px var(--font);
+}
+.ui-table th {
+  padding-block: 6px;
+  padding-inline: 0 8px;
+  color: var(--ink-2);
+  font: 500 13px var(--font);
+  text-align: start;
+}
+.ui-table td {
+  padding-block: 9px;
+  padding-inline: 0 8px;
+  border-block-start: .5px solid var(--sep);
+  vertical-align: baseline;
+}
+.ui-table .ui-end {
+  padding-inline: 16px 0;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ui-table td .ui-pill {
+  margin-inline-start: 4px;
+}
+.ui-details {
+  margin-block-start: 10px;
+}
+.ui-details summary {
+  color: var(--c-screens-text);
+  font: var(--type-subhead);
+  list-style: none;
+  cursor: pointer;
+}
+.ui-details summary::-webkit-details-marker {
+  display: none;
+}
+
+/* ---- cohort chips (phones) / table (768px and up) ---- */
+.ui-coh {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.ui-coh li {
+  padding-block: 10px;
+}
+.ui-coh li + li {
+  border-block-start: .5px solid var(--sep);
+}
+.ui-coh-who {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font: var(--type-body);
+}
+.ui-coh-who b {
+  font-weight: 600;
+}
+.ui-chips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-block-start: 8px;
+}
+.ui-chip {
+  padding: 8px 10px;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  font: 600 17px/1.3 var(--font);
+  font-variant-numeric: tabular-nums;
+}
+.ui-chip small {
+  display: block;
+  margin-block-end: 2px;
+  color: var(--ink-2);
+  font: 500 12px var(--font);
+}
+.ui-chip .ui-pill {
+  display: block;
+  inline-size: fit-content;
+  margin: 4px 0 0;
+}
+.ui-coh-table {
+  display: none;
+}
+@media (min-width: 768px) {
+  .ui-coh {
+    display: none;
+  }
+  .ui-coh-table {
+    display: block;
+  }
+}
+
+/* ---- charts ---- */
+.ui-chart {
+  min-inline-size: 0;
+  margin-block-start: 10px;
+}
+.ui-chart svg {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  overflow: visible;
+}
+.ui-tick {
+  fill: var(--ink-2);
+  font: var(--type-tick);
+  font-variant-numeric: tabular-nums;
+}
+.ui-lbl {
+  fill: var(--ink);
+  font: 400 13px var(--font);
+}
+.ui-vl {
+  fill: var(--ink);
+  font: 600 13px var(--font);
+  font-variant-numeric: tabular-nums;
+}
+.ui-hit {
+  fill: transparent;
+  outline: none;
+}
+.ui-hit:focus-visible {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+.ui-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-block-start: 10px;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.ui-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ui-key i {
+  display: inline-block;
+  inline-size: 10px;
+  block-size: 10px;
+  border-radius: 3px;
+}
+.ui-tip {
+  position: fixed;
+  z-index: 50;
+  min-inline-size: 130px;
+  padding: 8px 12px;
+  border-radius: var(--r-tooltip);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow-tooltip);
+  font: var(--type-footnote);
+  pointer-events: none;
+}
+.ui-tip-t {
+  margin-block-end: 3px;
+  color: var(--ink-2);
+}
+.ui-tip-r {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+}
+.ui-tip-r span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ui-tip-r i {
+  display: inline-block;
+  inline-size: 12px;
+  block-size: 3px;
+  border-radius: 2px;
+}
+.ui-tip-r b {
+  font-variant-numeric: tabular-nums;
+}

@@ -38,7 +38,7 @@ const ROUTE_COMPONENTS: Record<RouteKey, () => React.ReactElement> = {
 };
 
 const App = () => {
-  const [tweaks, setTweak] = useTweaks();
+  const [tweaks, setTweak, theme] = useTweaks();
   // The active page lives in the URL hash, so a refresh (or a bookmark, or a
   // link pasted to someone else) lands on the same page instead of Overview.
   const { route, params, navigate, replace } = useRoute();
@@ -119,7 +119,7 @@ const App = () => {
       />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         <Topbar
-          theme={tweaks.theme}
+          theme={theme}
           setTheme={(v) => setTweak("theme", v)}
           active={route}
           isMobile={isMobile}
