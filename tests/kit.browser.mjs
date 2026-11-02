@@ -68,6 +68,25 @@ try {
       const { context, page } = await open({ viewport: { width, height }, colorScheme, deviceScaleFactor: 2 });
       await page.waitForTimeout(2000);
       ok((await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0, `no horizontal scroll at ${width} ${colorScheme}`);
+      if (width === 390) {
+        // Every count bubble's digits reach 4.5:1 on its fill (translucent
+        // fills composited over the card).
+        const low = await page.evaluate(() => {
+          const parse = (c) => { const m = c.match(/[\d.]+/g).map(Number); return { rgb: m.slice(0, 3), a: m.length > 3 ? m[3] : 1 }; };
+          const over = (fg, bg) => fg.rgb.map((v, i) => v * fg.a + bg[i] * (1 - fg.a));
+          const lum = (c) => c.map((v) => v / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)).reduce((acc, v, i) => acc + v * [0.2126, 0.7152, 0.0722][i], 0);
+          const ratio = (x, y) => { const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p); return (hi + 0.05) / (lo + 0.05); };
+          const bubbles = [...document.querySelectorAll(".ui-bub")];
+          const out = bubbles.map((b) => {
+            const card = parse(getComputedStyle(b.closest(".ui-card")).backgroundColor).rgb;
+            const cs = getComputedStyle(b);
+            const bg = over(parse(cs.backgroundColor), card);
+            return { label: b.getAttribute("aria-label") ?? b.textContent, ratio: +ratio(over(parse(cs.color), bg), bg).toFixed(2) };
+          });
+          return { count: out.length, low: out.filter((x) => x.ratio < 4.5) };
+        });
+        ok(low.count >= 15 && low.low.length === 0, `bubble digits reach 4.5:1 in ${colorScheme} (${low.count} bubbles)`, low.low);
+      }
       await page.screenshot({ path: `${output}/kit-${width}-${colorScheme}.png`, fullPage: true });
       await context.close();
     }

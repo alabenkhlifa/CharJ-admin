@@ -116,7 +116,7 @@ html[data-theme="light"] {
   --card: #ffffff;
   --card-pressed: #f7f7fa;
   --ink: #000000;
-  --ink-2: rgba(60, 60, 67, .62);
+  --ink-2: rgba(60, 60, 67, .73);
   --sep: rgba(60, 60, 67, .16);
   --fill: rgba(120, 120, 128, .12);
   --bar: rgba(249, 249, 249, .86);

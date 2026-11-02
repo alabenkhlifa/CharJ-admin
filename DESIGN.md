@@ -46,7 +46,7 @@ colors:
   card-light: "#ffffff"
   card-pressed-light: "#f7f7fa"
   ink-light: "#000000"
-  ink-secondary-light: "rgba(60, 60, 67, .62)"
+  ink-secondary-light: "rgba(60, 60, 67, .73)"
   separator-light: "rgba(60, 60, 67, .16)"
   fill-light: "rgba(120, 120, 128, .12)"
   bar-material-light: "rgba(249, 249, 249, .86)"
@@ -233,7 +233,7 @@ Each Usage section owns one colour: **Screens Blue** (screens, also charger subm
 ### Neutral
 - **Grouped Ground** (grouped-ground-light / grouped-ground-dark): page background, #f2f2f7 light, pure black dark.
 - **Card** (card-light / card-dark): every container. Card Pressed (card-pressed-*) is the hover of a linked card.
-- **Ink / Secondary Ink** (ink-*, ink-secondary-*): primary text; secondary text, units, meta, axis ticks.
+- **Ink / Secondary Ink** (ink-*, ink-secondary-*): primary text; secondary text, units, meta, axis ticks. Secondary Ink is .73 alpha in light (iOS uses .6), the lightest that reaches 4.5:1 on Grouped Ground.
 - **Separator** (separator-*): 0.5px row dividers, chart gridlines.
 - **Fill** (fill-*): segmented track, zero bubbles, chips, pills, empty bars and progress tracks.
 - **Idle Grey** (idle): inactive tab icons, chevrons, sub-step bars, Android series, categories with no data yet (Android Auto).
@@ -241,7 +241,7 @@ Each Usage section owns one colour: **Screens Blue** (screens, also charger subm
 
 ### Category colour map
 
-| Category | Base (ring, bars, dark fills) | Light text | Light fill (square, bubble) | Dark text |
+| Category | Base (ring, bars, dark fills) | Light text (and light bubble) | Light fill (square) | Dark text (and dark bubble) |
 |---|---|---|---|---|
 | Active | active | active-text-light | base | active-text-dark |
 | Came back | came-back | came-back-text-light | came-back-text-light | came-back-text-dark |
@@ -258,7 +258,7 @@ Each Usage section owns one colour: **Screens Blue** (screens, also charger subm
 | Contributions | contributions | contributions-text-light | base | contributions-text-dark |
 | Idle | idle | ink-secondary-light | base | ink-secondary-dark |
 
-Every coloured text tone meets 4.5:1 on both Card and Grouped Ground in its theme (checked with the WCAG formula; `tests/tokens.test.ts` keeps it so). Idle text is Secondary Ink, like any other secondary text.
+Every coloured text tone meets 4.5:1 on both Card and Grouped Ground in its theme, and so does Secondary Ink (also on Fill over Card, where zero bubbles and chips sit). Idle text is Secondary Ink, like any other secondary text. Count bubbles are filled with the category's **text** tone in both themes, not the fill tone, so their digits in glyph ink reach 4.5:1 too. `tests/tokens.test.ts` checks all of this with the WCAG formula.
 
 Glyph ink on a filled square or bubble flips with the theme: white on light, black on dark (`--glyph`). Rings, chart bars and progress bars always use the base tone; the darker tones exist for small filled shapes and coloured text, where the base fails contrast on white.
 
@@ -342,7 +342,7 @@ Filled with the category colour (light: the fill tone from the map). The Today c
 - **Open item:** each row links to its filtered Community view in the real build. The mock rows are not links on purpose (the target pages did not exist); do not ship a row that looks tappable and goes nowhere.
 
 ### Count bubble
-30px tall pill, min width 30px, 9px inline padding, 15px/700 tabular in glyph ink, filled with the category's light fill tone (base in dark). At zero: Fill background, Secondary Ink text.
+30px tall pill, min width 30px, 9px inline padding, 15px/700 tabular in glyph ink, filled with the category's text tone in both themes (white digits on the dark light-mode tone, black digits on the light dark-mode tone, always 4.5:1 or more). At zero: Fill background, Secondary Ink text.
 
 ### Segmented control
 Fill track, 9px radius, 2px padding, max width 420px, equal columns. Labels 13px/500, selected 600. A Card-coloured thumb (#636366 in dark) slides under the selected segment over 0.32s on the house curve, sized from the selected button. Buttons use `aria-pressed`. It only switches data (Test phones / Production, All / iOS / Android).

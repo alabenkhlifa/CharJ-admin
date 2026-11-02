@@ -1,4 +1,4 @@
-import { toneFill, type Category } from "./category";
+import { toneText, type Category } from "./category";
 import "./ui.css";
 
 const nf = new Intl.NumberFormat("en-US");
@@ -10,11 +10,15 @@ type Props = {
   label?: string;
 };
 
-/** Count bubble. A zero is never coloured: Fill and Secondary Ink. */
+/**
+ * Count bubble, filled with the category's text tone so the digits (glyph ink:
+ * white on light, black on dark) reach 4.5:1. A zero is never coloured: Fill
+ * and Secondary Ink.
+ */
 export const Bubble = ({ n, tone, label }: Props) => (
   <span
     className={n ? "ui-bub" : "ui-bub ui-bub-zero"}
-    style={n ? { background: toneFill(tone) } : undefined}
+    style={n ? { background: toneText(tone) } : undefined}
     aria-label={label}
   >
     {nf.format(n)}

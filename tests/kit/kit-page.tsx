@@ -17,6 +17,7 @@ import { Empty } from "../../src/ui/empty";
 import { HeroValue } from "../../src/ui/hero-value";
 import { Pill } from "../../src/ui/pill";
 import { scrollToId } from "../../src/ui/motion";
+import { CATEGORIES } from "../../src/ui/category";
 
 const I = ({ d }: { d: string }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: d }} />
@@ -183,6 +184,14 @@ export const KitPage = () => {
         </HealthCard>
         <HealthCard title="Android Auto" color="idle" icon={<I d={P.car} />}>
           <Empty size="body">No car events yet. They arrive with the next native build.</Empty>
+        </HealthCard>
+        <HealthCard title="Bubbles" color="needs-you" icon={<I d={P.bell} />} meta="every category" id="card-bubbles">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBlockStart: 10 }}>
+            {CATEGORIES.map((c, i) => (
+              <Bubble key={c} n={i + 1} tone={c} label={c} />
+            ))}
+            <Bubble n={0} tone="screens" label="zero" />
+          </div>
         </HealthCard>
       </Grid>
       <div style={{ height: 600 }} />

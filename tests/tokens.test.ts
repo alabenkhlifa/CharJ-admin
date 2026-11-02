@@ -144,10 +144,14 @@ const lum = (c: number[]) =>
     .map((v) => v / 255)
     .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
     .reduce((acc, v, i) => acc + v * [0.2126, 0.7152, 0.0722][i], 0);
-const contrast = (fg: string, bg: string) => {
-  const b = rgb(bg);
-  const [hi, lo] = [lum(rgb(fg, b)), lum(b)].sort((x, y) => y - x);
+const ratio = (fg: number[], bg: number[]) => {
+  const [hi, lo] = [lum(fg), lum(bg)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
+};
+/** fg over bg, where bg may itself be translucent over `under` (a hex surface). */
+const contrast = (fg: string, bg: string, under?: string) => {
+  const b = rgb(bg, under ? rgb(under) : undefined);
+  return ratio(rgb(fg, b), b);
 };
 
 test("every coloured text tone reads at 4.5:1 on Card and Grouped Ground in both themes", () => {
@@ -167,4 +171,30 @@ test("every coloured text tone reads at 4.5:1 on Card and Grouped Ground in both
 test("idle text is Secondary Ink", () => {
   assert.equal(resolve(light, "--c-idle-text"), resolve(light, "--ink-2"));
   assert.equal(resolve(dark, "--c-idle-text"), resolve(dark, "--ink-2"));
+});
+
+test("Secondary Ink reads at 4.5:1 on Card, Grouped Ground and Fill over Card in both themes", () => {
+  for (const [name, theme] of [["light", light], ["dark", dark]] as const) {
+    const ink2 = resolve(theme, "--ink-2");
+    const card = resolve(theme, "--card");
+    for (const [label, r] of [
+      ["card", contrast(ink2, card)],
+      ["ground", contrast(ink2, resolve(theme, "--ground"))],
+      ["fill on card", contrast(ink2, resolve(theme, "--fill"), card)],
+    ] as const) {
+      assert.ok(r >= 4.5, `${name} --ink-2 ${ink2} on ${label}: ${r.toFixed(2)}`);
+    }
+  }
+});
+
+test("count bubbles: glyph digits on the category text tone reach 4.5:1 in both themes", () => {
+  for (const [name, theme] of [["light", light], ["dark", dark]] as const) {
+    const glyph = resolve(theme, "--glyph");
+    const card = resolve(theme, "--card");
+    for (const c of CATEGORIES) {
+      const fill = resolve(theme, `--c-${c}-text`); // translucent tones (idle) sit on the card
+      const r = contrast(glyph, fill, card);
+      assert.ok(r >= 4.5, `${name} ${c} bubble: ${glyph} on ${fill}: ${r.toFixed(2)}`);
+    }
+  }
 });
