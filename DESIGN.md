@@ -15,6 +15,10 @@ colors:
   trip: "#00c7be"
   navigate: "#32ade6"
   contributions: "#af52de"
+  languages: "#e70df2"
+  permissions: "#b84900"
+  users: "#d6008b"
+  android-auto: "#6f1fd6"
   idle: "#8e8e93"
   active-text-light: "#d70f3f"
   came-back-text-light: "#1f7f37"
@@ -29,6 +33,10 @@ colors:
   navigate-text-light: "#0071a4"
   cars-text-light: "#7a6142"
   contributions-text-light: "#8944ab"
+  languages-text-light: "#bd0bc6"
+  permissions-text-light: "#b84900"
+  users-text-light: "#d10088"
+  android-auto-text-light: "#6f1fd6"
   onboarding-fill-light: "#a37f00"
   trip-fill-light: "#00807a"
   navigate-fill-light: "#0071a4"
@@ -42,6 +50,10 @@ colors:
   actions-text-dark: "#7d7aff"
   routes-text-dark: "#5ac8e0"
   contributions-text-dark: "#da8fff"
+  languages-text-dark: "#e70df2"
+  permissions-text-dark: "#e35a00"
+  users-text-dark: "#ff00a6"
+  android-auto-text-dark: "#b75fe3"
   grouped-ground-light: "#f2f2f7"
   card-light: "#ffffff"
   card-pressed-light: "#f7f7fa"
@@ -228,7 +240,9 @@ A full-saturation category palette (Apple system colours) on a quiet grey ground
 - **Alarm Red** (alarm): Couldn't charge, the tab and sidebar count badge. Reserved for something broken.
 
 ### Tertiary (Usage categories)
-Each Usage section owns one colour: **Screens Blue** (screens, also charger submissions and the "Show table" link), **Actions Indigo** (actions, also versions and review reports), **Onboarding Yellow** (onboarding), **Trip Teal** (trip), **Navigate Sky** (navigate), **Contributions Purple** (contributions), **Cars Brown** (cars), **Routes Teal-Blue** (routes).
+Each Usage section owns one colour: **Screens Blue** (screens, also charger submissions and the "Show table" link), **Actions Indigo** (actions, also versions and review reports), **Onboarding Yellow** (onboarding), **Trip Teal** (trip), **Navigate Sky** (navigate), **Contributions Purple** (contributions), **Cars Brown** (cars), **Routes Teal-Blue** (routes), **Language Magenta** (languages), **Permission Rust** (permissions), **People Raspberry** (users), **Auto Violet** (Android Auto, once it has data).
+
+The four added for Usage (languages, permissions, users, android-auto) sit in the hue gaps the Apple system colours leave (magenta, raspberry, violet, rust). Picked by OKLab distance from every tone a Usage page shows (bases, light fills, light and dark text), each at least ΔE 10 from them, and validated as a set with the dataviz palette check in both modes (lightness band, chroma, CVD ≥ 8 pairwise, normal vision ≥ 15, ≥ 3:1 on the card; Auto Violet is under 3:1 on the dark card, which is legal because Android Auto draws no chart). The system was already crowded (Active and Alarm sit ΔE 4.5 apart), so a colour is never the only cue: every card carries its title.
 
 ### Neutral
 - **Grouped Ground** (grouped-ground-light / grouped-ground-dark): page background, #f2f2f7 light, pure black dark.
@@ -236,7 +250,7 @@ Each Usage section owns one colour: **Screens Blue** (screens, also charger subm
 - **Ink / Secondary Ink** (ink-*, ink-secondary-*): primary text; secondary text, units, meta, axis ticks. Secondary Ink is .73 alpha in light (iOS uses .6), the lightest that reaches 4.5:1 on Grouped Ground.
 - **Separator** (separator-*): 0.5px row dividers, chart gridlines.
 - **Fill** (fill-*): segmented track, zero bubbles, chips, pills, empty bars and progress tracks.
-- **Idle Grey** (idle): inactive tab icons, chevrons, sub-step bars, Android series, categories with no data yet (Android Auto).
+- **Idle Grey** (idle): inactive tab icons, chevrons, sub-step bars, Android series, and a category before its data exists (Android Auto until its first event, a Lune-only chart before the Lune update). Never a category that has data.
 - **Bar Material** (bar-material-*): the frosted tab bar.
 
 ### Category colour map
@@ -256,6 +270,10 @@ Each Usage section owns one colour: **Screens Blue** (screens, also charger subm
 | Routes | routes | routes-text-light | routes-text-light | routes-text-dark |
 | Cars | cars | cars-text-light | cars-fill-light | base |
 | Contributions | contributions | contributions-text-light | base | contributions-text-dark |
+| Languages | languages | languages-text-light | base | languages-text-dark (= base) |
+| Permissions | permissions | permissions-text-light (= base) | base | permissions-text-dark |
+| Users | users | users-text-light | base | users-text-dark |
+| Android Auto | android-auto | android-auto-text-light (= base) | base | android-auto-text-dark |
 | Idle | idle | ink-secondary-light | base | ink-secondary-dark |
 
 Every coloured text tone meets 4.5:1 on both Card and Grouped Ground in its theme, and so does Secondary Ink (also on Fill over Card, where zero bubbles and chips sit). Idle text is Secondary Ink, like any other secondary text. Count bubbles are filled with the category's **text** tone in both themes, not the fill tone, so their digits in glyph ink reach 4.5:1 too. `tests/tokens.test.ts` checks all of this with the WCAG formula.
@@ -302,7 +320,7 @@ Glyph ink on a filled square or bubble flips with the theme: white on light, bla
 - **Tablet and desktop (768px and up):** a 260px sidebar column plus content; content padding 10px 28px 48px, max width 1120px, centred. Cards sit in a two-column grid (16px gap); a card may span both. Needs you sits beside the rings on Home.
 - **Rhythm:** 16px between cards, 26px above a section title and 10px below it, 10–12px between a card header and its content, 4px between a value and its sub line.
 - **Large title block:** 18px top, 14px bottom, the theme toggle (36px circle in Fill) at the end edge.
-- **Responsive swaps, not shrinking:** the cohort table becomes per-phone chip rows (three chips across) under 768px and a table above it.
+- **Responsive swaps, not shrinking:** the cohort table becomes per-phone chip rows (three chips across) under 768px and a table above it. Inside Usage the swap follows the room the page has, not the viewport: the table shows from 600px of content (at 768 the sidebar leaves ~450px), and once a week has 10 or more installs ("60% (12 of 20)") the chips go one per row on a narrow page.
 - Logical properties only: `inset-inline`, `margin-inline`, `padding-inline-start`, `border-block-start`.
 
 Breakpoints: 768px is the only layout switch; the product must hold at 375 / 768 / 1440 with no horizontal scroll.
@@ -334,7 +352,7 @@ Continuous soft corners scaled to size: cards 16px, chips and sidebar links 10px
 - **Entry:** rises 14px and fades in over 0.5s, staggered 60ms by order.
 
 ### Category square
-Filled with the category colour (light: the fill tone from the map). The Today card's square is a 135deg gradient from Active to Queue because it holds all three rings. A square names a category; it is never an ornament.
+Filled with the category colour (light: the fill tone from the map). The Today card's square is a 135deg gradient from Active to Queue because it holds all three rings; by the same rule the Usage Funnels card's square is a 135deg gradient of Onboarding, Trip, Navigate and Contributions, the four funnels it holds. A square names a category; it is never an ornament.
 
 ### List rows (Needs you)
 - Two-column grid: title (Body) with a detail line (Footnote, Secondary Ink) on the start side, count bubble at the end. 11px block padding, 0.5px separators between rows.
@@ -360,12 +378,12 @@ Fill track, 9px radius, 2px padding, max width 420px, equal columns. Labels 13px
 - **Build ceiling (not yet shipped):** Fitness-style finish (arc gradient, end-cap shading, overlap past 100%), and a segmented ring when the goal or sample is under 10.
 
 ### Bars
-- **Sparkline bars (Home):** 30 flex columns, 3px gap, 64px tall, 3px radius, Active colour, growing from the bottom over 0.7s. A day with no data is a 3px Fill stub, not a bar. Axis: first day and "Today" in 12px Secondary Ink.
+- **Sparkline bars (Home):** 30 flex columns, 3px gap, 64px tall, 3px radius, Active colour, growing from the bottom over 0.7s. A day with a real zero is a 3px Fill stub, not a bar. A day nobody measured is a full-height hatch in Fill (45deg, 2px on 5px), so it never reads as a zero. Axis: first day and "Today" in 12px Secondary Ink.
 - **Progress bars (funnels):** 6px Fill track, 3px radius; fill in the funnel's colour, sub-steps in Idle Grey and indented 14px; widen over 0.9s, staggered 80ms after 0.1s.
 
 ### Charts (Usage)
 - SVG drawn at the container's real width (`clientWidth`, minimum 280px) with a viewBox in real pixels, so text and bars never scale. Redraw on resize when width changes by more than 40px.
-- Columns: 170px tall, 30px start gutter for ticks, stacked series with a 2px gap and only the top segment rounded (up to 4px). Gridlines in Separator at 0, half and max (0/1/2 when max is 2 or less). X labels every 7th day.
+- Columns: 170px tall, 30px start gutter for ticks, stacked series with a 2px gap and only the top segment rounded (up to 4px). Gridlines in Separator at 0, half and max (0/1/2 when max is 2 or less). X labels every 7th day. An unmeasured column is a full-height Fill hatch; its tooltip says "Not tracked" and the table gives one "not tracked" row per run. 90 days go by Monday week: phones as the average of the measured days, events summed only for fully measured weeks.
 - Horizontal bars: 32px rows, 16px bars, labels in a 112px (narrow) or 128px start gutter, total in 13px/600 after the bar.
 - Every column or row has a full-height transparent hit rect that is focusable and shows the tooltip (Card background, 12px radius, 13px, swatch per series) on hover and focus.
 - A key of 10px squares (3px radius) sits above multi-series charts; a "Show table" disclosure in Screens Blue text gives the same data as a table.
@@ -380,6 +398,8 @@ Fill track, 9px radius, 2px padding, max width 420px, equal columns. Labels 13px
 
 ### Empty and "not tracked" states
 - No data for a window that was never measured reads "not tracked" in 13px Secondary Ink. It is never drawn as 0.
+- The unmeasured spans live in one place (`src/lib/tracking.ts`): everything before 14 Sep 2026 (analytics shipped that day) and 16 Sep to 16 Oct 2026 inclusive (the app's events didn't reach the server). In charts those days are hatched (bars and columns), their tooltip and table say "not tracked", they stay out of every average, and a note under the chart names the span and why. A return window that overlaps one reads "not tracked".
+- People are counted once: "Any design" reads the server's all-designs rows, a design reads only its own rows, and counts of people are never summed across designs (only across platforms, where a phone is one install).
 - A real zero is a zero: Fill bubble, "Nothing waiting", or a Fill stub bar.
 - Data that will exist later says when: "Production return rates fill in after the Lune OTA", "No car events yet. They arrive with the next native build." That category's square goes Idle Grey.
 - Under 10, show counts only ("1 of 1") and say why in a sub line; a percentage always carries its count.

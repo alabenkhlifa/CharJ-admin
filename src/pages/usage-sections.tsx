@@ -11,6 +11,7 @@ import {
   type UsageStep,
 } from "../data/usage-report";
 import { countOrPercent, countOrPercentParts, plural, shortDay } from "../lib/health-format";
+import { untrackedNote } from "../lib/tracking";
 import type { Category } from "../ui/category";
 import { CohortChips } from "../ui/cohort-chips";
 import { Columns, type ColumnSeries } from "../ui/columns";
@@ -40,6 +41,7 @@ import {
   luneOnlyNote,
   lunePending,
   luneUnsplitNote,
+  seconds,
   unsplitNote,
   who,
   windowText,
@@ -58,7 +60,7 @@ export type SectionProps = {
 };
 
 /** iOS in the category's colour, Android (and anything else) in Idle Grey (DESIGN.md "Idle Grey"). */
-const byPlatform = (platforms: string[], values: (p: string) => number[], tone: Category): ColumnSeries[] =>
+const byPlatform = (platforms: string[], values: (p: string) => (number | null)[], tone: Category): ColumnSeries[] =>
   platforms.map((p) => ({ name: platformName(p), tone: p === "ios" ? tone : "idle", values: values(p) }));
 
 const weekOf = (w: string) => `Week of ${shortDay(w)}`;
@@ -69,14 +71,22 @@ export const ActivityDetail = ({ scope: s, waiting }: SectionProps) => {
   const a = s && !lunePending(s) ? activitySeries(s.report, { from: s.ui === "lune" ? s.firstLune : null }) : null;
   const week = a?.grain === "week";
   const any = !!a && a.totalActive.some(Boolean);
+  const missing = a ? untrackedNote(a.days) : null;
   const body = (chart: (series: NonNullable<typeof a>) => ReactNode) => {
     if (!s) return <Waiting size="chart">{waiting}</Waiting>;
     if (!a) return <Empty size="body">{LUNE_SOON}</Empty>;
-    if (!any) return <Empty size="body">No {who(s)} opened the app in {windowText(s.days)}.</Empty>;
+    if (a.avgActive === null) return <Empty size="body">{missing ?? "Not tracked."}</Empty>;
+    if (!any)
+      return (
+        <Empty size="body">
+          No {who(s)} opened the app in {windowText(s.days)}.{missing && ` ${missing}`}
+        </Empty>
+      );
     return (
       <>
         {chart(a)}
         {s.ui === "lune" && s.firstLune && <Note>Starts on {shortDay(s.firstLune)}, the first day with the Lune design.</Note>}
+        {missing && <Note>{missing} Those days are hatched and left out of the averages.</Note>}
       </>
     );
   };
@@ -87,15 +97,16 @@ export const ActivityDetail = ({ scope: s, waiting }: SectionProps) => {
       <HealthCard title="Active phones" color={color} icon={<UsageIcon name="pulse" />} meta={week ? "a day, by week" : "per day"} index={0}>
         {body((x) => (
           <>
-            <HeroValue value={x.avgActive} decimals={1} unit="phones a day" />
+            <HeroValue value={x.avgActive ?? 0} decimals={1} unit="phones a day" />
             <Columns
               labels={x.labels}
               series={byPlatform(x.platforms, (p) => x.active[p], "active")}
-              label={week ? "Phones that opened the app, average per day of each week" : "Phones that opened the app per day"}
+              label={week ? "Phones that opened the app, average per measured day of each week" : "Phones that opened the app per day"}
               {...axis}
             />
             <Note>
-              A phone counts once a day, however often it opens the app.{week && " Each column is the average day of that week."}
+              A phone counts once a day, however often it opens the app.
+              {week && " Each column is the average measured day of that week."}
             </Note>
           </>
         ))}
@@ -103,14 +114,17 @@ export const ActivityDetail = ({ scope: s, waiting }: SectionProps) => {
       <HealthCard title="Events" color={color} icon={<UsageIcon name="bars" />} meta={week ? "per week" : "per day"} index={1}>
         {body((x) => (
           <>
-            <HeroValue value={x.totalEvents.reduce((t, n) => t + n, 0)} unit="events" />
+            <HeroValue value={x.totalEvents.reduce<number>((t, n) => t + (n ?? 0), 0)} unit="events" />
             <Columns
               labels={x.labels}
               series={byPlatform(x.platforms, (p) => x.events[p], "active")}
               label={week ? "Events per week" : "Events per day"}
               {...axis}
             />
-            <Note>Everything the app sent, app opens included.</Note>
+            <Note>
+              Everything the app sent, app opens included, on the measured days.
+              {week && " A week with any unmeasured day is left out, since its sum would read low."}
+            </Note>
           </>
         ))}
       </HealthCard>
@@ -125,11 +139,12 @@ const WINDOW_LABEL = { 1: "Within 1 day", 7: "Within 7 days", 30: "Within 30 day
 export const ComingBackDetail = ({ scope: s, waiting }: SectionProps) => {
   let body: ReactNode = <Waiting size="list">{waiting}</Waiting>;
   let color: Category = "came-back";
-  if (s && lunePending(s)) {
+  // Cohorts are every install week: whether Lune has any comes from the cohort rows, not the window.
+  const weeks = s ? cohortRows(s.report) : [];
+  if (s && s.ui === "lune" && !weeks.length) {
     color = "idle";
     body = <Empty size="body">{LUNE_SOON}</Empty>;
   } else if (s) {
-    const weeks = cohortRows(s.report);
     if (!weeks.length) {
       color = "idle";
       body = <Empty size="body">No installs from {who(s)} since tracking began.</Empty>;
@@ -159,7 +174,11 @@ export const ComingBackDetail = ({ scope: s, waiting }: SectionProps) => {
           <Note>
             Installed = the week the anonymous account was created, counting only phones that opened the app. "Within N days" = opened
             again on any day 1 to N after installing; "open" means that window is still running for some installs. Under 10 installs
-            it shows counts, not percentages. Every install week since tracking began on 14 Sep 2026, whatever the window.
+            it shows counts, not percentages. Every install week, whatever the window.
+          </Note>
+          <Note>
+            Not tracked: before 14 Sep 2026, when analytics shipped, and from 16 Sep to 16 Oct 2026, when the app's events didn't
+            reach the server. A window that touches either span reads "not tracked" rather than a count that would run low.
           </Note>
         </>
       );
@@ -189,7 +208,7 @@ export const LanguagesDetail = ({ scope: s, waiting }: SectionProps) => {
       <>
         <HBars
           rows={rows.map((r) => ({ name: languageName(r.language), values: platforms.map((p) => r.platforms[p] ?? 0) }))}
-          series={platforms.map((p) => ({ name: platformName(p), tone: p === "ios" ? "actions" : "idle" }))}
+          series={platforms.map((p) => ({ name: platformName(p), tone: p === "ios" ? "languages" : "idle" }))}
           label="Users per language"
           labelHeader="Language"
         />
@@ -206,7 +225,7 @@ export const LanguagesDetail = ({ scope: s, waiting }: SectionProps) => {
     changes = (
       <HBars
         rows={switches.map((d) => ({ name: `To ${languageName(d.detail)}`, values: [d.events] }))}
-        series={[{ name: "Switches", tone: "actions" }]}
+        series={[{ name: "Switches", tone: "languages" }]}
         label="Language switches, by the language picked"
         labelHeader="Switched"
       />
@@ -214,10 +233,10 @@ export const LanguagesDetail = ({ scope: s, waiting }: SectionProps) => {
 
   return (
     <>
-      <HealthCard title="Users per language" color={pending ? "idle" : "actions"} icon={<UsageIcon name="globe" />} meta="users" index={0}>
+      <HealthCard title="Users per language" color={pending ? "idle" : "languages"} icon={<UsageIcon name="globe" />} meta="users" index={0}>
         {users}
       </HealthCard>
-      <HealthCard title="Language switches" color={s && !switches.length && soon ? "idle" : "actions"} icon={<UsageIcon name="globe" />} meta="times" index={1}>
+      <HealthCard title="Language switches" color={s && !switches.length && soon ? "idle" : "languages"} icon={<UsageIcon name="globe" />} meta="times" index={1}>
         {changes}
       </HealthCard>
     </>
@@ -259,7 +278,7 @@ export const ScreensDetail = ({ scope: s, waiting }: SectionProps) => {
                   label="Phones that saw each screen"
                   labelHeader="Screen"
                 />
-                <Note>Each phone counts once per screen. A phone that moved to the Lune design in this window counts once per design.</Note>
+                <Note>Each phone counts once per screen, whichever design it ran.</Note>
               </>
             )}
       </HealthCard>
@@ -483,22 +502,32 @@ const ContributionsCard = ({ scope: s, waiting, index }: FunnelProps) => {
 
 const PermissionsCard = ({ scope: s, waiting, index }: FunnelProps) => {
   let body: ReactNode = <Waiting size="list">{waiting}</Waiting>;
+  let color: Category = "permissions";
   if (s) {
     const kinds = permissionTable(s.report);
     const note = lunePending(s) ? LUNE_SOON : luneOnlyNote(s);
     const split = unsplitNote(s, { ui: false });
     if (!kinds.length) {
+      if (note) color = "idle";
       body = <Empty size="body">{note ?? `No permission asked in ${windowText(s.days)}.`}</Empty>;
     } else {
+      // Asked → allowed is the funnel's path, in the category colour; denied and
+      // not answered branch off it as sub-steps, like car skipped in Onboarding.
+      const name = (result: string) => {
+        const n = RESULT_NAME[result] ?? result;
+        return n.charAt(0).toUpperCase() + n.slice(1);
+      };
       const steps: LadderStep[] = kinds.flatMap((k) => [
         { name: `${permissionName(k.kind)} asked`, value: k.asked },
+        { name: name("granted"), value: k.results.granted ?? 0 },
         ...Object.entries(k.results)
+          .filter(([result]) => result !== "granted")
           .sort(([, a], [, b]) => b - a)
           .map(([result, n]) => ({ name: RESULT_NAME[result] ?? result, value: n, sub: true })),
       ]);
       body = (
         <>
-          <Ladder tone="idle" steps={steps} />
+          <Ladder tone="permissions" steps={steps} />
           <TableView
             caption="Permission answers by where they were asked"
             head={["Permission", "Asked from", "Answer", "Times"]}
@@ -516,7 +545,7 @@ const PermissionsCard = ({ scope: s, waiting, index }: FunnelProps) => {
     }
   }
   return (
-    <HealthCard title="Permissions" color="idle" icon={<UsageIcon name="lock" />} meta="times" index={index}>
+    <HealthCard title="Permissions" color={color} icon={<UsageIcon name="lock" />} meta="times" index={index}>
       {body}
     </HealthCard>
   );
@@ -540,7 +569,7 @@ export const MissingCarsCard = ({ scope: s, waiting }: SectionProps) => {
   if (s) {
     const mc = s.report.missing_cars;
     const soon = luneUnsplitNote(s);
-    if (!mc.total_searches) {
+    if (soon || !mc.total_searches) {
       if (soon) color = "idle";
       body = <Empty size="body">{soon ?? `No car searches in ${windowText(s.days)}.`}</Empty>;
     } else {
@@ -577,8 +606,6 @@ export const MissingCarsCard = ({ scope: s, waiting }: SectionProps) => {
 };
 
 // ---- Routes ----
-
-const seconds = (ms: number | null) => (ms == null ? "—" : `${(ms / 1000).toFixed(1)} s`);
 
 export const RoutesDetail = ({ scope: s, waiting }: SectionProps) => {
   const r = s?.report.routes;
@@ -632,20 +659,26 @@ export const AndroidAutoDetail = ({ scope: s, waiting }: SectionProps) => {
   if (s) {
     const aa = s.report.android_auto;
     body = aa.sessions ? (
-      <Stats
-        items={[
-          { value: nf.format(aa.sessions), label: "sessions" },
-          { value: `${(aa.minutes / aa.sessions).toFixed(1)} min`, label: "average length" },
-          { value: nf.format(aa.chargers_opened), label: "chargers opened" },
-          { value: nf.format(aa.navigations), label: "navigations" },
-        ]}
-      />
+      <>
+        <Stats
+          items={[
+            { value: nf.format(aa.sessions), label: "sessions" },
+            { value: `${(aa.minutes / aa.sessions).toFixed(1)} min`, label: "average length" },
+          ]}
+        />
+        <Stats
+          items={[
+            { value: nf.format(aa.chargers_opened), label: "chargers opened" },
+            { value: nf.format(aa.navigations), label: "navigations started" },
+          ]}
+        />
+      </>
     ) : (
       <Empty size="body">No car events yet. They arrive with the next native build: sessions, their length, chargers opened and navigation started in the car.</Empty>
     );
   }
   return (
-    <HealthCard title="Android Auto" color="idle" icon={<UsageIcon name="auto" />} index={0} wide>
+    <HealthCard title="Android Auto" color={s?.report.android_auto.sessions ? "android-auto" : "idle"} icon={<UsageIcon name="auto" />} index={0} wide>
       {body}
     </HealthCard>
   );

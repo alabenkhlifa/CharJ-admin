@@ -3,7 +3,10 @@ import { tone as baseTone, type Category } from "./category";
 import "./ui.css";
 
 type Props = {
-  /** One column per key (usually 30 days). A 0 or null is a 3px Fill stub, not a bar. */
+  /**
+   * One column per key (usually 30 days). A 0 is a 3px Fill stub (a real
+   * zero); null is a day nobody measured: a hatched column, never a 0.
+   */
   data: { key: string; value: number | null }[];
   tone: Category;
   /** Labels under the first and last column ("4 Oct", "Today"). */
@@ -19,7 +22,9 @@ export const Bars = ({ data, tone, axis, label }: Props) => {
     <>
       <div className="ui-bars" role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
         {data.map((d, i) =>
-          d.value ? (
+          d.value === null ? (
+            <i key={d.key} className="ui-bar-na" />
+          ) : d.value ? (
             <i
               key={d.key}
               style={{

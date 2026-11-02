@@ -199,6 +199,66 @@
           "#f3e5fa"
         ]
       },
+      "languages": {
+        "role": "tertiary",
+        "displayName": "Language Magenta",
+        "canonical": "#e70df2",
+        "tonalRamp": [
+          "#450449",
+          "#740679",
+          "#a209a9",
+          "#cb0bd5",
+          "#e70df2",
+          "#ee56f6",
+          "#f59efa",
+          "#fbdbfd"
+        ]
+      },
+      "permissions": {
+        "role": "tertiary",
+        "displayName": "Permission Rust",
+        "canonical": "#b84900",
+        "tonalRamp": [
+          "#371600",
+          "#5c2400",
+          "#813300",
+          "#a24000",
+          "#b84900",
+          "#cd804c",
+          "#e3b699",
+          "#f4e4d9"
+        ]
+      },
+      "users": {
+        "role": "tertiary",
+        "displayName": "People Raspberry",
+        "canonical": "#d6008b",
+        "tonalRamp": [
+          "#40002a",
+          "#6b0046",
+          "#960061",
+          "#bc007a",
+          "#d6008b",
+          "#e24cae",
+          "#ef99d1",
+          "#f9d9ee"
+        ]
+      },
+      "android-auto": {
+        "role": "tertiary",
+        "displayName": "Auto Violet",
+        "canonical": "#6f1fd6",
+        "tonalRamp": [
+          "#210940",
+          "#38106b",
+          "#4e1696",
+          "#621bbc",
+          "#6f1fd6",
+          "#9a62e2",
+          "#c5a5ef",
+          "#e9ddf9"
+        ]
+      },
       "idle": {
         "role": "neutral",
         "displayName": "Idle Grey",
@@ -384,6 +444,46 @@
         "role": "tertiary",
         "displayName": "Contributions Purple text tone (dark)",
         "canonical": "#da8fff"
+      },
+      "languages-text-light": {
+        "role": "tertiary",
+        "displayName": "Language Magenta text tone (light)",
+        "canonical": "#bd0bc6"
+      },
+      "languages-text-dark": {
+        "role": "tertiary",
+        "displayName": "Language Magenta text tone (dark)",
+        "canonical": "#e70df2"
+      },
+      "permissions-text-light": {
+        "role": "tertiary",
+        "displayName": "Permission Rust text tone (light)",
+        "canonical": "#b84900"
+      },
+      "permissions-text-dark": {
+        "role": "tertiary",
+        "displayName": "Permission Rust text tone (dark)",
+        "canonical": "#e35a00"
+      },
+      "users-text-light": {
+        "role": "tertiary",
+        "displayName": "People Raspberry text tone (light)",
+        "canonical": "#d10088"
+      },
+      "users-text-dark": {
+        "role": "tertiary",
+        "displayName": "People Raspberry text tone (dark)",
+        "canonical": "#ff00a6"
+      },
+      "android-auto-text-light": {
+        "role": "tertiary",
+        "displayName": "Auto Violet text tone (light)",
+        "canonical": "#6f1fd6"
+      },
+      "android-auto-text-dark": {
+        "role": "tertiary",
+        "displayName": "Auto Violet text tone (dark)",
+        "canonical": "#b75fe3"
       }
     },
     "typographyMeta": {
@@ -616,6 +716,21 @@
       {
         "name": "The Alarm Is Earned Rule",
         "body": "Alarm Red appears only when something is broken or waiting with a count above zero. A zero is drawn in Fill and Secondary Ink, never in a category colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Not Tracked Rule",
+        "body": "Days nobody measured (before 14 Sep 2026, and 16 Sep to 16 Oct 2026 inclusive; src/lib/tracking.ts) are a full-height Fill hatch in bars and columns, say \"not tracked\" in tooltips and tables, stay out of every average, and turn any return window that overlaps them into \"not tracked\". A real zero stays a 3px Fill stub.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Count Per Person Rule",
+        "body": "Any design reads the server's all-designs rows; a design reads only its own rows. People are never summed across designs, only across platforms, where a phone is one install.",
+        "section": "colors"
+      },
+      {
+        "name": "The Gradient Square Rule",
+        "body": "A card that holds several categories gets a 135deg gradient square of their fill tones: Today (Active to Queue) and the Usage Funnels card (Onboarding, Trip, Navigate, Contributions). Every other square is one category.",
         "section": "colors"
       },
       {

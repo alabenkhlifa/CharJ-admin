@@ -18,6 +18,7 @@ import {
   ringSegments,
   shortDay,
 } from "../lib/health-format";
+import { isTracked, untrackedNote, untrackedRuns } from "../lib/tracking";
 import { buildHash } from "../lib/use-route";
 import { Bars } from "../ui/bars";
 import { Bubble } from "../ui/bubble";
@@ -221,18 +222,23 @@ const ActiveCard = ({ report, waiting, href }: { report: SummaryReport | null; w
       </HealthCard>
     );
   }
-  const peak = Math.max(0, ...report.daily.map((d) => d.active));
+  // A day nobody measured is hatched, never a 0; real zero days stay stubs.
+  const daily = report.daily.map((d) => ({ key: d.day, value: isTracked(d.day) ? d.active : null }));
+  const peak = Math.max(0, ...daily.map((d) => d.value ?? 0));
+  const missing = untrackedNote(report.daily.map((d) => d.day));
+  const hatched = untrackedRuns(report.daily.map((d) => d.day)).map((r) => (r.from === r.to ? shortDay(r.from) : `${shortDay(r.from)} – ${shortDay(r.to)}`));
   const avg = report.avg7.toLocaleString("en-US", { maximumFractionDigits: 1 });
   return (
     <HealthCard title="Active phones" color="active" icon={ICON.pulse} meta="30 days" href={href} id="card-active" index={1}>
       <HeroValue value={report.avg7} decimals={1} unit="avg / day, last 7 days" />
       {/* No tooltip or table here: the whole card links to Usage, where the full chart has both. */}
       <Bars
-        data={report.daily.map((d) => ({ key: d.day, value: d.active }))}
+        data={daily}
         tone="active"
         axis={report.daily.length ? { start: shortDay(report.daily[0].day), end: "Today" } : undefined}
-        label={`Phones that opened the app per day, last ${report.daily.length} days: ${plural(report.today.active, "phones")} today, ${avg} a day over the last 7 days, peak ${nf.format(peak)}.`}
+        label={`Phones that opened the app per day, last ${report.daily.length} days: ${plural(report.today.active, "phones")} today, ${avg} a day over the last 7 days, peak ${nf.format(peak)}.${missing ? ` ${missing}` : ""}`}
       />
+      {hatched.length > 0 && <Empty>Hatched days weren't tracked ({hatched.join(", ")}).</Empty>}
     </HealthCard>
   );
 };
@@ -337,7 +343,9 @@ export const SummaryPage = ({ env, onEnv, queue }: Props) => {
   const report = usage.data;
   const waiting = usage.error ? "Couldn't load." : LOADING;
   const [openedAt] = useState(() => Date.now());
-  const usageHref = buildHash("usage", { env });
+  // Each card opens its own Usage drill-in, for the same data.
+  const activityHref = buildHash("usage", { env, section: "activity" });
+  const comingBackHref = buildHash("usage", { env, section: "coming-back" });
 
   const asOf = report ? Date.parse(report.generated_at) : openedAt;
   const sentence = report
@@ -369,8 +377,8 @@ export const SummaryPage = ({ env, onEnv, queue }: Props) => {
           )}
         </HealthCard>
         <NeedsYou queue={queue} />
-        <ActiveCard report={report} waiting={waiting} href={usageHref} />
-        <CameBackCard report={report} waiting={waiting} href={usageHref} />
+        <ActiveCard report={report} waiting={waiting} href={activityHref} />
+        <CameBackCard report={report} waiting={waiting} href={comingBackHref} />
         <VersionsCard report={report} waiting={waiting} />
       </div>
     </div>

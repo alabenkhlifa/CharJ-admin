@@ -94,8 +94,8 @@ const Back = ({ href }: { href: string }) => (
 
 const Foot = () => (
   <p className="use-foot">
-    Days are Tunis days, and internal test phones are left out. Classic includes the builds from before the design label existed
-    ("no label" on Summary). A phone that moved to the Lune design inside the window counts once per design.
+    Days are Tunis days, and internal test phones are left out. Any design counts each phone once, even one that moved to Lune
+    inside the window. No label is the builds from before the design label existed; they run the classic look.
   </p>
 );
 
@@ -117,12 +117,19 @@ export const UsagePage = ({ params, onParams }: Props) => {
   const platform = parseUsagePlatform(params.get("platform"));
   const ui = parseUsageUi(params.get("ui"));
   const env = parseUsageEnvironment(params.get("env"));
+  const keys = SECTION_FILTERS[section ?? "overview"];
   const filters = useMemo<UsageFilters>(() => ({ days, platform, ui, env }), [days, platform, ui, env]);
+  // A view reads only the filters it shows: a platform or design kept in the
+  // URL from the overview doesn't narrow (or annotate) Cars or Routes.
+  const shown = useMemo<UsageFilters>(
+    () => ({ ...filters, platform: keys.includes("platform") ? platform : "all", ui: keys.includes("ui") ? ui : "all" }),
+    [filters, keys, platform, ui],
+  );
 
   // Users has its own source; every other view reads the report.
   const usage = useUsage("usage", days, env, { enabled: section !== "users" });
   // Null while loading another window or environment: never the previous numbers.
-  const scope = useMemo(() => (usage.data ? makeScope(usage.data, filters) : null), [usage.data, filters]);
+  const scope = useMemo(() => (usage.data ? makeScope(usage.data, shown) : null), [usage.data, shown]);
   const waiting = usage.error ? "Couldn't load." : LOADING;
 
   // Links keep the filters exactly as the URL has them.
@@ -134,7 +141,6 @@ export const UsagePage = ({ params, onParams }: Props) => {
     window.scrollTo(0, 0);
   }, [section]);
 
-  const keys = SECTION_FILTERS[section ?? "overview"];
   const failed = usage.error && section !== "users" && (
     <RetryLine onRetry={usage.refresh}>Couldn't load usage. {usage.error}</RetryLine>
   );

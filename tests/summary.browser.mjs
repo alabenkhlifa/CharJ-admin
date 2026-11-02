@@ -72,7 +72,8 @@ const queueBodies = (zero = false) => ({
   "admin-feedback": {
     items: zero ? [] : todo.feedback.newest.map((f, i) => ({ id: `f${i}`, device_id: "d", category: f.category, message: f.message_80, email: "", app_version: "1.3.0", platform: "ios", locale: "fr", resolved: false, resolved_at: null, resolved_by: null, created_at: f.created_at })),
     total: zero ? 0 : todo.feedback.open,
-    summary: { total: 9, open: zero ? 0 : todo.feedback.open, resolved: 6, last_7_days: 1, by_category: { bug: 1, suggestion: 1, compliment: 1, charger_data: 0, other: 0 } },
+    // open_requests: what waits (design votes are informational; af43201 reads this field).
+    summary: { total: 9, open: zero ? 0 : todo.feedback.open, open_requests: zero ? 0 : todo.feedback.open, resolved: 6, last_7_days: 1, by_category: { bug: 1, suggestion: 1, compliment: 1, charger_data: 0, other: 0 } },
   },
   "admin-confirmations": {
     items: zero ? [] : todo.could_not_charge_7d.newest.map((v, i) => ({ id: `v${i}`, charger_id: "c1", charger_name: v.charger, charger_city: "La Marsa", user_id: "u1", outcome: "could_not_charge", reason: v.reason, connector_type: v.connector_type, visit_date: v.submitted_at.slice(0, 10), submitted_at: v.submitted_at, hidden_at: null, hidden_reason: null })),
@@ -219,7 +220,8 @@ try {
     eq(await page.locator(".sum-hl").innerText(), "", "zero: no highlight sentence when both days are 0 (its line stays)");
     eq(await hero(page, "#card-active"), "0.0 avg / day, last 7 days", "zero: 0.0 avg / day, named for its window");
     eq(await page.locator("#card-active .ui-bars i").count(), 30, "zero: 30 bars");
-    eq(await page.locator("#card-active .ui-bars i.ui-bar-zero").count(), 30, "zero: every day is a Fill stub");
+    eq(await page.locator("#card-active .ui-bars i.ui-bar-zero").count(), 17, "zero: every measured day is a Fill stub (a real zero)");
+    eq(await page.locator("#card-active .ui-bars i.ui-bar-na").count(), 13, "zero: 4–16 Oct are hatched, not tracked, never a zero stub");
     ok((await page.locator("#card-back").innerText()).includes("Fills in once an install week has had its 7 days"), "zero: Came back explains when it fills in");
     ok((await square(page, "#card-back")).includes("--c-idle-fill"), "zero: the Came back square goes Idle Grey with no cohort");
     ok((await page.getByText("No one opened the app in the last 30 days.").count()) === 1, "zero: Versions empty state");
@@ -262,10 +264,13 @@ try {
         eq(await page.locator("#card-needs .ui-meta").innerText(), "4 waiting", "snapshot: Needs you meta");
         eq(await page.locator(".ui-tabs .ui-nav-badge").innerText(), "4", "snapshot: Community tab badge is the queue total");
         eq(await hero(page, "#card-active"), "3.4 avg / day, last 7 days", "snapshot: 3.4 avg / day, last 7 days (the 7-day average, not the 30 days)");
-        eq(await page.locator("#card-active .ui-bars").getAttribute("aria-label"), "Phones that opened the app per day, last 30 days: 1 phone today, 3.4 a day over the last 7 days, peak 6.", "snapshot: the sparkline's label carries its numbers");
-        eq(await page.locator("#card-active .ui-bars i:not(.ui-bar-zero)").count(), prod.dau_30d.filter((d) => d.dau).length, "snapshot: a bar per day with phones");
+        eq(await page.locator("#card-active .ui-bars").getAttribute("aria-label"), "Phones that opened the app per day, last 30 days: 1 phone today, 3.4 a day over the last 7 days, peak 6. Not tracked: 4–16 Oct, when the app's events didn't reach the server.", "snapshot: the sparkline's label carries its numbers and the unmeasured days");
+        eq(await page.locator("#card-active .ui-bars i:not(.ui-bar-zero):not(.ui-bar-na)").count(), prod.dau_30d.filter((d) => d.dau && d.day >= "2026-10-17").length, "snapshot: a bar per measured day with phones");
+        eq(await page.locator("#card-active .ui-bars i.ui-bar-na").count(), 13, "snapshot: 4–16 Oct hatched (16 Oct had events but was only partly recorded)");
+        eq(await page.locator("#card-active .ui-empty").innerText(), "Hatched days weren't tracked (4 Oct – 16 Oct).", "snapshot: the card says which days are hatched");
+        eq(await page.locator("#card-back").getAttribute("href"), "#/usage?env=production&section=coming-back", "snapshot: Came back opens its Usage drill-in");
         eq(await page.locator("#card-active .ui-ax").innerText(), "4 Oct\nToday", "snapshot: axis from 4 Oct to Today");
-        eq(await page.locator("#card-active").getAttribute("href"), "#/usage?env=production", "snapshot: Active phones opens Usage for the same data");
+        eq(await page.locator("#card-active").getAttribute("href"), "#/usage?env=production&section=activity", "snapshot: Active phones opens the Activity drill-in for the same data");
         eq(await page.$$eval(".sum-vers li", (li) => li.map((l) => `${l.querySelector("span").firstChild.textContent} [${l.querySelector(".ui-pill").textContent}] ${l.querySelector("em").textContent}`)), ["Android 1.2.1 [no label] 19 users", "iOS 1.2.1 [no label] 19 users"], "snapshot: versions");
         eq(await page.locator(".ui-card", { hasText: "Versions in use" }).locator(".ui-meta").innerText(), "2 versions", "snapshot: 2 versions");
         eq((await page.locator(".sum-lang").innerText()).replace(/\s+/g, " "), "Users per language FR 25 · AR 0 · EN 13", "snapshot: users per language, counts only");
@@ -309,7 +314,7 @@ try {
     ok((await page.locator("#card-back").innerText()).includes("Counts only, since under 10 installs"), "env: Came back says why it shows counts");
     eq(await hero(page, "#card-back"), "1 of 1", "env: Came back 1 of 1");
     eq(await page.$$eval(".sum-vers li", (li) => li.length), 4, "env: four test-phone builds");
-    eq(await page.locator("#card-active").getAttribute("href"), "#/usage?env=development", "env: the cards keep the environment");
+    eq(await page.locator("#card-active").getAttribute("href"), "#/usage?env=development&section=activity", "env: the cards keep the environment");
     await page.reload();
     await page.waitForSelector(".ui-rings");
     eq(await page.locator(".ui-seg button[aria-pressed=true]").innerText(), "Development", "env: survives a reload");

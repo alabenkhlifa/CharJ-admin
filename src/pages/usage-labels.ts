@@ -2,7 +2,9 @@
 // values the app sends (record_app_events in ../charj/supabase/migrations).
 // A value with no name here is shown with its underscores turned to spaces.
 
-import type { UsageDays, UsageEnvironment, UsagePlatform, UsageUi } from "../data/usage-report";
+import { platformName, type UsageDays, type UsageEnvironment, type UsagePlatform, type UsageUi } from "../data/usage-report";
+
+export { platformName };
 
 export const SECTIONS = [
   "activity",
@@ -68,19 +70,20 @@ export const PLATFORM_OPTIONS: { v: UsagePlatform; l: string }[] = [
   { v: "ios", l: "iOS" },
   { v: "android", l: "Android" },
 ];
+// One server design each, never a sum: "No label" is the builds from before
+// the design label (they run the classic look).
 export const UI_OPTIONS: { v: UsageUi; l: string }[] = [
-  { v: "all", l: "Any design" },
+  { v: "all", l: "Any" },
   { v: "lune", l: "Lune" },
   { v: "classic", l: "Classic" },
+  { v: "unknown", l: "No label" },
 ];
+export const UI_NAME: Record<UsageUi, string> = { all: "Any design", lune: "Lune", classic: "Classic", unknown: "No label" };
 export const ENV_LABEL: Record<UsageEnvironment, string> = {
   production: "Production",
   preview: "Preview",
   development: "Development",
 };
-
-export const PLATFORM_NAME: Record<string, string> = { ios: "iOS", android: "Android", web: "Web" };
-export const platformName = (p: string) => PLATFORM_NAME[p] ?? p;
 
 export const LANGUAGE_NAME: Record<string, string> = { fr: "French", ar: "Arabic", en: "English" };
 export const languageName = (l: string) => LANGUAGE_NAME[l] ?? l.toUpperCase();

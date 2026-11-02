@@ -315,6 +315,12 @@ a.ui-card:hover {
   background: var(--fill);
   animation: none;
 }
+/* Not tracked: a hatched slot the full height, so it never reads as a zero. */
+.ui-bars i.ui-bar-na {
+  block-size: 100%;
+  background: repeating-linear-gradient(-45deg, var(--fill) 0 2px, transparent 2px 5px);
+  animation: none;
+}
 @keyframes ui-grow {
   from {
     transform: scaleY(0);

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { niceMax, shortDay } from "../lib/health-format";
 import { tone as baseTone, type Category } from "./category";
 import { ChartKey } from "./chart-key";
@@ -14,7 +15,8 @@ const BOTTOM = 22;
 const TOP = 6;
 const GAP = 2;
 
-export type ColumnSeries = { name: string; tone: Category; values: number[] };
+/** null = not tracked: a column where every series is null is drawn hatched, never as 0. */
+export type ColumnSeries = { name: string; tone: Category; values: (number | null)[] };
 
 type Props = {
   /** One per column, usually ISO days. */
@@ -33,6 +35,22 @@ type Props = {
   labelHeader?: string;
 };
 
+/**
+ * Table rows: the columns with something in them, and one "not tracked" row
+ * per run of unmeasured columns (first..last label); empty measured columns are left out.
+ */
+type TableRow = { key: string; first: string; last: string; index: number; na: boolean };
+const tableRows = (labels: string[], untracked: boolean[], totals: number[]): TableRow[] => {
+  const out: TableRow[] = [];
+  labels.forEach((lab, i) => {
+    const prev = out[out.length - 1];
+    if (untracked[i] && prev?.na && untracked[i - 1]) prev.last = lab;
+    else if (untracked[i]) out.push({ key: `na-${lab}`, first: lab, last: lab, index: i, na: true });
+    else if (totals[i]) out.push({ key: lab, first: lab, last: lab, index: i, na: false });
+  });
+  return out;
+};
+
 const roundedTop = (x: number, y: number, w: number, h: number, r: number) =>
   `M${x},${y + h} V${y + r} Q${x},${y} ${x + r},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + h} Z`;
 
@@ -40,6 +58,8 @@ const roundedTop = (x: number, y: number, w: number, h: number, r: number) =>
  * Stacked columns drawn at the container's real width, 30px start gutter for
  * ticks, gridlines at 0 / half / max, x labels every 7th from the end. Every
  * column is a focusable hit area with a tooltip; "Show table" has the numbers.
+ * A column with no measurement (every series null) is a hatched band that
+ * says "not tracked", in the tooltip and as one table row per run.
  */
 export const Columns = ({
   labels,
@@ -53,8 +73,10 @@ export const Columns = ({
 }: Props) => {
   const [ref, box] = useBoxWidth<HTMLDivElement>();
   const { tip, target } = useChartTip();
+  const hatch = `ui-hatch-${useId().replace(/:/g, "")}`;
   const n = labels.length;
   const at = (s: ColumnSeries, i: number) => s.values[i] ?? 0;
+  const untracked = labels.map((_, i) => series.length > 0 && series.every((s) => s.values[i] === null));
   const totals = labels.map((_, i) => series.reduce((a, s) => a + at(s, i), 0));
 
   let chart = null;
@@ -72,7 +94,17 @@ export const Columns = ({
     const ticks = top <= 2 ? [0, 1, 2] : [0, top / 2, top];
     chart = (
       <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="group" aria-label={label}>
+        <defs>
+          <pattern id={hatch} width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="2" height="5" style={{ fill: "var(--fill)" }} />
+          </pattern>
+        </defs>
         <g transform={box.rtl ? `translate(${W} 0) scale(-1 1)` : undefined}>
+          {labels.map((lab, i) =>
+            untracked[i] ? (
+              <rect key={`na-${lab}`} className="ui-col-na" x={GUTTER + band * i} y={TOP} width={band} height={H - BOTTOM - TOP} fill={`url(#${hatch})`} />
+            ) : null,
+          )}
           {ticks.map((t) => (
             <line key={t} x1={GUTTER} x2={W} y1={y(t)} y2={y(t)} style={{ stroke: "var(--sep)" }} strokeWidth={1} />
           ))}
@@ -102,7 +134,12 @@ export const Columns = ({
               y={TOP}
               width={band}
               height={H - BOTTOM - TOP}
-              {...target(formatLabel(lab), series.map((s) => ({ name: s.name, value: nf.format(at(s, i)), tone: s.tone })))}
+              {...target(
+                formatLabel(lab),
+                untracked[i]
+                  ? [{ name: "Not tracked", value: "—" }]
+                  : series.map((s) => ({ name: s.name, value: nf.format(at(s, i)), tone: s.tone })),
+              )}
             />
           ))}
         </g>
@@ -134,13 +171,29 @@ export const Columns = ({
         caption={label}
         head={[labelHeader, ...series.map((s) => s.name), ...(multi ? ["Total"] : [])]}
         numeric={series.map((_, i) => i + 1).concat(multi ? [series.length + 1] : [])}
-        rows={labels
-          .map((lab, i) => ({
-            key: lab,
-            cells: [formatLabel(lab), ...series.map((s) => nf.format(at(s, i))), ...(multi ? [nf.format(totals[i])] : [])],
-            total: totals[i],
-          }))
-          .filter((r) => r.total)}
+        rows={tableRows(labels, untracked, totals).map((r) =>
+          r.na
+            ? {
+                key: r.key,
+                cells: [
+                  r.first === r.last ? formatLabel(r.first) : `${formatLabel(r.first)} – ${formatLabel(r.last)}`,
+                  ...series.map((s) => (
+                    <span key={s.name} className="ui-na">
+                      not tracked
+                    </span>
+                  )),
+                  ...(multi ? [""] : []),
+                ],
+              }
+            : {
+                key: r.key,
+                cells: [
+                  formatLabel(r.first),
+                  ...series.map((s) => nf.format(at(s, r.index))),
+                  ...(multi ? [nf.format(totals[r.index])] : []),
+                ],
+              },
+        )}
       />
     </>
   );

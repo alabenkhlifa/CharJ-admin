@@ -18,6 +18,10 @@ export const CATEGORIES = [
   "trip",
   "navigate",
   "contributions",
+  "languages",
+  "permissions",
+  "users",
+  "android-auto",
   "idle",
 ] as const;
 

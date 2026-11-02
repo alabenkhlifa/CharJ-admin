@@ -9,6 +9,7 @@ import {
   screensTable,
 } from "../data/usage-report";
 import { countOrPercentParts, plural, shortDay } from "../lib/health-format";
+import { untrackedNote } from "../lib/tracking";
 import { Bars } from "../ui/bars";
 import { tone as baseTone, type Category } from "../ui/category";
 import type { SquareColor } from "../ui/category-square";
@@ -20,10 +21,12 @@ import { Note, Stats, UsageIcon, Waiting } from "./usage-bits";
 import { actionName, languageName, screenName, type UsageSection } from "./usage-labels";
 import {
   funnelSummaries,
+  funnelsUnsplitNote,
   LUNE_SOON,
   luneOnlyNote,
   lunePending,
   luneUnsplitNote,
+  seconds,
   unsplitNote,
   who,
   windowText,
@@ -64,8 +67,6 @@ const Preview = ({ section, title, color, icon, href, index, wide, children }: S
   </HealthCard>
 );
 
-const seconds = (ms: number | null) => (ms == null ? "—" : `${(ms / 1000).toFixed(1)} s`);
-
 export const ActivityPreview = ({ scope: s, waiting, href, index, wide }: CardProps) => {
   let body: ReactNode = <Waiting>{waiting}</Waiting>;
   let color: Category = "active";
@@ -75,10 +76,18 @@ export const ActivityPreview = ({ scope: s, waiting, href, index, wide }: CardPr
   } else if (s) {
     const from = s.ui === "lune" ? s.firstLune : null;
     const a = activitySeries(s.report, { from });
-    if (!a.totalActive.some(Boolean)) {
-      body = <Empty size="body">No {who(s)} opened the app in {windowText(s.days)}.</Empty>;
+    const missing = untrackedNote(a.days);
+    if (a.avgActive === null) {
+      body = <Empty size="body">{missing ?? "Not tracked."}</Empty>;
+    } else if (!a.totalActive.some(Boolean)) {
+      body = (
+        <Empty size="body">
+          No {who(s)} opened the app in {windowText(s.days)}.{missing && ` ${missing}`}
+        </Empty>
+      );
     } else {
       const week = a.grain === "week";
+      const peak = Math.max(...a.totalActive.map((v) => v ?? 0));
       body = (
         <>
           <HeroValue value={a.avgActive} decimals={1} unit="phones a day" />
@@ -86,9 +95,10 @@ export const ActivityPreview = ({ scope: s, waiting, href, index, wide }: CardPr
             data={a.labels.map((key, i) => ({ key, value: a.totalActive[i] }))}
             tone="active"
             axis={{ start: shortDay(a.labels[0]), end: week ? "This week" : "Today" }}
-            label={`Phones that opened the app ${week ? "a day, averaged by week" : "per day"}, ${windowText(s.days)}: ${a.avgActive.toLocaleString("en-US")} a day on average, peak ${nf.format(Math.max(...a.totalActive))}.`}
+            label={`Phones that opened the app ${week ? "a day, averaged by week" : "per day"}, ${windowText(s.days)}: ${a.avgActive.toLocaleString("en-US")} a day on the measured days, peak ${nf.format(peak)}.${missing ? ` ${missing}` : ""}`}
           />
           {from && <Note>Starts on {shortDay(from)}, the first day with the Lune design.</Note>}
+          {missing && <Note>{missing} Hatched, and left out of the average.</Note>}
         </>
       );
     }
@@ -103,11 +113,13 @@ export const ActivityPreview = ({ scope: s, waiting, href, index, wide }: CardPr
 export const ComingBackPreview = ({ scope: s, waiting, href, index, wide }: CardProps) => {
   let body: ReactNode = <Waiting>{waiting}</Waiting>;
   let color: Category = "came-back";
-  if (s && lunePending(s)) {
+  // Cohorts are every install week, so whether Lune has any is read from the cohort rows themselves.
+  const weeks = s ? cohortRows(s.report) : [];
+  if (s && s.ui === "lune" && !weeks.length) {
     color = "idle";
     body = <Empty size="body">{LUNE_SOON}</Empty>;
   } else if (s) {
-    const latest = latestCohort(cohortRows(s.report));
+    const latest = latestCohort(weeks);
     if (!latest) {
       color = "idle";
       body = (
@@ -142,7 +154,7 @@ export const ComingBackPreview = ({ scope: s, waiting, href, index, wide }: Card
 
 export const LanguagesPreview = ({ scope: s, waiting, href, index, wide }: CardProps) => {
   let body: ReactNode = <Waiting>{waiting}</Waiting>;
-  let color: Category = "actions";
+  let color: Category = "languages";
   if (s && lunePending(s)) {
     color = "idle";
     body = <Empty size="body">{LUNE_SOON}</Empty>;
@@ -223,17 +235,23 @@ export const ActionsPreview = ({ scope: s, waiting, href, index, wide }: CardPro
   );
 };
 
+/** admin-usage lists at most this many missing car names. */
+const MISSING_CAP = 50;
+
 const FUNNEL_TONE: Record<FunnelKey, Category> = {
   onboarding: "onboarding",
   trip: "trip",
   navigate: "navigate",
   contributions: "contributions",
-  permissions: "idle",
+  permissions: "permissions",
 };
 
-export const FunnelsPreview = ({ scope: s, waiting, href, index, wide }: CardProps) => (
+export const FunnelsPreview = ({ scope: s, waiting, href, index, wide }: CardProps) => {
+  const split = s && funnelsUnsplitNote(s);
+  return (
   <Preview section="funnels" title="Funnels" color="funnels" icon={<UsageIcon name="funnel" />} href={href} index={index} wide={wide}>
     {s ? (
+      <>
       <ul className="use-lines">
         {funnelSummaries(s).map((f) => (
           <li key={f.key}>
@@ -245,11 +263,14 @@ export const FunnelsPreview = ({ scope: s, waiting, href, index, wide }: CardPro
           </li>
         ))}
       </ul>
+      {split && <Note>{split}</Note>}
+      </>
     ) : (
       <Waiting>{waiting}</Waiting>
     )}
   </Preview>
-);
+  );
+};
 
 export const CarsPreview = ({ scope: s, waiting, href, index, wide }: CardProps) => {
   let body: ReactNode = <Waiting>{waiting}</Waiting>;
@@ -258,7 +279,8 @@ export const CarsPreview = ({ scope: s, waiting, href, index, wide }: CardProps)
     const mc = s.report.missing_cars;
     const soon = luneUnsplitNote(s);
     const split = unsplitNote(s);
-    if (!mc.total_searches) {
+    // Car searches are Lune events: under Classic or No label they'd belong to another design.
+    if (soon || !mc.total_searches) {
       if (soon) color = "idle";
       body = <Empty size="body">{soon ?? `No car searches in ${windowText(s.days)}.`} The catalog is inside.</Empty>;
     } else {
@@ -267,7 +289,8 @@ export const CarsPreview = ({ scope: s, waiting, href, index, wide }: CardProps)
         <>
           <HeroValue value={percent ?? counts} unit={percent ? `${counts} found nothing` : "searches found nothing"} />
           <Empty size="body">
-            {plural(mc.queries.length, "names")} to look at. The catalog is inside.{split && ` ${split}`}
+            {mc.queries.length >= MISSING_CAP ? `The top ${MISSING_CAP} names` : plural(mc.queries.length, "names")} to look at. The
+            catalog is inside.{split && ` ${split}`}
           </Empty>
         </>
       );
@@ -312,6 +335,8 @@ export const RoutesPreview = ({ scope: s, waiting, href, index, wide }: CardProp
 
 export const AndroidAutoPreview = ({ scope: s, waiting, href, index, wide }: CardProps) => {
   let body: ReactNode = <Waiting>{waiting}</Waiting>;
+  // Idle Grey only while there is no car data yet.
+  const color: Category = s && s.report.android_auto.sessions ? "android-auto" : "idle";
   if (s) {
     const aa = s.report.android_auto;
     if (!aa.sessions) {
@@ -328,7 +353,7 @@ export const AndroidAutoPreview = ({ scope: s, waiting, href, index, wide }: Car
     }
   }
   return (
-    <Preview section="android-auto" title="Android Auto" color="idle" icon={<UsageIcon name="auto" />} href={href} index={index} wide={wide}>
+    <Preview section="android-auto" title="Android Auto" color={color} icon={<UsageIcon name="auto" />} href={href} index={index} wide={wide}>
       {body}
     </Preview>
   );
@@ -348,7 +373,7 @@ export const UsersPreview = ({ href, index, wide }: Omit<CardProps, "scope" | "w
       </>
     );
   return (
-    <Preview section="users" title="Users" color="active" icon={<UsageIcon name="person" />} href={href} index={index} wide={wide}>
+    <Preview section="users" title="Users" color="users" icon={<UsageIcon name="person" />} href={href} index={index} wide={wide}>
       {body}
     </Preview>
   );

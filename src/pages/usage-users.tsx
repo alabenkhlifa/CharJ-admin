@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   useAdminUsers,
   type AdminUser,
@@ -166,6 +166,13 @@ export const UsersSection = ({ params, onParams }: Props) => {
   const per = (SIZES as readonly number[]).includes(Number(params.get("per"))) ? Number(params.get("per")) : DEFAULT_PER;
   const page = positive(params.get("page"), 1);
   const { data: users, total, loading, error, refresh } = useAdminUsers(page, per, show, lookup);
+  // A ?page= past the end (a shorter list since, or a hand-edited link) moves
+  // to the last page once the total is known, as the catalog does.
+  const last = Math.max(1, Math.ceil(total / per));
+  const past = !loading && !error && total > 0 && page > last;
+  useEffect(() => {
+    if (past) onParams({ page: last > 1 ? String(last) : null });
+  }, [past, last, onParams]);
 
   const scope = lookup
     ? "One driver, from Driver visits."
@@ -174,7 +181,7 @@ export const UsersSection = ({ params, onParams }: Props) => {
       : "Every anonymous session.";
 
   let body: ReactNode;
-  if (loading) body = <Waiting size="list">Loading…</Waiting>;
+  if (loading || past) body = <Waiting size="list">Loading…</Waiting>;
   else if (error) body = <RetryLine onRetry={refresh}>Couldn't load users: {error}</RetryLine>;
   else if (!users.length)
     body = (
@@ -201,7 +208,7 @@ export const UsersSection = ({ params, onParams }: Props) => {
       title="Users"
       color="active"
       icon={<UsageIcon name="person" />}
-      meta={!loading && !error ? (lookup ? "1 driver" : `${nf.format(total)} ${total === 1 ? "session" : "sessions"}`) : undefined}
+      meta={!loading && !error ? `${nf.format(total)} ${lookup ? (total === 1 ? "driver" : "drivers") : total === 1 ? "session" : "sessions"}` : undefined}
       index={0}
       wide
     >
@@ -221,7 +228,7 @@ export const UsersSection = ({ params, onParams }: Props) => {
       </div>
       <p className="use-cap">{scope} Reviews and submissions are left out: anonymous sign-ins rotate, so they rarely match a current session.</p>
       {body}
-      {!error && total > 0 && (
+      {!error && total > 0 && !past && (
         <Pager
           label="Users"
           page={page}

@@ -79,9 +79,11 @@ export const highlight = (
   return `${head}, ${fmt(Math.abs(diff))} ${diff > 0 ? "more" : "fewer"} than ${last}`;
 };
 
+/** Fixed short month names: some ICU builds (Chrome, Node) write "Sept" for en-GB. */
+export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 /** "2026-11-02" → "2 Nov" (a calendar day; no time zone shift). */
-export const shortDay = (isoDay: string): string =>
-  new Date(`${isoDay}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+export const shortDay = (isoDay: string): string => `${Number(isoDay.slice(8, 10))} ${MONTHS[Number(isoDay.slice(5, 7)) - 1]}`;
 
 /** A round axis top: 2 for tiny counts, then 1/2/5 × 10^k. */
 export const niceMax = (m: number): number => {

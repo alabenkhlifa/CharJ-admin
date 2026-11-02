@@ -1,13 +1,14 @@
 // ── admin-usage report: shapes, strict parsing, small derivations ──────────
 // Source: the admin-usage Edge Function (../charj/supabase/functions/admin-usage),
 // which returns public.admin_usage_report(view, days, environment) as is.
-// Pure module (its only import is the pure health-format helpers) so
-// `node --test` can load it directly.
+// Pure module (it imports only the pure health-format and tracking helpers)
+// so `node --test` can load it directly.
 //
 // Both views are parsed strictly: a missing key or a wrong type throws rather
 // than drawing a misleading 0. Extra keys are ignored, so an additive server
 // change never breaks the page.
 import { windowState, type WindowState } from "../lib/health-format.ts";
+import { cohortWindowUntracked, isTracked, UNTRACKED, type UntrackedSpan } from "../lib/tracking.ts";
 
 export const USAGE_ENVIRONMENTS = ["production", "preview", "development"] as const;
 export type UsageEnvironment = (typeof USAGE_ENVIRONMENTS)[number];
@@ -152,10 +153,14 @@ const parseUsage = (value: unknown): UsageReport => {
   const missing = object(r.missing_cars);
   const routes = object(r.routes);
   const auto = object(r.android_auto);
+  const daily = list(r.daily, (d) => ({ day: day(d.day), ...dims(d), active: count(d.active), events: count(d.events) }));
+  // Any design reads the server's ui='all' rows (people counted once across
+  // designs). A report without them would read as nobody, so it is refused.
+  if (daily.length && !daily.some((d) => d.ui === "all")) invalid();
   return {
     ...header(r),
     days,
-    daily: list(r.daily, (d) => ({ day: day(d.day), ...dims(d), active: count(d.active), events: count(d.events) })),
+    daily,
     cohorts: list(r.cohorts, (c) => ({
       install_week: day(c.install_week),
       ...dims(c),
@@ -245,12 +250,14 @@ export const languageCounts = (languages: SummaryReport["languages"]) => {
 };
 
 const PLATFORM: Record<string, string> = { android: "Android", ios: "iOS", web: "Web" };
+/** "iOS", "Android", "Web"; anything else as sent. */
+export const platformName = (p: string): string => PLATFORM[p] ?? p;
 
 /** "Android 1.3.0" + the design label ('unknown' is an older build: "no label"). */
 export const versionRows = (versions: SummaryReport["versions"]) => {
   const rows = versions.map((v) => ({
     key: `${v.platform}|${v.app_version}|${v.ui}`,
-    name: `${PLATFORM[v.platform] ?? v.platform} ${v.app_version}`,
+    name: `${platformName(v.platform)} ${v.app_version}`,
     ui: v.ui === "unknown" ? "no label" : v.ui,
     users: v.users,
   }));
@@ -261,7 +268,13 @@ export const versionRows = (versions: SummaryReport["versions"]) => {
 
 export const USAGE_PLATFORMS = ["all", "ios", "android"] as const;
 export type UsagePlatform = (typeof USAGE_PLATFORMS)[number];
-export const USAGE_UIS = ["all", "lune", "classic"] as const;
+export const USAGE_UIS = ["all", "lune", "classic", "unknown"] as const;
+/**
+ * The design filter is one server design each: 'all' (any design), 'lune',
+ * 'classic', or 'unknown' (builds from before the design label, shown as
+ * "No label"; they run the classic look). Never a sum of designs, because a
+ * phone that switched design would count twice.
+ */
 export type UsageUi = (typeof USAGE_UIS)[number];
 export type UsageFilter = { platform?: UsagePlatform; ui?: UsageUi };
 
@@ -273,25 +286,15 @@ export const parseUsageDays = (value: string | null | undefined): UsageDays =>
   pick(USAGE_DAYS, value == null ? null : Number(value), 30);
 /** `?platform=`: all, ios or android. */
 export const parseUsagePlatform = (value: string | null | undefined): UsagePlatform => pick(USAGE_PLATFORMS, value, "all");
-/** `?ui=`: all, lune or classic. */
+/** `?ui=`: all, lune, classic or unknown. */
 export const parseUsageUi = (value: string | null | undefined): UsageUi => pick(USAGE_UIS, value, "all");
 
-/**
- * Builds from before the Lune OTA send no design label ('unknown'), and the
- * Lune design did not exist yet, so they are classic (spec, "Data").
- */
-export const uiMatches = (ui: string, filter: UsageUi = "all"): boolean =>
-  filter === "all" || (filter === "lune" ? ui === "lune" : ui === "classic" || ui === "unknown");
 const platformMatches = (platform: string, filter: UsagePlatform = "all") => filter === "all" || platform === filter;
 
-/**
- * The report narrowed to one platform and/or design, client-side. Sections the
- * server does not split (contributions, missing cars, routes, Android Auto)
- * stay whole, and permissions have a design but no platform.
- */
-export const filterUsage = (report: UsageReport, { platform = "all", ui = "all" }: UsageFilter = {}): UsageReport => {
-  if (platform === "all" && ui === "all") return report;
-  const keep = <T extends UsageDims>(rows: T[]) => rows.filter((r) => platformMatches(r.platform, platform) && uiMatches(r.ui, ui));
+/** Every design of one platform: for questions about a design (has Lune started?). */
+export const onPlatform = (report: UsageReport, platform: UsagePlatform = "all"): UsageReport => {
+  if (platform === "all") return report;
+  const keep = <T extends UsageDims>(rows: T[]) => rows.filter((r) => platformMatches(r.platform, platform));
   const f = report.funnels;
   return {
     ...report,
@@ -300,21 +303,42 @@ export const filterUsage = (report: UsageReport, { platform = "all", ui = "all" 
     languages: keep(report.languages),
     screens: keep(report.screens),
     actions: keep(report.actions),
+    funnels: { ...f, onboarding: keep(f.onboarding), trip: keep(f.trip), navigate: { taps: keep(f.navigate.taps), launched: keep(f.navigate.launched) } },
+  };
+};
+
+/**
+ * The report narrowed to one platform and exactly one design, client-side.
+ * Any design reads the server's ui='all' rows, where a person is counted once
+ * across designs; a design reads only its own rows. Summing over platforms
+ * stays exact (a phone is one install). Sections the server does not split
+ * (contributions, missing cars, routes, Android Auto) stay whole; permissions
+ * have a design but no platform and no 'all' rows (they are plain counts).
+ */
+export const filterUsage = (report: UsageReport, { platform = "all", ui = "all" }: UsageFilter = {}): UsageReport => {
+  const p = onPlatform(report, platform);
+  const keep = <T extends UsageDims>(rows: T[]) => rows.filter((r) => r.ui === ui);
+  const f = p.funnels;
+  return {
+    ...p,
+    daily: keep(p.daily),
+    cohorts: keep(p.cohorts),
+    languages: keep(p.languages),
+    screens: keep(p.screens),
+    actions: keep(p.actions),
     funnels: {
       ...f,
       onboarding: keep(f.onboarding),
       trip: keep(f.trip),
       navigate: { taps: keep(f.navigate.taps), launched: keep(f.navigate.launched) },
-      permissions: f.permissions.filter((p) => uiMatches(p.ui, ui)),
+      permissions: ui === "all" ? f.permissions : f.permissions.filter((x) => x.ui === ui),
     },
   };
 };
 
 // ── Usage page: derivations ────────────────────────────────────────────────
-// Distinct-user counts are summed across platforms (a phone is on one) and
-// across designs. A phone that moved to Lune inside the window sits in two
-// design rows, so a summed user count can run one high per such phone; the
-// page says so.
+// Each takes a report from filterUsage (one design), so the only sums are
+// over platforms, where a phone counts once.
 
 /** iOS first, then Android, then anything else the server saw. */
 const PLATFORM_ORDER = ["ios", "android"];
@@ -327,9 +351,6 @@ const add = (into: Record<string, number>, key: string, n: number) => {
   into[key] = (into[key] ?? 0) + n;
 };
 
-/** Analytics shipped on 14 Sep 2026 (app_analytics_events, the cohort rollup's first week). */
-export const TRACKING_STARTED = "2026-09-14";
-
 export type CohortWindow = { days: 1 | 7 | 30; n: number; of: number; state: WindowState };
 export type CohortWeek = {
   install_week: string;
@@ -341,10 +362,10 @@ export type CohortWeek = {
 
 /**
  * Return windows per install week, newest first, summed over the rows left by
- * the filters. A window reads "not tracked" when it closed, for the week's
- * first installers, before tracking began (windowState), never a 0.
+ * the filters. A window that overlaps a day nobody measured (lib/tracking)
+ * reads "not tracked", never a 0; otherwise windowState says open or final.
  */
-export const cohortRows = (report: UsageReport, trackedFrom: string | null = TRACKING_STARTED): CohortWeek[] => {
+export const cohortRows = (report: UsageReport, spans: readonly UntrackedSpan[] = UNTRACKED): CohortWeek[] => {
   const weeks = new Map<string, { installed: number; back: [number, number, number]; open: [boolean, boolean, boolean]; platforms: Record<string, number> }>();
   for (const c of report.cohorts) {
     const w = weeks.get(c.install_week) ?? { installed: 0, back: [0, 0, 0], open: [false, false, false], platforms: {} };
@@ -365,7 +386,7 @@ export const cohortRows = (report: UsageReport, trackedFrom: string | null = TRA
         days,
         n: w.back[i],
         of: w.installed,
-        state: windowState(install_week, trackedFrom, days, !w.open[i]),
+        state: cohortWindowUntracked(install_week, days, spans) ? "not_tracked" : windowState(install_week, null, days, !w.open[i]),
       })),
     }));
 };
@@ -379,16 +400,21 @@ export type ActivitySeries = {
   /** ISO days, or the Monday of each week. */
   labels: string[];
   platforms: string[];
-  /** Phones that opened the app: per day, or the average per day of each week. */
-  active: Record<string, number[]>;
-  /** All events: per day, or summed per week. */
-  events: Record<string, number[]>;
-  totalActive: number[];
-  totalEvents: number[];
-  /** Mean phones a day over every day shown. */
-  avgActive: number;
-  /** Days shown (after `from`). */
-  dayCount: number;
+  /**
+   * Phones that opened the app: per day, or the average per measured day of
+   * each week. null = not tracked (never drawn as 0).
+   */
+  active: Record<string, (number | null)[]>;
+  /** All events: per day, or summed per week. null = not tracked (a week with any unmeasured day). */
+  events: Record<string, (number | null)[]>;
+  totalActive: (number | null)[];
+  totalEvents: (number | null)[];
+  /** Mean phones a day over the measured days shown; null when none was measured. */
+  avgActive: number | null;
+  /** Measured days shown (after `from`). */
+  trackedDays: number;
+  /** Every day shown, measured or not. */
+  days: string[];
 };
 
 const monday = (isoDay: string) => {
@@ -400,15 +426,20 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 
 /**
  * Active phones and events per platform. 7 and 30 days are daily; 90 days are
- * Monday weeks (lib/time-range's grain), where active is the average per day
- * (distinct phones can't be summed over days) and events are summed.
- * `from` drops the days before it (a Lune chart starts at its first event).
+ * Monday weeks (lib/time-range's grain), where active is the average per
+ * measured day (distinct phones can't be summed over days) and events are
+ * summed. Days nobody measured (lib/tracking) are null and stay out of every
+ * average. `from` drops the days before it (a Lune chart starts at its first event).
  */
-export const activitySeries = (report: UsageReport, { from }: { from?: string | null } = {}): ActivitySeries => {
+export const activitySeries = (
+  report: UsageReport,
+  { from, spans = UNTRACKED }: { from?: string | null; spans?: readonly UntrackedSpan[] } = {},
+): ActivitySeries => {
   const grain = report.days === 90 ? "week" : "day";
   const rows = from ? report.daily.filter((d) => d.day >= from) : report.daily;
   const platforms = platformsOf(rows);
   const days = [...new Set(rows.map((d) => d.day))].sort();
+  const tracked = (d: string) => isTracked(d, spans);
   const perDay = new Map<string, { active: Record<string, number>; events: Record<string, number> }>();
   for (const d of rows) {
     const at = perDay.get(d.day) ?? { active: {}, events: {} };
@@ -418,33 +449,43 @@ export const activitySeries = (report: UsageReport, { from }: { from?: string | 
   }
   const labels = grain === "day" ? days : [...new Set(days.map(monday))];
   const bucketDays = (label: string) => (grain === "day" ? [label] : days.filter((d) => monday(d) === label));
-  const active: Record<string, number[]> = {};
-  const events: Record<string, number[]> = {};
+  const active: Record<string, (number | null)[]> = {};
+  const events: Record<string, (number | null)[]> = {};
   for (const p of platforms) {
     active[p] = labels.map((label) => {
-      const ds = bucketDays(label);
+      const ds = bucketDays(label).filter(tracked);
+      if (!ds.length) return null;
       const sum = ds.reduce((a, d) => a + (perDay.get(d)?.active[p] ?? 0), 0);
       return grain === "day" ? sum : round1(sum / ds.length);
     });
-    events[p] = labels.map((label) => bucketDays(label).reduce((a, d) => a + (perDay.get(d)?.events[p] ?? 0), 0));
+    events[p] = labels.map((label) => {
+      const ds = bucketDays(label);
+      // A sum with an unmeasured day in it would read low: the whole bucket is not tracked.
+      if (!ds.every(tracked)) return null;
+      return ds.reduce((a, d) => a + (perDay.get(d)?.events[p] ?? 0), 0);
+    });
   }
-  const totalActive = labels.map((_, i) => round1(platforms.reduce((a, p) => a + active[p][i], 0)));
-  const totalEvents = labels.map((_, i) => platforms.reduce((a, p) => a + events[p][i], 0));
-  const allActive = days.reduce((a, d) => a + Object.values(perDay.get(d)?.active ?? {}).reduce((x, y) => x + y, 0), 0);
+  const total = (series: Record<string, (number | null)[]>, i: number) => {
+    const vs = platforms.map((p) => series[p][i]);
+    return vs.every((v) => v === null) ? null : round1(vs.reduce<number>((a, v) => a + (v ?? 0), 0));
+  };
+  const measured = days.filter(tracked);
+  const allActive = measured.reduce((a, d) => a + Object.values(perDay.get(d)?.active ?? {}).reduce((x, y) => x + y, 0), 0);
   return {
     grain,
     labels,
     platforms,
     active,
     events,
-    totalActive,
-    totalEvents,
-    avgActive: days.length ? round1(allActive / days.length) : 0,
-    dayCount: days.length,
+    totalActive: labels.map((_, i) => total(active, i)),
+    totalEvents: labels.map((_, i) => total(events, i)),
+    avgActive: measured.length ? round1(allActive / measured.length) : null,
+    trackedDays: measured.length,
+    days,
   };
 };
 
-/** Any event from the Lune design in the window (after a platform filter). */
+/** Any event from the Lune design in the window (on a report from onPlatform: every design). */
 export const luneSeen = (report: UsageReport): boolean => report.daily.some((d) => d.ui === "lune" && d.events > 0);
 
 /** The first day with a Lune event, or null before the Lune update. */

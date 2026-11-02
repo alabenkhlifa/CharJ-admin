@@ -5,6 +5,7 @@ import {
   filterUsage,
   firstLuneDay,
   luneSeen,
+  onPlatform,
   permissionTable,
   stepTotals,
   tapRows,
@@ -15,7 +16,7 @@ import {
   type UsageUi,
 } from "../data/usage-report";
 import { plural } from "../lib/health-format";
-import { ENV_LABEL, platformName, type FilterKey } from "./usage-labels";
+import { ENV_LABEL, platformName, UI_NAME, type FilterKey } from "./usage-labels";
 
 export type UsageFilters = { days: UsageDays; platform: UsagePlatform; ui: UsageUi; env: UsageEnvironment };
 
@@ -31,12 +32,13 @@ export type UsageScope = UsageFilters & {
 };
 
 export const makeScope = (raw: UsageReport, f: UsageFilters): UsageScope => {
-  const onPlatform = filterUsage(raw, { platform: f.platform });
+  // Has Lune started? Asked of every design on the platform, not the filtered rows.
+  const designs = onPlatform(raw, f.platform);
   return {
     ...f,
     report: filterUsage(raw, { platform: f.platform, ui: f.ui }),
-    lune: luneSeen(onPlatform),
-    firstLune: firstLuneDay(onPlatform),
+    lune: luneSeen(designs),
+    firstLune: firstLuneDay(designs),
     luneAnywhere: luneSeen(raw),
   };
 };
@@ -47,18 +49,25 @@ export const CLASSIC_ONLY = "Only the Lune design sends these events.";
 /** Under the Lune filter before any Lune event: every split section is empty for that reason. */
 export const lunePending = (s: UsageScope) => s.ui === "lune" && !s.lune;
 
-/** Why a Lune-only chart is empty, or null when an empty one is a real zero. */
-export const luneOnlyNote = (s: UsageScope): string | null => (s.ui === "classic" ? CLASSIC_ONLY : !s.lune ? LUNE_SOON : null);
+/** Classic or No label: designs that never send Lune-only events. */
+export const notLune = (s: Pick<UsageScope, "ui">) => s.ui === "classic" || s.ui === "unknown";
 
-/** For Lune-only counts the server doesn't split by platform or design. */
-export const luneUnsplitNote = (s: UsageScope): string | null => (s.luneAnywhere ? null : LUNE_SOON);
+/** Why a Lune-only chart is empty, or null when an empty one is a real zero. */
+export const luneOnlyNote = (s: UsageScope): string | null => (notLune(s) ? CLASSIC_ONLY : !s.lune ? LUNE_SOON : null);
+
+/**
+ * For Lune-only counts the server doesn't split (contributions started, missing
+ * cars): not shown under Classic or No label, where they'd claim Lune events
+ * for another design; and not before any Lune event.
+ */
+export const luneUnsplitNote = (s: UsageScope): string | null => (notLune(s) ? CLASSIC_ONLY : s.luneAnywhere ? null : LUNE_SOON);
 
 export const windowText = (days: UsageDays) => `the last ${days} days`;
 
 /** "phones", "iOS phones", "Android phones on the Lune design". */
 export const who = (s: Pick<UsageScope, "platform" | "ui">) => {
   const p = s.platform === "all" ? "" : `${platformName(s.platform)} `;
-  const d = s.ui === "all" ? "" : s.ui === "lune" ? " on the Lune design" : " on the classic design";
+  const d = { all: "", lune: " on the Lune design", classic: " on the classic design", unknown: " on builds with no design label" }[s.ui];
   return `${p}phones${d}`;
 };
 
@@ -77,14 +86,26 @@ export const scopeLine = (f: UsageFilters, keys: FilterKey[]) =>
     keys.includes("days") && `Last ${f.days} days`,
     keys.includes("env") && ENV_LABEL[f.env],
     keys.includes("platform") && f.platform !== "all" && platformName(f.platform),
-    keys.includes("ui") && f.ui !== "all" && (f.ui === "lune" ? "Lune" : "Classic"),
+    keys.includes("ui") && f.ui !== "all" && UI_NAME[f.ui],
   ]
     .filter(Boolean)
     .join(" · ");
 
+/** "0.4 s" for a route answer; "—" when there is none. */
+export const seconds = (ms: number | null) => (ms == null ? "—" : `${(ms / 1000).toFixed(1)} s`);
+
 export type FunnelKey = "onboarding" | "trip" | "navigate" | "contributions" | "permissions";
 
 /** One line per funnel for the overview card: its first and last step, as counts. */
+/** What the Funnels card can't narrow: contributions (any filter), permissions (platform). */
+export const funnelsUnsplitNote = (s: UsageScope): string | null => {
+  const parts = [
+    (s.platform !== "all" || s.ui !== "all") && "Contributions aren't split by platform or design",
+    s.platform !== "all" && "permissions aren't split by platform",
+  ].filter(Boolean);
+  return parts.length ? `${parts.join(", and ")}: they count every phone.` : null;
+};
+
 export const funnelSummaries = (s: UsageScope): { key: FunnelKey; name: string; text: string }[] => {
   const f = s.report.funnels;
   const pending = lunePending(s);
@@ -118,6 +139,7 @@ export const funnelSummaries = (s: UsageScope): { key: FunnelKey; name: string; 
 
   const contributions = (() => {
     const c = f.contributions;
+    // Started and sent are Lune-only events, and none of these are split by design.
     if (luneUnsplitNote(s)) return `${plural(c.reviews_posted, "reviews")} posted`;
     return `${plural(c.review_started, "reviews")} started · ${n(c.reviews_posted)} posted · ${plural(c.submitted, "chargers")} sent`;
   })();

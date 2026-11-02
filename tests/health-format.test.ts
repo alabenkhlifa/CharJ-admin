@@ -78,6 +78,7 @@ test("plural drops the s for one", () => {
 
 test("shortDay and niceMax for chart labels and axes", () => {
   assert.equal(shortDay("2026-11-02"), "2 Nov");
+  assert.equal(shortDay("2026-09-21"), "21 Sep");
   assert.equal(shortDay("2026-10-04"), "4 Oct");
   assert.equal(niceMax(0), 2);
   assert.equal(niceMax(2), 2);

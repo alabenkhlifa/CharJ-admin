@@ -48,6 +48,10 @@ const MAP: [string, "light" | "dark" | "both", string][] = [
   ["navigate-text-light", "light", "--c-navigate-text"],
   ["cars-text-light", "light", "--c-cars-text"],
   ["contributions-text-light", "light", "--c-contributions-text"],
+  ["languages-text-light", "light", "--c-languages-text"],
+  ["permissions-text-light", "light", "--c-permissions-text"],
+  ["users-text-light", "light", "--c-users-text"],
+  ["android-auto-text-light", "light", "--c-android-auto-text"],
   ["ink-secondary-light", "light", "--c-idle-text"],
   ["active-text-dark", "dark", "--c-active-text"],
   ["came-back-text-dark", "dark", "--c-came-back-text"],
@@ -58,6 +62,10 @@ const MAP: [string, "light" | "dark" | "both", string][] = [
   ["actions-text-dark", "dark", "--c-actions-text"],
   ["routes-text-dark", "dark", "--c-routes-text"],
   ["contributions-text-dark", "dark", "--c-contributions-text"],
+  ["languages-text-dark", "dark", "--c-languages-text"],
+  ["permissions-text-dark", "dark", "--c-permissions-text"],
+  ["users-text-dark", "dark", "--c-users-text"],
+  ["android-auto-text-dark", "dark", "--c-android-auto-text"],
   ["ink-secondary-dark", "dark", "--c-idle-text"],
   // Categories with no dark text tone use their base.
   ["onboarding", "dark", "--c-onboarding-text"],
@@ -78,6 +86,10 @@ const MAP: [string, "light" | "dark" | "both", string][] = [
   ["routes-text-light", "light", "--c-routes-fill"],
   ["cars-fill-light", "light", "--c-cars-fill"],
   ["contributions", "light", "--c-contributions-fill"],
+  ["languages", "light", "--c-languages-fill"],
+  ["permissions", "light", "--c-permissions-fill"],
+  ["users", "light", "--c-users-fill"],
+  ["android-auto", "light", "--c-android-auto-fill"],
   ["grouped-ground-light", "light", "--ground"],
   ["card-light", "light", "--card"],
   ["card-pressed-light", "light", "--card-pressed"],
@@ -163,6 +175,41 @@ test("every coloured text tone reads at 4.5:1 on Card and Grouped Ground in both
         const fg = resolve(theme, `--c-${c}-text`);
         const ratio = contrast(fg, bg);
         assert.ok(ratio >= 4.5, `${name} ${c} text ${fg} on ${surface} ${bg}: ${ratio.toFixed(2)}`);
+      }
+    }
+  }
+});
+
+// The Usage page shows every category except the queue, needs-you and alarm.
+// No two of them may share a colour: each tone a page draws (base, light fill,
+// light text, dark text) stays apart from every other category's same tone.
+const oklab = (hex: string) => {
+  const [r, g, b] = rgb(hex).map((v) => v / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+};
+const deltaE = (a: string, b: string) => {
+  const [x, y] = [oklab(a), oklab(b)];
+  return 100 * Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+};
+
+test("the four Usage-only categories stay apart from every category on the Usage page, in every tone", () => {
+  const added = ["languages", "permissions", "users", "android-auto"];
+  const onUsage = CATEGORIES.filter((c) => !["queue", "needs-you", "alarm"].includes(c));
+  const tones: [Record<string, string>, string][] = [
+    [light, "--c-%"],
+    [light, "--c-%-fill"],
+    [light, "--c-%-text"],
+    [dark, "--c-%-text"],
+  ];
+  for (const a of added) {
+    for (const b of onUsage) {
+      if (a === b || b === "idle") continue;
+      for (const [theme, pattern] of tones) {
+        const [x, y] = [resolve(theme, pattern.replace("%", a)), resolve(theme, pattern.replace("%", b))];
+        assert.ok(deltaE(x, y) >= 10, `${a} vs ${b} ${pattern}: ${x} / ${y} ΔE ${deltaE(x, y).toFixed(1)}`);
       }
     }
   }

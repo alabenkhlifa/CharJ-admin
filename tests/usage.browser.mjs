@@ -30,6 +30,40 @@ const grid = (days, value) => days.flatMap((day) => PLATFORMS.flatMap((platform)
 const stepGrid = (steps, value) => steps.flatMap((step) => PLATFORMS.flatMap((platform) => UIS.map((ui) => ({ step, platform, ui, ...value(step, platform, ui) }))));
 const header = (environment, days) => ({ generated_at: DATA.generated_at, timezone: "Africa/Tunis", environment, days });
 
+// The server's ui='all' rows (Task 8b): people counted once across designs.
+// Here a sum of the design rows, except where `once` says a phone sat in two
+// designs ("languages|fr|android": 1), which is what "never sum designs" tests.
+const NUM = new Set(["active", "events", "installed", "returned_1", "returned_7", "returned_30", "users", "views", "taps", "went"]);
+const allRows = (rows, section, once = {}) => {
+  const by = new Map();
+  for (const r of rows) {
+    if (r.ui === "all") continue;
+    const id = Object.entries(r).filter(([k]) => !NUM.has(k) && k !== "ui").map(([, v]) => v).join("|");
+    const at = by.get(id) ?? { ...r, ui: "all", ...Object.fromEntries(Object.keys(r).filter((k) => NUM.has(k)).map((k) => [k, 0])) };
+    for (const k of Object.keys(r)) if (NUM.has(k)) at[k] += r[k];
+    by.set(id, at);
+  }
+  for (const [id, at] of by) {
+    const key = `${section}|${id.split("|").filter((v) => typeof v === "string").join("|")}`;
+    if (once[key]) Object.assign(at, once[key]);
+  }
+  return [...rows, ...by.values()];
+};
+const withAll = (r, once = {}) => ({
+  ...r,
+  daily: allRows(r.daily, "daily", once),
+  cohorts: allRows(r.cohorts, "cohorts", once),
+  languages: allRows(r.languages, "languages", once),
+  screens: allRows(r.screens, "screens", once),
+  actions: allRows(r.actions, "actions", once),
+  funnels: {
+    ...r.funnels,
+    onboarding: allRows(r.funnels.onboarding, "onboarding", once),
+    trip: allRows(r.funnels.trip, "trip", once),
+    navigate: { taps: allRows(r.funnels.navigate.taps, "taps", once), launched: allRows(r.funnels.navigate.launched, "launched", once) },
+  },
+});
+
 // The test phones: the S24U ran an older build until 2 Nov, the iPhone Lune.
 const phoneUi = (phone, day) => (phone === "iPhone" || day >= "2026-11-02" ? "lune" : "unknown");
 const DEV_DETAIL = { None: "", True: "true", False: "false" };
@@ -45,7 +79,7 @@ const development = (days = 30) => {
   const window = lastDays(days);
   const byDay = new Map(DATA.activity.days.map((d) => [d.day, d]));
   const f = DATA.funnels;
-  return {
+  return withAll({
     ...header("development", days),
     daily: grid(window, (day, platform, ui) => {
       const d = byDay.get(day);
@@ -62,6 +96,8 @@ const development = (days = 30) => {
     }))),
     languages: [
       { language: "fr", platform: "android", ui: "lune", users: 1 },
+      // The S24U used French on both builds: one phone, so 'all' says 1 (see `once`).
+      { language: "fr", platform: "android", ui: "unknown", users: 1 },
       { language: "en", platform: "android", ui: "unknown", users: 1 },
       { language: "fr", platform: "ios", ui: "lune", users: 1 },
       { language: "ar", platform: "ios", ui: "lune", users: 1 },
@@ -86,7 +122,7 @@ const development = (days = 30) => {
     missing_cars: { total_searches: DATA.missing_cars.total_car_searches, no_result: DATA.missing_cars.no_result_searches, queries: DATA.missing_cars.queries.map((q) => ({ query: q.query, searches: q.count })) },
     routes: { found: DATA.route_timing.succeeded_n, failed: [], p50_ms: DATA.route_timing.p50_ms, p95_ms: Math.round(DATA.route_timing.p95_ms) },
     android_auto: { sessions: 0, minutes: 0, chargers_opened: 0, navigations: 0 },
-  };
+  }, { "languages|fr|android": { users: 1 } });
 };
 
 // Production: the Task 1 / 1b sample. Daily from the mock's production DAU,
@@ -114,7 +150,7 @@ const prodDau = new Map(DATA.production_overview.dau_30d.map((d) => [d.day, d.da
 const zeroSteps = (steps) => stepGrid(steps, () => ({ events: 0, users: 0 }));
 const production = (days = 30) => {
   const trip = { route_requested: { android: [3, 6], ios: [3, 5] }, route_succeeded: { android: [3, 6], ios: [3, 5] }, navigation_launched: { android: [2, 5], ios: [1, 3] } };
-  return {
+  return withAll({
     ...header("production", days),
     daily: grid(lastDays(days), (day, platform, ui) => {
       const dau = prodDau.get(day) ?? 0;
@@ -147,9 +183,9 @@ const production = (days = 30) => {
     missing_cars: { queries: [], no_result: 0, total_searches: 0 },
     routes: { found: 11, failed: [], p50_ms: 438, p95_ms: 1614 },
     android_auto: { minutes: 0, sessions: 0, navigations: 0, chargers_opened: 0 },
-  };
+  });
 };
-const zero = (environment = "production", days = 30) => ({
+const zero = (environment = "production", days = 30) => withAll({
   ...header(environment, days),
   daily: grid(lastDays(days), () => ({ active: 0, events: 0 })),
   cohorts: [], languages: [], screens: [], actions: [],
@@ -173,19 +209,20 @@ const big = (environment, days = 30) => {
     environment,
     daily: r.daily.map((d) => ({ ...d, active: x(d.active), events: x(d.events) })),
     cohorts: r.cohorts.map((c) => ({ ...c, installed: x(c.installed) + 17, returned_1: x(c.returned_1), returned_7: x(c.returned_7) + 3, returned_30: x(c.returned_30) })),
-    languages: [...r.languages.map((l) => ({ ...l, users: x(l.users) })), { language: "de", platform: "ios", ui: "lune", users: 42 }],
+    languages: [...r.languages.map((l) => ({ ...l, users: x(l.users) })), ...["lune", "all"].map((ui) => ({ language: "de", platform: "ios", ui, users: 42 }))],
     screens: r.screens.map((s) => ({ ...s, views: x(s.views), users: x(s.users) })),
     actions: r.actions.map((a) => ({ ...a, events: x(a.events) })),
     funnels: {
       ...r.funnels,
       onboarding: r.funnels.onboarding.map((s) => ({ ...s, users: x(s.users), events: x(s.events) })),
       trip: r.funnels.trip.map((s) => ({ ...s, users: x(s.users), events: x(s.events) })),
-      navigate: { taps: [...r.funnels.navigate.taps.map((t) => ({ ...t, taps: x(t.taps), went: x(t.went) })), { warning: "private_emergency", platform: "android", ui: "lune", taps: 4321, went: 1234 }], launched: r.funnels.navigate.launched.map((s) => ({ ...s, users: x(s.users), events: x(s.events) })) },
+      navigate: { taps: [...r.funnels.navigate.taps.map((t) => ({ ...t, taps: x(t.taps), went: x(t.went) })), ...["lune", "all"].map((ui) => ({ warning: "private_emergency", platform: "android", ui, taps: 4321, went: 1234 }))], launched: r.funnels.navigate.launched.map((s) => ({ ...s, users: x(s.users), events: x(s.events) })) },
       contributions: { review_started: 12345, reviews_posted: 6789, add_started: 4321, submitted: 1234 },
       permissions: [{ kind: "location", result: "undetermined", source: "map_trip", ui: "lune", count: 12345 }, ...r.funnels.permissions.map((p) => ({ ...p, count: x(p.count) }))],
     },
     missing_cars: { total_searches: 54321, no_result: 12345, queries: [{ query: "mercedes-benz eqs suv 580 4matic", searches: 1234 }, ...r.missing_cars.queries] },
     routes: { found: 123456, failed: [{ reason: "service_unavailable", count: 12345 }, { reason: "no_route", count: 234 }], p50_ms: 12345, p95_ms: 123456 },
+    android_auto: { sessions: 12345, minutes: 98765.5, chargers_opened: 4321, navigations: 987 },
   };
 };
 
@@ -326,13 +363,21 @@ try {
       if (width === 390 && colorScheme === "light") {
         ok(requests.includes("admin-usage?view=usage&days=30&environment=development"), "overview: asks admin-usage view=usage for 30 days", requests);
         eq(await page.locator(".ui-lt p").innerText(), "Last 30 days · Development", "overview: subtitle names the window and data");
-        eq(await pressed(page), ["Window=30 days", "Platform=All phones", "App design=Any design", "Data=Development"], "overview: four filters");
+        eq(await pressed(page), ["Window=30 days", "Platform=All phones", "App design=Any", "Data=Development"], "overview: four filters");
+        eq(await page.locator(".ui-seg[aria-label='App design'] button").allInnerTexts(), ["Any", "Lune", "Classic", "No label"], "overview: one server design per option, never a sum");
         eq(await page.$$eval(".use-sec", (h) => h.map((x) => x.textContent)), ["Is anyone using it?", "Do people come back?", "Which features get used?", "Where do people get stuck?", "Cars and Android Auto", "Who uses it?"], "overview: the mock's questions head the groups");
         eq(await page.$$eval(".use a.ui-card", (a) => a.map((x) => x.getAttribute("href"))), OVERVIEW_ORDER.map((s) => `#/usage?env=development&section=${s}`), "overview: every card is a Show all link that keeps the filters");
         ok((await page.$$eval(".use a.ui-card .ui-meta", (m) => m.map((x) => x.textContent))).every((t) => t === "Show all"), "overview: each card says Show all");
-        const avg = development().daily.reduce((a, d) => a + d.active, 0) / 30;
-        eq(await hero(page, "#usage-activity"), `${(Math.round(avg * 10) / 10).toFixed(1)} phones a day`, "activity: the window's average a day");
-        eq(await page.locator("#usage-activity .ui-bars i").count(), 30, "activity: 30 daily bars");
+        // The all-designs rows, measured days only (17 Oct – 2 Nov): 4–16 Oct were not tracked.
+        const measured = development().daily.filter((d) => d.ui === "all" && d.day >= "2026-10-17");
+        const avg = measured.reduce((a, d) => a + d.active, 0) / 17;
+        eq(await hero(page, "#usage-activity"), `${(Math.round(avg * 10) / 10).toFixed(1)} phones a day`, "activity: the average of the measured days");
+        eq(await page.locator("#usage-activity .ui-bars i").count(), 30, "activity: 30 daily slots");
+        eq(await page.locator("#usage-activity .ui-bars i.ui-bar-na").count(), 13, "activity: 4–16 Oct hatched as not tracked, not drawn as 0");
+        ok((await cardText(page, "usage-activity")).includes("Not tracked: 4–16 Oct, when the app's events didn't reach the server. Hatched, and left out of the average."), "activity: the card says which days and why");
+        ok((await square(page, "#usage-languages")).includes("--c-languages-fill"), "languages: its own colour");
+        ok((await square(page, "#usage-users")).includes("--c-users-fill"), "users: its own colour");
+        ok(!(await page.locator(".use-foot").innerText()).includes("counts once per design"), "foot: no double-count caveat any more");
         eq(await hero(page, "#usage-coming-back"), "1 of 1", "coming back: the newest final week, as counts");
         ok((await cardText(page, "usage-coming-back")).includes("Counts only"), "coming back: says why there's no percentage");
         eq((await page.locator("#usage-languages .use-stats").innerText()).replace(/\s+/g, " "), "2 French 1 Arabic 1 English", "languages: users per language, FR / AR / EN");
@@ -407,8 +452,12 @@ try {
     eq(await titles(page), ["Active phones", "Events"], "activity: active phones and events");
     eq(await page.locator(".use .ui-card").first().locator(".ui-key span").allInnerTexts(), ["iOS", "Android"], "activity: iOS and Android series with a key");
     eq(await page.locator(".use .ui-card").first().locator("rect.ui-hit").count(), 30, "activity: a hit target per day");
+    eq(await page.locator(".use .ui-card").first().locator("rect.ui-col-na").count(), 13, "activity: 13 unmeasured days drawn as hatched bands");
+    await page.locator(".use .ui-card").first().locator("rect.ui-hit").nth(5).focus();
+    eq(await page.locator(".ui-tip").innerText().then((t) => t.replace(/\s+/g, " ").trim()), "9 Oct Not tracked —", "activity: an unmeasured day's tooltip says not tracked");
     await page.locator(".use .ui-card").first().locator("summary").click();
     ok((await page.locator(".use .ui-card").first().locator("table tbody tr").count()) > 0, "activity: Show table lists the days with phones");
+    eq(await page.locator(".use .ui-card").first().locator("table tbody tr").first().innerText().then((t) => t.replace(/\s+/g, " ").trim()), "4 Oct – 16 Oct not tracked not tracked", "activity: the table gives the unmeasured run as one not-tracked row");
     eq(await hscroll(page), 0, "activity: the open table keeps the page from scrolling sideways");
     // Coming back: the May iPhone install predates tracking: not tracked, never 0.
     await page.goto(`${base}/#/usage?env=development&section=coming-back`);
@@ -457,6 +506,7 @@ try {
     ok((await cardText(page, "usage-activity")).includes("Starts on 1 Nov, the first day with the Lune design."), "filters: a Lune chart starts at its first event, said on the card");
     eq(await page.locator("#usage-activity .ui-bars i").count(), shown.length, "filters: no zero days drawn before Lune");
     ok((await cardText(page, "usage-routes")).includes("Not split by platform or design"), "filters: routes say they count every phone");
+    ok((await cardText(page, "usage-funnels")).includes("Contributions aren't split by platform or design, and permissions aren't split by platform: they count every phone."), "filters: the Funnels card says which lines count every phone");
     await page.reload();
     await ready(page);
     eq(await pressed(page), ["Window=7 days", "Platform=iOS", "App design=Lune", "Data=Development"], "filters: survive a reload");
@@ -472,9 +522,19 @@ try {
     // A filter that matches nothing: an honest empty state, not zeros.
     await page.goto(`${base}/#/usage?env=development&platform=ios&ui=classic`);
     await ready(page);
-    eq(await cardText(page, "usage-activity").then((t) => t.split("\n").slice(-1)[0]), "No iOS phones on the classic design opened the app in the last 30 days.", "empty filter: Activity says so");
+    eq(await cardText(page, "usage-activity").then((t) => t.split("\n").slice(-1)[0]), "No iOS phones on the classic design opened the app in the last 30 days. Not tracked: 4–16 Oct, when the app's events didn't reach the server.", "empty filter: Activity says so, and which days weren't measured");
     eq(await page.locator("#usage-activity .ui-bars, #usage-activity .ui-val").count(), 0, "empty filter: no zero bars or hero");
     ok((await cardText(page, "usage-screens")).includes("Only the Lune design sends these events."), "empty filter: Lune-only charts say why under Classic");
+    eq(await page.locator("#usage-funnels .use-lines li").nth(3).innerText().then((t) => t.replace(/\s+/g, " ")), "Contributions 0 reviews posted", "classic: no Lune-only contribution counts");
+    ok((await cardText(page, "usage-cars")).includes("Only the Lune design sends these events."), "classic: car searches are Lune events, not shown as classic");
+    // One phone used French on both builds: Any design says 2 French phones, never 1 + 1 + 1.
+    await page.goto(`${base}/#/usage?env=development`);
+    await ready(page);
+    eq((await page.locator("#usage-languages .use-stats").innerText()).replace(/\s+/g, " "), "2 French 1 Arabic 1 English", "any design: a phone in two designs counts once");
+    await page.goto(`${base}/#/usage?env=development&ui=unknown`);
+    await ready(page);
+    eq((await page.locator("#usage-languages .use-stats").innerText()).replace(/\s+/g, " "), "1 French 0 Arabic 1 English", "no label: only the older builds' rows");
+    eq(await page.locator(".ui-lt p").innerText(), "Last 30 days · Development · No label", "no label: in the subtitle");
     eq(await hscroll(page), 0, "filters: no horizontal scroll");
     await context.close();
   }
@@ -498,7 +558,20 @@ try {
     ok((await cardText(page, "usage-cars")).includes("Starts with the Lune update."), "production: missing cars start with the Lune update");
     eq(await hero(page, "#usage-coming-back"), "1 of 4", "production: came back 1 of 4 (week of 19 Oct)");
     eq((await page.locator("#usage-languages .use-stats").innerText()).replace(/\s+/g, " "), "25 French 0 Arabic 13 English", "production: FR 25 · AR 0 · EN 13");
+    eq(await page.locator("#usage-activity .ui-bars i.ui-bar-na").count(), 13, "production: 4–16 Oct are hatched, though 16 Oct has events (a partial day)");
+    const prodMeasured = [...prodDau].filter(([d]) => d >= "2026-10-17").map(([, v]) => v);
+    eq(await hero(page, "#usage-activity"), `${(Math.round((prodMeasured.reduce((a, v) => a + v, 0) / 17) * 10) / 10).toFixed(1)} phones a day`, "production: the average leaves 4–16 Oct out");
+    ok(!(await page.locator("#usage-funnels").innerText()).includes("split"), "production, no filter: no unsplit note");
     await shot(page, "t8-390-production.png");
+    await page.goto(`${base}/#/usage?section=coming-back`);
+    await ready(page);
+    const prodCoh = await page.$$eval(".use .ui-coh li", (li) => li.map((x) => x.innerText.replace(/\s+/g, " ")));
+    for (const w of ["21 Sep", "28 Sep", "5 Oct"]) {
+      const row = prodCoh.find((x) => x.startsWith(`Week of ${w} `));
+      ok(row && /Within 1 day not tracked Within 7 days not tracked/.test(row), `production: the week of ${w} reads not tracked for day 1 and day 7`, row);
+    }
+    ok(prodCoh.find((x) => x.startsWith("Week of 19 Oct")).includes("Within 7 days 1 of 4"), "production: 19 Oct is measured, 1 of 4", prodCoh);
+    ok((await page.locator(".use .ui-card").innerText()).includes("from 16 Sep to 16 Oct 2026, when the app's events didn't reach the server"), "production: the cohort note names both spans");
     await page.goto(`${base}/#/usage?section=funnels`);
     await ready(page);
     ok((await page.locator(".use .ui-card", { hasText: "Onboarding" }).innerText()).includes("Starts with the Lune update."), "production: onboarding drill-in waits for Lune");
@@ -568,19 +641,28 @@ try {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await copy.click();
     eq(await copy.innerText(), "Copied", "users: tapping an id copies it");
-    for (const width of [768, 1440]) {
+    // 1036 and 1100 put the card just past the 720px table switch (container 720–780).
+    for (const width of [768, 1036, 1100, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.waitForTimeout(300);
       eq(await hscroll(page), 0, `users: no horizontal scroll at ${width}`);
       fit = await fits(page);
       ok(fit.bad.length === 0, `users: fits at ${width}`, fit);
-      eq(await page.locator(".use-users-table").isVisible(), width === 1440, `users: ${width === 1440 ? "a table on a wide card" : "rows on a narrow card"}`);
+      const wide = await page.evaluate(() => document.querySelector(".use").getBoundingClientRect().width >= 720);
+      eq(await page.locator(".use-users-table").isVisible(), wide, `users: ${wide ? "a table on a wide card" : "rows on a narrow card"} at ${width}`);
     }
     await shot(page, "t8-1440-users.png");
     // Driver visits → Open driver now builds section=users.
     await page.goto(`${base}/#/usage?section=users&user=${USERS[3].id}`);
     await page.waitForSelector(".use-chip");
     ok(true, "users: section=users&user= works too");
+    await page.goto(`${base}/#/usage?section=users&user=ffffffff-0000-4000-8000-000000000000`);
+    await page.waitForSelector(".use .ui-card .ui-empty");
+    eq(await page.locator(".use .ui-card .ui-meta").innerText(), "0 drivers", "users: a lookup that finds nobody says 0 drivers");
+    await page.goto(`${base}/#/usage?section=users&page=9`);
+    await page.waitForFunction(() => location.hash.includes("page=2"));
+    await page.waitForSelector(".use-users li", { state: "attached" });
+    eq(await page.locator(".ui-pager-range").innerText(), "26–40 of 40", "users: a page past the end moves to the last page");
     await context.close();
   }
 
@@ -620,6 +702,8 @@ try {
       ok(fit.bad.length === 0, `${tag}: fits`, fit);
       eq(await hscroll(page), 0, `${tag}: no horizontal scroll`);
       if (!s) eq(fit.columns, width >= 1024 + 80 ? 2 : 1, `${tag}: ${width >= 1100 ? "two columns" : "one column"}`);
+      if (!s) ok((await square(page, "#usage-android-auto")).includes(fixture === "big" ? "--c-android-auto-fill" : "--c-idle-fill"), `${tag}: Android Auto is ${fixture === "big" ? "violet with data" : "idle grey before its data"}`);
+      if (s === "funnels") ok((await square(page, ".use .ui-card:last-child")).includes("--c-permissions-fill"), `${tag}: Permissions has its own colour once it has data`);
     }
     if (width === 768 && fixture === "dev") {
       await page.goto(`${base}/#/usage?env=development`);

@@ -20,6 +20,10 @@
   --c-trip: #00c7be;
   --c-navigate: #32ade6;
   --c-contributions: #af52de;
+  --c-languages: #e70df2;
+  --c-permissions: #b84900;
+  --c-users: #d6008b;
+  --c-android-auto: #6f1fd6;
   --c-idle: #8e8e93;
 
   /* Type ramp (font shorthand; set font-variant-numeric after it, the
@@ -139,6 +143,10 @@ html[data-theme="light"] {
   --c-navigate-text: #0071a4;
   --c-cars-text: #7a6142;
   --c-contributions-text: #8944ab;
+  --c-languages-text: #bd0bc6;
+  --c-permissions-text: var(--c-permissions);
+  --c-users-text: #d10088;
+  --c-android-auto-text: var(--c-android-auto);
   --c-idle-text: var(--ink-2);
 
   /* Squares and bubbles carrying a glyph (white on light). */
@@ -155,6 +163,10 @@ html[data-theme="light"] {
   --c-navigate-fill: #0071a4;
   --c-cars-fill: #7a6142;
   --c-contributions-fill: var(--c-contributions);
+  --c-languages-fill: var(--c-languages);
+  --c-permissions-fill: var(--c-permissions);
+  --c-users-fill: var(--c-users);
+  --c-android-auto-fill: var(--c-android-auto);
   --c-idle-fill: var(--c-idle);
 }
 
@@ -185,6 +197,10 @@ html[data-theme="dark"] {
   --c-navigate-text: var(--c-navigate);
   --c-cars-text: var(--c-cars);
   --c-contributions-text: #da8fff;
+  --c-languages-text: var(--c-languages);
+  --c-permissions-text: #e35a00;
+  --c-users-text: #ff00a6;
+  --c-android-auto-text: #b75fe3;
   --c-idle-text: var(--ink-2);
 
   /* Dark: every fill is the base tone, glyphs are black. */
@@ -201,6 +217,10 @@ html[data-theme="dark"] {
   --c-navigate-fill: var(--c-navigate);
   --c-cars-fill: var(--c-cars);
   --c-contributions-fill: var(--c-contributions);
+  --c-languages-fill: var(--c-languages);
+  --c-permissions-fill: var(--c-permissions);
+  --c-users-fill: var(--c-users);
+  --c-android-auto-fill: var(--c-android-auto);
   --c-idle-fill: var(--c-idle);
 }
 
