@@ -15,6 +15,7 @@ import { Pill } from "../../ui/pill";
 import { Segmented } from "../../ui/segmented";
 import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Waiting, When } from "./bits";
 import { nf, useClampPage } from "./format";
+import { Row } from "./row";
 import type { CommunityView } from "./params";
 import { useSaving } from "./use-saving";
 
@@ -64,54 +65,60 @@ const ReportRow = ({ report, onFlip, track }: RowProps) => {
   };
   const r = report.review;
   return (
-    <li className="com-item">
-      <div className="com-top">
-        <div className="com-tags">
-          <h3 className="com-title">{report.reasonLabel || "No reason"}</h3>
+    <Row
+      glyph={<ComIcon name="flag" />}
+      tone={report.resolved ? null : "actions"}
+      title={report.reasonLabel || "No reason"}
+      when={report.createdAt}
+      status={
+        <>
+          {r ? (
+            <>
+              A review of <bdi>{r.chargerName || "an unnamed charger"}</bdi>
+            </>
+          ) : (
+            "The review no longer exists."
+          )}
           {report.resolved && <Pill>Resolved</Pill>}
-        </div>
-        <When iso={report.createdAt} />
-      </div>
-      <p className="com-meta">
-        {r ? (
-          <>
-            A review of <bdi>{r.chargerName || "an unnamed charger"}</bdi>
-          </>
-        ) : (
-          "The review no longer exists."
-        )}
-      </p>
+        </>
+      }
+      actions={
+        <button type="button" className="ui-btn" onClick={() => void toggle()} disabled={busy}>
+          {busy ? (report.resolved ? "Reopening…" : "Resolving…") : report.resolved ? "Reopen" : "Resolve"}
+        </button>
+      }
+      after={
+        error && (
+          <p className="ui-error" role="alert">
+            {error}
+          </p>
+        )
+      }
+    >
       {report.notes.trim() && (
         <p className="com-text">
           <bdi>{report.notes}</bdi>
         </p>
       )}
+      {/* The reported review itself, quoted: what the admin decides on, without a click. */}
       {r && (
-        <details className="ui-details">
-          <summary>Show review</summary>
-          <p className="com-meta">
-            <Stars n={r.stars} /> · posted <When iso={r.createdAt} />
-          </p>
+        <figure className="com-quote" aria-label="The reported review">
+          <figcaption>
+            <Stars n={r.stars} />
+            <span>
+              posted <When iso={r.createdAt} />
+            </span>
+          </figcaption>
           {r.comment.trim() ? (
             <p className="com-text">
               <bdi>{r.comment}</bdi>
             </p>
           ) : (
-            <p className="com-meta">No comment, stars only.</p>
+            <p className="com-aside">No comment, stars only.</p>
           )}
-        </details>
+        </figure>
       )}
-      <div className="com-actions">
-        <button type="button" className="ui-btn" onClick={() => void toggle()} disabled={busy}>
-          {busy ? (report.resolved ? "Reopening…" : "Resolving…") : report.resolved ? "Reopen" : "Resolve"}
-        </button>
-      </div>
-      {error && (
-        <p className="ui-error" role="alert">
-          {error}
-        </p>
-      )}
-    </li>
+    </Row>
   );
 };
 
@@ -205,25 +212,23 @@ const RecentReviewsCard = ({ page, onPage }: { page: number; onPage: (n: number)
       <>
         <ul className="com-list" aria-label="Recent reviews">
           {data.slice((at - 1) * REVIEWS_PER_PAGE, at * REVIEWS_PER_PAGE).map((r) => (
-            <li key={r.id} className="com-item">
-              <div className="com-top">
-                <span className="com-tags">
-                  <Stars n={r.rating} />
-                  <span className="com-meta">
-                    <bdi>{r.chargerName}</bdi>
-                  </span>
-                </span>
-                <When iso={r.createdAt} />
-              </div>
+            <Row
+              key={r.id}
+              glyph={<ComIcon name="star" />}
+              tone="contributions"
+              title={<bdi>{r.chargerName}</bdi>}
+              when={r.createdAt}
+              status={<Stars n={r.rating} />}
+              meta={`By ${r.raterShort}`}
+            >
               {r.comment.trim() ? (
                 <p className="com-text">
                   <bdi>{r.comment}</bdi>
                 </p>
               ) : (
-                <p className="com-meta">No comment, stars only.</p>
+                <p className="com-aside">No comment, stars only.</p>
               )}
-              <p className="com-meta">By {r.raterShort}</p>
-            </li>
+            </Row>
           ))}
         </ul>
         {data.length > REVIEWS_PER_PAGE && <Pager label="Reviews" page={at} perPage={REVIEWS_PER_PAGE} total={data.length} onPage={onPage} />}

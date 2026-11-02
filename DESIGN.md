@@ -373,6 +373,14 @@ Filled with the category colour (light: the fill tone from the map). The Today c
 - A zero row reads "Nothing waiting" and gets a zero bubble.
 - **Open item:** each row links to its filtered Community view in the real build. The mock rows are not links on purpose (the target pages did not exist); do not ship a row that looks tappable and goes nowhere.
 
+### Inbox rows (Community lists)
+Every Community list (feedback, design-vote comments, submissions, review reports, recent reviews, driver visits) uses one row (`src/pages/community/row.tsx`), like Apple Mail or Linear's inbox:
+- **Tile** at the inline start: 36px, 10px radius, a 20px glyph at stroke 2 for the kind of item (bug, idea, heart, pin, chat, thumb, flag, star, pin-plus, check, cross). While the item waits or informs, it wears its category: the base at 14% behind the text tone (Chargers' current-day treatment). Once nothing waits (resolved, hidden, reviewed) it turns Fill with Secondary Ink, like a zero. Couldn't charge is Alarm; Charged is Navigate.
+- **Title** 17px/600 with the time at the end (13px Secondary Ink, tabular). **Status line** 15px Secondary Ink: what happened, the outcome in Ink 600 (Alarm Text for Couldn't charge), state pills (Resolved, Hidden) at its end; a submission's connectors are Fill chips (13px/500 Ink) here.
+- **Body:** the driver's words in 15px/1.4 Ink (line breaks kept, 70ch); quiet lines (No message, Hidden: …, Approved by …) in 13px Secondary Ink; the reported review quoted on Fill (10px radius, stars and "posted" in its caption) so a report is decided without a click; a possible duplicate as a Fill callout with a warning glyph in Ink.
+- **Last line:** who and where in 13px Secondary Ink at the start, the row's buttons at the end; a long line pushes the buttons onto their own line, still at the end. Parts join with " · ", and the space before the dot doesn't break, so no line starts with one.
+- 14px block padding; 0.5px separators inset to start where the text does (48px), as in iOS lists. Rows are not links, so they have no hover.
+
 ### Count bubble
 30px tall pill, min width 30px, 9px inline padding, 15px/700 tabular in glyph ink, filled with the category's text tone in both themes (white digits on the dark light-mode tone, black digits on the light dark-mode tone, always 4.5:1 or more). At zero: Fill background, Secondary Ink text.
 
@@ -392,7 +400,7 @@ Pills on the ground, not a segmented track: two by two on a phone, one row once 
 
 ### Buttons and fields
 - **Button:** Fill, 10px radius, 34px tall, 6px 14px, 15px/600 Ink. **Primary** (one per item: Approve) is filled with Screens Text in glyph ink, like a bubble, so its label keeps 4.5:1 in both themes.
-- **Text action:** 15px/600 Screens Text, no fill ("Try again", "Show review", "Refresh" at the end of a list card's filter bar: lists reload by hand or after an action, never on a timer).
+- **Text action:** 15px/600 Screens Text, no fill ("Try again", "Refresh" at the end of a list card's filter bar: lists reload by hand or after an action, never on a timer).
 - **Select:** a filter whose labels carry counts ("Resolved (123)") or run long ("Couldn't charge") is a select (Fill, 10px radius, 15px/500), not a segmented control that would clip it on a phone.
 - **Field:** Fill, 10px radius, 8px 10px, 17px Ink, label above in 13px Secondary Ink. Arabic fields write right to left.
 - **Error line:** 15px Alarm Text (something failed); a done or refused action ("Someone already reviewed this") is a 15px Ink line on Fill above the list.

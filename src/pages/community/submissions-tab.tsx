@@ -19,9 +19,10 @@ import { HealthCard } from "../../ui/health-card";
 import { Pager } from "../../ui/pager";
 import { Segmented } from "../../ui/segmented";
 import { ApproveDialog, type NearbyState } from "./approve-dialog";
-import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Waiting, When } from "./bits";
+import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Waiting } from "./bits";
 import { ago, nf, reviewGoneMessage, shortId, useClampPage, useNow } from "./format";
 import type { CommunityView } from "./params";
+import { Dots, Row } from "./row";
 
 // Charger submissions: chargers drivers propose from the app (the old
 // Submissions page). Approve goes through a confirm step and opens the new
@@ -58,7 +59,7 @@ const ReviewLine = ({ s }: { s: Submission }) => {
     .join(" · ");
   return (
     <>
-      <p className="com-meta">
+      <p className="com-aside">
         {head}
         {s.status === "approved" && s.chargerId && (
           <>
@@ -68,7 +69,7 @@ const ReviewLine = ({ s }: { s: Submission }) => {
         )}
       </p>
       {s.reviewNote && (
-        <p className="com-meta">
+        <p className="com-aside">
           Note: <bdi>{s.reviewNote}</bdi>
         </p>
       )}
@@ -96,46 +97,91 @@ const SubmissionItem = ({ s, nearby, onApprove, onRejected, onConflict }: ItemPr
   // Only the app's own uploads load; any other URL is counted, never fetched or linked.
   const photos = splitPhotos(s.photos, SUPABASE_URL);
   const others = otherPhotosLine(photos.other);
+  const pending = s.status === "pending";
   return (
-    <li className="com-item">
-      <div className="com-top">
-        <h3 className="com-title">
-          <bdi>{s.name || "Unnamed charger"}</bdi>
-        </h3>
-        <When iso={s.createdAt} />
-      </div>
-      <p className="com-meta">
-        {where ? (
-          <a href={mapsUrl(s.lat as number, s.lng as number)} target="_blank" rel="noopener noreferrer" aria-label={`${where} on Google Maps, opens in a new tab`}>
-            {where}
-          </a>
-        ) : (
-          "No usable pin"
-        )}
-        {s.address && (
+    <Row
+      glyph={<ComIcon name="pinPlus" />}
+      tone={pending ? "screens" : null}
+      title={<bdi>{s.name || "Unnamed charger"}</bdi>}
+      when={s.createdAt}
+      status={
+        s.connectors.length > 0 ? (
+          <ul className="com-conns" aria-label="Connectors">
+            {s.connectors.map((c, i) => (
+              <li key={i}>{connectorLine(c)}</li>
+            ))}
+          </ul>
+        ) : s.connectorsRaw ? (
           <>
-            {" · "}
-            <bdi>{s.address}</bdi>
+            Connectors couldn't be read: <bdi>{s.connectorsRaw}</bdi>
           </>
-        )}
-      </p>
-      {s.connectors.length > 0 ? (
-        <ul className="com-conns" aria-label="Connectors">
-          {s.connectors.map((c, i) => (
-            <li key={i}>{connectorLine(c)}</li>
-          ))}
-        </ul>
-      ) : (
-        <p className="com-meta">
-          {s.connectorsRaw ? (
+        ) : (
+          "No connectors given."
+        )
+      }
+      meta={
+        <Dots
+          parts={[
+            where ? (
+              <a href={mapsUrl(s.lat as number, s.lng as number)} target="_blank" rel="noopener noreferrer" aria-label={`${where} on Google Maps, opens in a new tab`}>
+                {where}
+              </a>
+            ) : (
+              "No usable pin"
+            ),
+            s.address && <bdi>{s.address}</bdi>,
             <>
-              Connectors couldn't be read: <bdi>{s.connectorsRaw}</bdi>
-            </>
-          ) : (
-            "No connectors given."
+              sent by <bdi title={s.submittedBy}>{s.submittedBy ? shortId(s.submittedBy) : "anonymous"}</bdi>
+            </>,
+            s.appVersion && `app ${s.appVersion}`,
+          ]}
+        />
+      }
+      actions={
+        pending &&
+        !rejecting && (
+          <>
+            <button type="button" className="ui-btn ui-btn-primary" onClick={onApprove}>
+              Approve…
+            </button>
+            <button type="button" className="ui-btn" onClick={() => setRejecting(true)}>
+              Reject…
+            </button>
+          </>
+        )
+      }
+      after={
+        <>
+          {pending && rejecting && (
+            <form
+              className="com-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void reject();
+              }}
+            >
+              <label className="com-field">
+                Note (optional, kept with the submission)
+                <textarea className="com-input" dir="auto" maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} />
+              </label>
+              <div className="com-actions">
+                <button type="submit" className="ui-btn" disabled={busy}>
+                  {busy ? "Rejecting…" : "Reject"}
+                </button>
+                <button type="button" className="ui-btn" onClick={() => setRejecting(false)} disabled={busy}>
+                  Cancel
+                </button>
+              </div>
+            </form>
           )}
-        </p>
-      )}
+          {error && (
+            <p className="ui-error" role="alert">
+              {error}
+            </p>
+          )}
+        </>
+      }
+    >
       {s.notes.trim() && (
         <p className="com-text">
           <bdi>{s.notes}</bdi>
@@ -157,56 +203,18 @@ const SubmissionItem = ({ s, nearby, onApprove, onRejected, onConflict }: ItemPr
           ))}
         </div>
       )}
-      {others && <p className="com-meta">{others}</p>}
-      <p className="com-meta">
-        Sent by <bdi title={s.submittedBy}>{s.submittedBy ? shortId(s.submittedBy) : "anonymous"}</bdi>
-        {s.appVersion && ` · app ${s.appVersion}`}
-      </p>
+      {others && <p className="com-aside">{others}</p>}
       {dupes.length > 0 && (
         <p className="com-near">
-          <b>Possible duplicate:</b> <bdi>{dupes[0].name || "Unnamed charger"}</bdi>, {nf.format(dupes[0].meters)} m away
-          {dupes.length > 1 && ` (and ${nf.format(dupes.length - 1)} more within 100 m)`}.
+          <ComIcon name="alert" />
+          <span>
+            <b>Possible duplicate:</b> <bdi>{dupes[0].name || "Unnamed charger"}</bdi>, {nf.format(dupes[0].meters)} m away
+            {dupes.length > 1 && ` (and ${nf.format(dupes.length - 1)} more within 100 m)`}.
+          </span>
         </p>
       )}
       <ReviewLine s={s} />
-      {s.status === "pending" && !rejecting && (
-        <div className="com-actions">
-          <button type="button" className="ui-btn ui-btn-primary" onClick={onApprove}>
-            Approve…
-          </button>
-          <button type="button" className="ui-btn" onClick={() => setRejecting(true)}>
-            Reject…
-          </button>
-        </div>
-      )}
-      {s.status === "pending" && rejecting && (
-        <form
-          className="com-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void reject();
-          }}
-        >
-          <label className="com-field">
-            Note (optional, kept with the submission)
-            <textarea className="com-input" dir="auto" maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} />
-          </label>
-          <div className="com-actions">
-            <button type="submit" className="ui-btn" disabled={busy}>
-              {busy ? "Rejecting…" : "Reject"}
-            </button>
-            <button type="button" className="ui-btn" onClick={() => setRejecting(false)} disabled={busy}>
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-      {error && (
-        <p className="ui-error" role="alert">
-          {error}
-        </p>
-      )}
-    </li>
+    </Row>
   );
 };
 

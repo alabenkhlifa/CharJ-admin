@@ -16,7 +16,8 @@ import { HealthCard } from "../../ui/health-card";
 import { Pager } from "../../ui/pager";
 import { Pill } from "../../ui/pill";
 import { Segmented } from "../../ui/segmented";
-import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Stats, Waiting, When } from "./bits";
+import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Stats, Waiting } from "./bits";
+import { Dots, Row } from "./row";
 import { useSaving } from "./use-saving";
 import { nf, shortId, useClampPage } from "./format";
 import type { CommunityView } from "./params";
@@ -78,79 +79,86 @@ const VisitRow = ({ visit, onOpenDriver, onFlip, track }: RowProps) => {
   };
   const failed = visit.outcome === "could_not_charge";
   return (
-    <li className="com-item">
-      <div className="com-top">
-        <h3 className="com-title">
-          <bdi>{visit.chargerName}</bdi>
-        </h3>
-        <When iso={visit.submittedAt} />
-      </div>
-      <p className="com-meta">
-        {visit.chargerCity && (
-          <>
-            <bdi>{visit.chargerCity}</bdi>
-            {" · "}
-          </>
-        )}
-        visited {formatVisitDate(visit.visitDate)}
-      </p>
-      <p className="com-tags">
-        <span className={failed ? "com-vote com-failed" : "com-vote"}>{failed ? "Couldn't charge" : "Charged"}</span>
-        {visit.reason && <span className="com-meta">{REASON_LABELS[visit.reason]}</span>}
-        {visit.connectorType && <Pill>{visit.connectorType}</Pill>}
-        {hidden && <Pill>Hidden</Pill>}
-      </p>
-      <p className="com-meta">
-        Driver{" "}
-        <button type="button" className="com-id" onClick={() => onOpenDriver(visit.userId)} title={`Open ${visit.userId} in Usage → Users`}>
-          {shortId(visit.userId)}
-        </button>
-      </p>
+    <Row
+      glyph={<ComIcon name={failed ? "cross" : "check"} />}
+      tone={hidden ? null : failed ? "alarm" : "navigate"}
+      title={<bdi>{visit.chargerName}</bdi>}
+      when={visit.submittedAt}
+      status={
+        <>
+          <Dots
+            parts={[
+              <b className={failed ? "com-failed" : undefined}>{failed ? "Couldn't charge" : "Charged"}</b>,
+              visit.reason && REASON_LABELS[visit.reason],
+              visit.connectorType,
+            ]}
+          />
+          {hidden && <Pill>Hidden</Pill>}
+        </>
+      }
+      meta={
+        <Dots
+          parts={[
+            visit.chargerCity && <bdi>{visit.chargerCity}</bdi>,
+            `visited ${formatVisitDate(visit.visitDate)}`,
+            <>
+              driver{" "}
+              <button type="button" className="com-id" onClick={() => onOpenDriver(visit.userId)} title={`Open ${visit.userId} in Usage → Users`}>
+                {shortId(visit.userId)}
+              </button>
+            </>,
+          ]}
+        />
+      }
+      actions={
+        hiding ? undefined : hidden ? (
+          <button type="button" className="ui-btn" onClick={() => void apply(false)} disabled={busy}>
+            {busy ? "Unhiding…" : "Unhide"}
+          </button>
+        ) : (
+          <button type="button" className="ui-btn" onClick={() => setHiding(true)}>
+            Hide…
+          </button>
+        )
+      }
+      after={
+        <>
+          {hiding && (
+            <form
+              className="com-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void apply(true);
+              }}
+            >
+              <label className="com-field">
+                Why hide it? (1–500 characters, kept with the report)
+                <input className="com-input" dir="auto" maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
+              </label>
+              <div className="com-actions">
+                <button type="submit" className="ui-btn" disabled={busy || !reason.trim()}>
+                  {busy ? "Hiding…" : "Hide"}
+                </button>
+                <button type="button" className="ui-btn" onClick={() => setHiding(false)} disabled={busy}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+          {error && (
+            <p className="ui-error" role="alert">
+              {error}
+            </p>
+          )}
+        </>
+      }
+    >
       {hidden && visit.hiddenReason && (
-        <p className="com-meta">
+        <p className="com-aside">
           Hidden: <bdi>{visit.hiddenReason}</bdi>
         </p>
       )}
-      {hiding ? (
-        <form
-          className="com-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void apply(true);
-          }}
-        >
-          <label className="com-field">
-            Why hide it? (1–500 characters, kept with the report)
-            <input className="com-input" dir="auto" maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
-          </label>
-          <div className="com-actions">
-            <button type="submit" className="ui-btn" disabled={busy || !reason.trim()}>
-              {busy ? "Hiding…" : "Hide"}
-            </button>
-            <button type="button" className="ui-btn" onClick={() => setHiding(false)} disabled={busy}>
-              Cancel
-            </button>
-          </div>
-        </form>
-      ) : (
-        <div className="com-actions">
-          {hidden ? (
-            <button type="button" className="ui-btn" onClick={() => void apply(false)} disabled={busy}>
-              {busy ? "Unhiding…" : "Unhide"}
-            </button>
-          ) : (
-            <button type="button" className="ui-btn" onClick={() => setHiding(true)}>
-              Hide…
-            </button>
-          )}
-        </div>
-      )}
-      {error && (
-        <p className="ui-error" role="alert">
-          {error}
-        </p>
-      )}
-    </li>
+    </Row>
   );
 };
 

@@ -399,6 +399,8 @@ try {
     ok((await first.locator(".com-meta").first().innerText()).startsWith("driver@example.tn · android · 1.3.0 · fr"), "feedback: contact and device");
     eq(await first.locator(".com-meta a").getAttribute("href"), "mailto:driver@example.tn", "feedback: the contact is a mail link");
     eq(await page.$$eval("#com-feedback .com-text bdi", (b) => b.length), 3, "feedback: drivers' text is isolated in <bdi>");
+    eq(await first.locator(".com-title").innerText(), "Bug", "feedback: the kind of feedback is the row's title");
+    ok((await first.locator(".com-tile").getAttribute("style")).includes("--c-needs-you"), "feedback: an open request's tile wears Needs Orange");
 
     // Design votes: 5 votes, under 10 → counts only.
     eq(await stats(page, "#com-votes"), ["3 Likes it", "2 Doesn't like it"], "votes: thumbs counted");
@@ -406,8 +408,8 @@ try {
     ok(!(await page.locator("#com-votes").innerText()).includes("%"), "votes: no percentage under 10");
     eq(await page.$$eval("#com-votes .com-near-list li", (li) => li.map((l) => l.innerText.replace(/\s+/g, " "))), ["Android 2 like · 1 don't", "iOS 1 like · 1 don't"], "votes: the platform split, most votes first");
     eq(await page.$$eval("#com-votes .com-list .com-item", (li) => li.map((l) => l.innerText.replace(/\s+/g, " "))), [
-      "Likes it fr 2h ago Magnifique, enfin lisible la nuit iOS · 1.3.0",
-      "Doesn't like it ar 3h ago Trop sombre pour moi Android · 1.3.0",
+      "Likes it 2h ago Magnifique, enfin lisible la nuit iOS · 1.3.0 · fr",
+      "Doesn't like it 3h ago Trop sombre pour moi Android · 1.3.0 · ar",
     ], "votes: the latest comments with their vote, locale and date");
     eq(await page.locator("#com-votes .ui-meta").innerText(), "5 votes", "votes: card meta");
     ok(requests.includes("admin-feedback?status=all&category=design&page=1&perPage=100"), "votes: the tally reads every design vote");
@@ -416,8 +418,8 @@ try {
     const before = count(requests, "admin-feedback?status=open&category=requests&page=1&perPage=3");
     await first.getByRole("button", { name: "Resolve" }).click();
     await first.getByRole("button", { name: "Reopen" }).waitFor();
-    eq(await first.locator(".ui-pill").allInnerTexts(), ["Bug", "Resolved"], "resolve: the row says Resolved and stays for an undo");
-    ok((await first.innerText()).includes("Resolved · by admin@charj.test · just now"), "resolve: who and when");
+    eq((await first.locator(".com-status").innerText()).replace(/\s+/g, " "), "Resolved by admin@charj.test · just now", "resolve: the row says who resolved it and when, and stays for an undo");
+    eq(await first.locator(".com-tile-done").count(), 1, "resolve: the tile goes grey once nothing waits");
     eq(await stats(page, "#com-feedback"), ["2 Open requests", "2 Resolved", "2 Received, 7 days", "4 Received, all time"], "resolve: Open requests 3 → 2, Resolved 1 → 2");
     eq(await optionsOf(page, "#com-feedback", "Status"), ["Open (2)", "Resolved (2)", "All"], "resolve: the filter counts follow");
     await page.waitForFunction(() => document.querySelector(".com-tabs a .com-badge")?.textContent === "2");
@@ -617,7 +619,7 @@ try {
     await agil.getByRole("button", { name: "Reject…" }).click();
     await agil.getByLabel(/Note/).fill("Doublon de la borne Agil existante");
     await agil.getByRole("button", { name: "Reject", exact: true }).click();
-    await agil.locator(".com-meta", { hasText: "Rejected" }).waitFor();
+    await agil.locator(".com-aside", { hasText: "Rejected" }).waitFor();
     eq(S.posts.at(-1).body, { id: S3, action: "reject", note: "Doublon de la borne Agil existante" }, "reject: the POST carries the note");
     ok((await agil.innerText()).includes("Note: Doublon de la borne Agil existante"), "reject: the row shows the note");
     eq(await agil.getByRole("button", { name: "Approve…" }).count(), 0, "reject: no actions left on a reviewed row");
@@ -700,12 +702,12 @@ try {
     const links = await lac.locator(".com-photos a").evaluateAll((as) => as.map((a) => ({ label: a.getAttribute("aria-label"), ref: a.getAttribute("referrerpolicy"), rel: a.getAttribute("rel") })));
     eq(links.map((l) => l.label), ["Photo 1 of 2, opens in a new tab", "Photo 2 of 2, opens in a new tab"], "photos: numbered among the app's own");
     ok(links.every((l) => l.ref === "no-referrer" && l.rel.includes("noreferrer")), "photos: links send no referrer", links);
-    const line = lac.locator(".com-meta", { hasText: "not from the app" });
+    const line = lac.locator(".com-aside", { hasText: "not from the app" });
     eq(await line.innerText(), "2 photos not from the app", "photos: the others are counted in a plain line");
     eq(await line.locator("a").count(), 0, "photos: that line is not a link");
     const gammarth = items(page, "#com-submissions").nth(1);
     eq(await gammarth.locator(".com-photos").count(), 0, "photos: no strip when none is the app's");
-    eq(await gammarth.locator(".com-meta", { hasText: "not from the app" }).innerText(), "1 photo not from the app", "photos: one, singular");
+    eq(await gammarth.locator(".com-aside", { hasText: "not from the app" }).innerText(), "1 photo not from the app", "photos: one, singular");
     ok(!(await page.locator("#com-submissions").innerHTML()).includes("tracker.example"), "photos: an outside URL is nowhere in the page");
     const outside = urls.filter((u) => /tracker\.example|x\.supabase\.co/.test(u));
     eq(outside, [], "photos: no request goes to an outside photo host");
@@ -714,7 +716,7 @@ try {
     await context.close();
   }
 
-  // ---- 5. Reviews: reports open first, Show review, resolve flips the row ----
+  // ---- 5. Reviews: reports open first, the review quoted, resolve flips the row ----
   {
     const { context, page, requests, S } = await open();
     await page.goto(`${base}/${LINKS.reviews}`);
@@ -727,13 +729,10 @@ try {
     const spam = items(page, "#com-reports").first();
     eq(await spam.locator(".com-title").innerText(), "Spam", "reports: the reason in words");
     ok((await spam.innerText()).includes("A review of Shell Hammamet"), "reports: which charger");
-    eq(await spam.locator(":scope > .com-text").innerText(), "Il fait de la pub pour son garage", "reports: the reporter's note");
-    eq(await spam.locator("details").getAttribute("open"), null, "reports: the review is behind Show review");
-    await spam.locator("summary", { hasText: "Show review" }).click();
-    eq(await spam.locator("details .com-stars").getAttribute("aria-label"), "1 of 5 stars", "show review: its stars");
-    eq(await spam.locator("details .com-text").innerText(), "Visitez mon garage www.example.tn", "show review: its words");
-    await items(page, "#com-reports").nth(1).locator("summary").click();
-    ok((await items(page, "#com-reports").nth(1).innerText()).includes("No comment, stars only."), "show review: a stars-only review says so");
+    eq(await spam.locator(".com-body > .com-text").innerText(), "Il fait de la pub pour son garage", "reports: the reporter's note");
+    eq(await spam.locator(".com-quote .com-stars").getAttribute("aria-label"), "1 of 5 stars", "reports: the reported review is quoted, with its stars");
+    eq(await spam.locator(".com-quote .com-text").innerText(), "Visitez mon garage www.example.tn", "reports: and its words, without a click");
+    ok((await items(page, "#com-reports").nth(1).locator(".com-quote").innerText()).includes("No comment, stars only."), "reports: a stars-only review says so");
 
     await spam.getByRole("button", { name: "Resolve" }).click();
     await spam.getByRole("button", { name: "Reopen" }).waitFor();
@@ -807,6 +806,8 @@ try {
     eq(await page.locator("#com-visits .com-stats .com-alarm").innerText(), "3", "visits: Couldn't charge in Alarm text (broken, above zero)");
     const marsa = items(page, "#com-visits").first();
     eq(await marsa.locator(".com-failed").innerText(), "Couldn't charge", "visits: the outcome");
+    ok((await marsa.locator(".com-tile").getAttribute("style")).includes("--c-alarm"), "visits: a failed visit's tile is Alarm");
+    eq((await marsa.locator(".com-status").innerText()).replace(/\s+/g, " "), "Couldn't charge · Charger not working · CCS", "visits: outcome, reason and connector on one line");
     ok((await marsa.innerText()).includes("Charger not working"), "visits: the reason");
     ok((await marsa.innerText()).includes("visited 1 Nov 2026"), "visits: the visit date");
 
@@ -920,7 +921,7 @@ try {
       await queueSettled(page);
       const fit = await fits(page);
       ok(fit.bad.length === 0, `390 ${colorScheme} ${tab}: fits`, fit);
-      const all = await contrasts(page, ".com .com-meta, .com .com-when, .com .ui-pill, .com .com-badge, .com .com-stats span, .com .ui-btn, .com .com-near-list span");
+      const all = await contrasts(page, ".com .com-meta, .com .com-aside, .com .com-status, .com .com-when, .com .ui-pill, .com .com-badge, .com .com-stats span, .com .ui-btn, .com .com-near-list span, .com .com-conns li, .com .com-quote figcaption");
       const low = all.filter((c) => c.ratio < 4.5);
       ok(low.length === 0, `390 ${colorScheme} ${tab}: secondary text, pills, badges and buttons reach 4.5:1`, low);
       if (tab === "feedback") await shot(page, `t9-390-${colorScheme}.png`);

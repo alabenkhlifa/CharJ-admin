@@ -20,8 +20,8 @@ import type { RouteParams } from "../../lib/use-route";
 import { Empty } from "../../ui/empty";
 import { HealthCard } from "../../ui/health-card";
 import { Pager } from "../../ui/pager";
-import { Pill } from "../../ui/pill";
-import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Stats, Thumb, Waiting, When } from "./bits";
+import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Stats, Thumb, Waiting, type ComIconName } from "./bits";
+import { Dots, Row } from "./row";
 import { useSaving } from "./use-saving";
 import { ago, nf, useClampPage, useNow } from "./format";
 import type { CommunityView } from "./params";
@@ -44,6 +44,16 @@ const STATUS_OPTIONS: { v: FeedbackStatus; l: string }[] = [
   { v: "resolved", l: "Resolved" },
   { v: "all", l: "All" },
 ];
+
+/** The tile glyph for each kind of feedback (a design vote shows its thumb instead). */
+const CATEGORY_GLYPH: Record<FeedbackItem["category"], ComIconName> = {
+  bug: "bug",
+  suggestion: "bulb",
+  compliment: "heart",
+  charger_data: "pin",
+  other: "chat",
+  design: "thumb",
+};
 
 const PLATFORM: Record<string, string> = { ios: "iOS", android: "Android" };
 const platformName = (p: string) => PLATFORM[p] ?? p;
@@ -75,50 +85,54 @@ const FeedbackRow = ({ item, onFlip, track }: RowProps) => {
     // The server's row when it sent one; else the change it confirmed.
     onFlip(res.item ?? { ...item, resolved: !item.resolved, resolvedAt: item.resolved ? null : new Date().toISOString(), resolvedBy: null });
   };
-  const resolvedLine = item.resolved
-    ? ["Resolved", item.resolvedBy && `by ${item.resolvedBy}`, item.resolvedAt && ago(item.resolvedAt, now)].filter(Boolean).join(" · ")
-    : null;
+  const informational = isInformational(item);
+  const status: ReactNode[] = [
+    item.vote && <Vote vote={item.vote} />,
+    item.resolved && (item.resolvedBy ? `Resolved by ${item.resolvedBy}` : "Resolved"),
+    item.resolved && item.resolvedAt && ago(item.resolvedAt, now),
+    informational && !item.resolved && "Informational: not counted as waiting.",
+  ];
   return (
-    <li className="com-item">
-      <div className="com-top">
-        <span className="com-tags">
-          <Pill>{CATEGORY_LABELS[item.category]}</Pill>
-          {item.vote && <Vote vote={item.vote} />}
-          {item.resolved && <Pill>Resolved</Pill>}
-        </span>
-        <When iso={item.createdAt} />
-      </div>
+    <Row
+      glyph={item.vote ? <Thumb up={item.vote === "up"} size={20} /> : <ComIcon name={CATEGORY_GLYPH[item.category]} />}
+      tone={item.resolved ? null : informational ? "design" : "needs-you"}
+      title={CATEGORY_LABELS[item.category]}
+      when={item.createdAt}
+      status={status.some(Boolean) && <Dots parts={status} />}
+      meta={
+        <>
+          {item.email ? (
+            <a href={`mailto:${item.email}`}>
+              <bdi>{item.email}</bdi>
+            </a>
+          ) : (
+            "Anonymous"
+          )}
+          {" · "}
+          {deviceLine(item)}
+        </>
+      }
+      actions={
+        <button type="button" className="ui-btn" onClick={() => void toggle()} disabled={busy}>
+          {busy ? (item.resolved ? "Reopening…" : "Resolving…") : item.resolved ? "Reopen" : "Resolve"}
+        </button>
+      }
+      after={
+        error && (
+          <p className="ui-error" role="alert">
+            {error}
+          </p>
+        )
+      }
+    >
       {item.message.trim() ? (
         <p className="com-text">
           <bdi>{item.message}</bdi>
         </p>
       ) : (
-        <p className="com-meta">{isInformational(item) ? "No comment" : "No message"}</p>
+        <p className="com-aside">{informational ? "No comment" : "No message"}</p>
       )}
-      <p className="com-meta">
-        {item.email ? (
-          <a href={`mailto:${item.email}`}>
-            <bdi>{item.email}</bdi>
-          </a>
-        ) : (
-          "Anonymous"
-        )}
-        {" · "}
-        {deviceLine(item)}
-      </p>
-      {isInformational(item) && !item.resolved && <p className="com-meta">Informational: not counted as waiting.</p>}
-      {resolvedLine && <p className="com-meta">{resolvedLine}</p>}
-      <div className="com-actions">
-        <button type="button" className="ui-btn" onClick={() => void toggle()} disabled={busy}>
-          {busy ? (item.resolved ? "Reopening…" : "Resolving…") : item.resolved ? "Reopen" : "Resolve"}
-        </button>
-      </div>
-      {error && (
-        <p className="ui-error" role="alert">
-          {error}
-        </p>
-      )}
-    </li>
+    </Row>
   );
 };
 
@@ -329,19 +343,18 @@ const DesignVotesCard = ({ votes }: { votes: AdminLoad<DesignTally> }) => {
         {t.comments.length ? (
           <ul className="com-list" aria-label="Latest comments">
             {t.comments.map((c) => (
-              <li key={c.id} className="com-item">
-                <div className="com-top">
-                  <span className="com-tags">
-                    {c.vote && <Vote vote={c.vote} />}
-                    {c.locale && <Pill>{c.locale}</Pill>}
-                  </span>
-                  <When iso={c.createdAt} />
-                </div>
+              <Row
+                key={c.id}
+                glyph={c.vote ? <Thumb up={c.vote === "up"} size={20} /> : <ComIcon name="chat" />}
+                tone="design"
+                title={c.vote ? VOTE_LABELS[c.vote] : "Comment"}
+                when={c.createdAt}
+                meta={[c.platform && platformName(c.platform), c.appVersion, c.locale].filter(Boolean).join(" · ") || undefined}
+              >
                 <p className="com-text">
                   <bdi>{c.message}</bdi>
                 </p>
-                {c.platform && <p className="com-meta">{[platformName(c.platform), c.appVersion].filter(Boolean).join(" · ")}</p>}
-              </li>
+              </Row>
             ))}
           </ul>
         ) : (

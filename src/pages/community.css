@@ -145,18 +145,54 @@
   color: var(--c-alarm-text);
 }
 
-/* ---- lists ---- */
+/* ---- lists: inbox rows (community/row.tsx) ---- */
+/* A tile at the start (what kind of item, and whether it still waits), the
+   title with its time at the end, a status line, the driver's words, and a
+   last line with who / where at the start and the buttons at the end. */
 .com-list {
   list-style: none;
-  margin: var(--s-sm) 0 0;
+  margin: var(--s-xs) 0 0;
   padding: 0;
 }
 .com-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  column-gap: var(--s-md);
+  align-items: start;
   min-inline-size: 0;
-  padding-block: var(--s-md);
+  padding-block: 14px;
 }
-.com-item + .com-item {
+/* Inset like an iOS list: the separator starts where the text does. */
+.com-item + .com-item::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 48px 0;
   border-block-start: .5px solid var(--sep);
+}
+/* The category's base at 14% behind its text tone (Chargers' current-day
+   treatment); once nothing waits, Fill and Secondary Ink, like a zero. */
+.com-tile {
+  display: grid;
+  place-items: center;
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: var(--r-chip);
+  background: color-mix(in srgb, var(--tile) 14%, transparent);
+  color: var(--tile-ink);
+}
+.com-tile svg {
+  inline-size: 20px;
+  block-size: 20px;
+  stroke-width: 2;
+}
+.com-tile-done {
+  background: var(--fill);
+  color: var(--ink-2);
+}
+.com-body {
+  min-inline-size: 0;
 }
 .com-top {
   display: flex;
@@ -177,21 +213,38 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.com-tags {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-xs) var(--s-sm);
+/* What happened: Secondary Ink, the outcome itself in Ink (or Alarm). */
+.com-status {
+  margin-block-start: 2px;
+  color: var(--ink-2);
+  font: var(--type-subhead);
+  overflow-wrap: anywhere;
 }
-.com-tags .ui-pill {
+.com-status b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.com-status .ui-pill {
   margin: 0;
+  vertical-align: 1px;
+}
+.com-status .ui-pill:not(:first-child) {
+  margin-inline-start: 6px;
 }
 /* The driver's own words: their line breaks kept, long words broken. */
 .com-text {
   margin: 6px 0 0;
   max-inline-size: 70ch;
-  font: var(--type-body);
+  font: 400 15px/1.4 var(--font);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* A quiet line in the body: "No message", "Hidden: …", "Approved by …". */
+.com-aside {
+  margin: 6px 0 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
   overflow-wrap: anywhere;
 }
 .com-meta {
@@ -202,15 +255,39 @@
   overflow-wrap: anywhere;
 }
 .com-meta a,
-.com-text a {
+.com-text a,
+.com-aside a {
   color: var(--c-screens-text);
   font-weight: 600;
+}
+/* Who / where at the start, the buttons at the end; a long meta pushes the
+   buttons onto their own line, still at the end. */
+.com-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm) var(--s-md);
+  margin-block-start: 10px;
+}
+.com-foot .com-meta {
+  flex: 1 1 14em;
+  margin: 0;
+}
+.com-foot .com-actions {
+  margin-block-start: 0;
+  margin-inline-start: auto;
 }
 .com-vote {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font: var(--type-card-title);
+}
+.com-status .com-vote {
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  vertical-align: top;
 }
 .com-vote svg {
   flex: none;
@@ -222,6 +299,38 @@
 .com-stars i {
   color: var(--sep);
   font-style: normal;
+}
+.com-status .com-stars {
+  color: var(--ink);
+}
+/* The reported review, quoted on Fill: what the admin decides on. */
+.com-quote {
+  margin: var(--s-sm) 0 0;
+  max-inline-size: 70ch;
+  padding: 10px var(--s-md);
+  border-radius: var(--r-chip);
+  background: var(--fill);
+}
+.com-quote figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-xs) var(--s-sm);
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.com-quote .com-stars {
+  color: var(--ink);
+}
+.com-quote .com-stars i {
+  color: var(--ink-2);
+  opacity: .45;
+}
+.com-quote .com-text {
+  margin-block-start: var(--s-xs);
+}
+.com-quote .com-aside {
+  margin-block-start: var(--s-xs);
 }
 
 .com-actions {
@@ -323,6 +432,21 @@ textarea.com-input {
   font: var(--type-subhead);
   font-variant-numeric: tabular-nums;
 }
+/* In a row the connectors are chips on the status line (the approve dialog keeps the list). */
+.com-status .com-conns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: var(--s-xs) 0 0;
+}
+.com-status .com-conns li {
+  padding: 3px var(--s-sm);
+  border-radius: var(--r-square);
+  background: var(--fill);
+  color: var(--ink);
+  font: 500 13px/1.3 var(--font);
+  font-variant-numeric: tabular-nums;
+}
 .com-photos {
   display: flex;
   flex-wrap: wrap;
@@ -350,6 +474,23 @@ textarea.com-input {
 }
 .com-near b {
   font-weight: 600;
+}
+/* In a row: a Fill callout with its warning glyph, under the driver's words. */
+.com-item .com-near {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-sm);
+  max-inline-size: 70ch;
+  padding: var(--s-sm) 10px;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+}
+.com-item .com-near svg {
+  flex: none;
+  inline-size: 18px;
+  block-size: 18px;
+  margin-block-start: 1px;
+  stroke-width: 2;
 }
 .com-near-list {
   list-style: none;
@@ -391,9 +532,7 @@ textarea.com-input {
 }
 
 /* A visit that ended without charging: broken, so Alarm text is earned. */
-.com-failed {
+.com-failed,
+.com-status .com-failed {
   color: var(--c-alarm-text);
-}
-.com-item > p.com-tags {
-  margin: 6px 0 0;
 }
