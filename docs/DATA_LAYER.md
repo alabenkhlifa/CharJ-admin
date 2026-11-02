@@ -1,47 +1,62 @@
 # Data layer
 
-All Supabase access lives in `src/data/`. Pages call hooks; hooks call the Supabase client or an admin Edge Function. Pages don't import `supabase` directly.
+All Supabase access lives in `src/data/` (the sidebar search hook in `src/lib/` aside). Pages call hooks; hooks call the Supabase client or an admin Edge Function. Pages don't import `supabase` directly.
 
 ## Hook pattern
 
-Every hook returns the same shape:
+Admin reads go through **`useAdminLoad(load)`** (`src/data/admin-load.ts`): pass a `useCallback` keyed by the view (path, filters) and get back
 
 ```ts
 {
-  data: T;            // empty array / object on initial render
-  loading: boolean;   // true on initial fetch
+  data: T | null;     // null until this view's first answer
+  loading: boolean;
   error: string | null;
-  // Optional:
-  refetch?: () => Promise<void>;
+  refresh: () => void;                    // re-read the same view; the data stays on screen meanwhile
+  patch: (change: (prev: T) => T) => void; // apply a write the server already confirmed (a row flips in place)
 }
 ```
 
-If `SUPABASE_CONFIGURED` is false, the hook short-circuits to `{ data: [], loading: false, error: "Supabase not configured" }`. Pages render an inline "not configured" banner — no crash.
+A new `load` is a new view: its data starts empty, so a filter change never shows the previous view's rows or numbers. `getJson` / `postJson` / `errorCode` wrap `adminFetch` (POST never throws: a network failure comes back as status 0). The older hooks (`useUsage`, `useQueue`, `useAdminUsers`, `useChargers`, `useNotifications`, `useEvModels`) have the same `{ data, loading, error, refresh? }` shape with their own state.
+
+Every hook short-circuits when `SUPABASE_CONFIGURED` is false: no request, `error: "… not configured"`, and the page shows an inline line instead of numbers. That state is known at load, so it is the hook's initial state, never a `setState` inside an effect.
+
+Admin responses are parsed **strictly** by a pure `*-report.ts` module (`node --test` loads them): a missing key or a wrong type throws, and the page shows "Couldn't load" rather than a silent 0. Extra keys are ignored, so an additive server change never breaks a page. Wire names stay snake_case in the parsers and become camelCase only where a page wants it.
 
 ## What's wired
 
-| Hook | Source | Auth |
-|---|---|---|
-| `useChargers()` | `search_chargers` RPC | anon |
-| `useOverviewStats()` | 8 batched COUNT queries on chargers / ratings / community_submissions | anon |
-| `useOverviewCharts()` | Single Promise.all over chargers / submissions / ratings (12 weeks for rating trend) | anon |
-| `useSidebarCounts()` | 3 COUNT queries (chargers / pending submissions / ratings) | anon |
-| `useSubmissions()` | `community_submissions` ordered by created_at desc | anon |
-| `useReviews()` | `ratings` (latest 200) joined client-side with `chargers(id, name)` | anon |
-| `useEvModels()` | `ev_models` ordered by make, model | anon |
-| `useAdminUsers(page, perPage)` | `admin-users` Edge Function via `adminFetch` | admin session |
-| `useGlobalSearch(query)` | Debounced `search_chargers` RPC + in-memory NAV match (powers the topbar spotlight) | anon |
-| `addCharger` (modal submit) | `admin-add-charger` Edge Function via `adminFetch` | admin session |
-| `useLocations()` | `governorates` (code + names) and `cities`, loaded once per page load and shared (module cache in `src/data/locations.ts`) | anon |
-| `usePinPlace(lat, lng)` | `governorate_for_point` + `suggest_city` RPCs, debounced 400 ms | anon |
-| `createCity` (Add city) | `admin-cities` Edge Function via `adminFetch`; appends to the shared city list | admin session |
-| `useNotifications(days)` | `admin-notifications` GET overview (pending, suggestions, history, subscribers, totals, funnel), parsed strictly by `notifications-report.ts`; `refresh()` keeps the old data on screen while it reloads; `skewMs` = server − local clock for countdowns | admin session |
-| `useChargerNotifications(id)` | same GET narrowed with `charger_id` (charger drawer's "Announce update") | admin session |
-| `cancelNotification` / `releaseNotification` / `announceUpdate` / `dismissSuggestion` / `previewNotification` | `admin-notifications` POST; resolve to `{ ok } \| { ok: false, error }` with the error already mapped to admin-facing copy | admin session |
+| Hook / action | Source | Auth | Used by |
+|---|---|---|---|
+| `useUsage(view, days, env)` | `admin-usage` (`view=summary` / `usage`), `parseUsageReport` | admin session | Summary, Usage |
+| `useQueue()` | `admin-feedback`, `admin-confirmations`, `admin-submissions`, `admin-review-reports` in parallel (`perPage=3`), `mergeQueue` | admin session | App: Summary's Needs you, Community badges, nav badge |
+| `useFeedback(status, category, page)`, `useDesignVotes()`, `setFeedbackResolved` | `admin-feedback` (`category=requests` by default; `category=design` for the tally, 100 a page, up to 5 pages) | admin session | Community → Feedback |
+| `useSubmissions(status, page)`, `reviewSubmission` | `admin-submissions` GET / POST | admin session | Community → Submissions |
+| `useReviewReports(status, page)`, `setReportResolved` | `admin-review-reports` GET / POST | admin session | Community → Reviews |
+| `useReviews()` | `ratings` (latest 200) joined client-side with `chargers(id, name)` | anon | Community → Reviews (Recent reviews) |
+| `useVisits(view)`, `moderateVisit` | `admin-confirmations` GET (`since_days`) / POST | admin session | Community → Driver visits |
+| `useAdminUsers(page, perPage, filter, lookup)` | `admin-users` | admin session | Usage → Users |
+| `useEvModels()` | `ev_models` ordered by make, model | anon | Usage → Cars (the catalog) |
+| `useChargers()` | `search_chargers` RPC (up to 1000 rows) | anon | Chargers (list, map, network), Community's nearby check |
+| `verifyCharger`, `setChargerStatus` | `admin-verify-charger`, `admin-set-charger-status` | admin session | Chargers drawer |
+| `loadChargerForEdit`, `saveCharger` | `admin-update-charger` GET / POST | admin session | Charger editor |
+| `submit` in the Add-charger modal | `admin-add-charger` | admin session | Add charger |
+| `useLocations()` | `governorates` (code + names) and `cities`, loaded once per page load and shared (module cache in `src/data/locations.ts`) | anon | Chargers filters, city picker, network coverage |
+| `usePinPlace(lat, lng)` | `governorate_for_point` + `suggest_city` RPCs, debounced 400 ms | anon | Add charger, editor |
+| `createCity` (Add city) | `admin-cities`; appends to the shared city list | admin session | City picker |
+| `useNotifications(days)`, `useChargerNotifications(id)` | `admin-notifications` GET overview (whole page / one charger), parsed by `notifications-report.ts`; `skewMs` = server − local clock | admin session | Notifications, Chargers drawer |
+| `cancelNotification` / `releaseNotification` / `announceUpdate` / `dismissSuggestion` / `previewNotification` | `admin-notifications` POST; `{ ok } \| { ok: false, error }` with admin-facing copy | admin session | Notifications, announce dialog |
+| `useGlobalSearch(query)` | Debounced `search_chargers` + in-memory NAV match | anon | Sidebar search |
+
+### The queue
+
+`useQueue()` lives in `App.tsx` and is passed down. A source that fails or answers in an unexpected shape is unknown (`null`), never 0, and then the total is unknown too: no nav badge, no Queue clear ring. It reads on mount, on `refresh()` (every Community action calls it) and when the window gets the focus back. It does not read again on a page change.
+
+### Writes
+
+A resolve / reopen / hide / unhide / reject patches the row in place with the server's row (or the change it confirmed) and adjusts the counts, so an undo stays one tap away; then the queue refreshes. The list's Refresh waits while such a write is on its way (`useSaving` in `src/pages/community/use-saving.ts`), so a read started before the write landed can't put the old row back.
 
 ## Mappers
 
-Most tables come back as snake_case via PostgREST. We map to camelCase + derive UI fields once per row in a `mapRawX` function, exported alongside the hook. Example: `mapRawCharger` computes `power = max(connectors.power_kw)`, summarises `working_hours` into a single string for the table column, etc.
+Anon tables come back as snake_case via PostgREST. We map to camelCase + derive UI fields once per row in a `mapRawX` function, exported alongside the hook. Example: `mapRawCharger` computes `power = max(connectors.power_kw)`, summarises `working_hours` into a single string for the table column, etc.
 
 This keeps page code clean (no `r.is_verified ? "Yes" : "No"` per cell).
 
@@ -74,7 +89,7 @@ Array<{ type: 'Type 2'|'CCS'|'CHAdeMO'|'Type 1'; power_kw: number; count: number
 - Missing day → "—" (unknown).
 - 24/7 is encoded as `"00:00"–"24:00"` for every day. Never `always_open: true`.
 
-`summarizeHours` and `dayCellLabel` in `pages/chargers.tsx` consume this shape. If the shape ever changes, both need to update.
+`summarizeHours` (`src/data/chargers.ts`) and the drawer's week grid (`src/pages/chargers/drawer.tsx`) consume this shape. If the shape ever changes, both need to update.
 
 ### `ev_models.connectors`
 
@@ -92,13 +107,20 @@ Array<{ soc: number; power_kw: number }>  // SoC % → power
 
 ### `admin-notifications` overview
 
-Wire names stay snake_case (`src/data/notifications-report.ts`, like `analytics-report.ts`). Things that bite:
+Wire names stay snake_case (`src/data/notifications-report.ts`). Things that bite:
 
 - `pending[].needs_review` is SQL `note = 'needs_review'`, so it is `null` (not `false`) when there is no note. The parser normalises it.
 - `pending[].eta` is already moved past quiet hours: an ETA of exactly 08:00:00 Tunis means "waiting for quiet hours to end". `waitsForQuietHours` keys on that.
 - `suggestions[].before` / `after` hold only the changed fields of `charger_update_events`, as raw JSONB. Compare connectors per type, never by array position (`connectorsLabel`).
 - `funnel` steps are counted independently, so a later step can be larger than an earlier one; the Funnel percentages can pass 100%.
 - `history[].opens` excludes users with analytics off, so the open rate is shown as "≥ x%".
+
+### `admin-usage` report
+
+- Days are Tunis days. The days nobody measured (before 14 Sep 2026, and 16 Sep–16 Oct 2026 when events didn't reach the server) live in `src/lib/tracking.ts`: charts hatch them, tables say "not tracked", averages and return windows leave them out. Never draw them as 0.
+- Read the `ui: 'all'` rows for "Any design" and a design's own rows for a design; never add designs together (a phone that moved to Lune counts in both). Platforms do add up.
+- `summary.versions` and the language rows count a user once per build / language, so they can sum past the active total: label them "users per …", never as shares.
+- `routes`, `missing_cars` and `funnels.contributions` are not split by platform or design; Usage hides those filters on their sections.
 
 ## Anon-readable tables
 
@@ -111,42 +133,37 @@ Per RLS audits:
 - `governorates` — SELECT on `code, name_fr, name_ar, name_en` only (not `geom`): name the columns
 - `cities` — SELECT all; writes need the `admin-cities` Edge Function
 
-## Service-role only (need an Edge Function)
+## Service-role only (read through an Edge Function)
 
-- `auth.users` — not exposed via PostgREST at all
-- `user_vehicles` — RLS limits to the owning user
-- `feedback` — service-role-only SELECT
-- `review_reports` — service-role-only SELECT/UPDATE
+- `auth.users` — not exposed via PostgREST at all (`admin-users`)
+- `user_vehicles` — RLS limits to the owning user (`admin-users`)
+- `feedback` — `admin-feedback`
+- `review_reports` — `admin-review-reports`
+- `charging_confirmations` — no client policies at all (`admin-confirmations`)
+- `community_submission_reviews` (who reviewed a submission, the note) — `admin-submissions`; the dashboard reads submissions through it too, though `community_submissions` itself is anon-readable
+- `app_analytics_*` (events, cohorts, ingestion days) — `admin-usage`
 
 ## What we can't compute (no data source at all)
 
-- DAU/WAU/MAU, sessions, last-active per user — no event log table
-- Trip plans created — no trips table
+- Trip plans created — no trips table (the trip funnel counts saves and shares from events instead)
 - Fleet uptime % — `get_charger_reliability` is per-charger, no fleet-wide metric
 - Verification velocity per admin — `verified_by` has no per-row history
 - "Top requested locations" from submissions — no popularity counter
 - OCM sync status / last-run — pg_cron doesn't surface a status table
-- Activity feed (who did what, when) — no event log
+- An app-version filter on Usage — usage rows carry no `app_version` (versions live on Summary)
 
-These were dropped from the dashboard. See `docs/MOCK_VS_REAL.md`.
+These are left out of the dashboard. See `docs/MOCK_VS_REAL.md`.
 
 ## Adding a new hook
 
-1. New file `src/data/foo.ts` with `useFoo()` returning `{ data, loading, error }`.
-2. Use the cancellation-flag pattern (`let cancelled = false; return () => { cancelled = true; };`) to avoid setState-after-unmount.
-3. If the data needs to be refreshed after a mutation, expose `refetch: () => Promise<void>` (see `useChargers` for the pattern using `useCallback`).
-4. Pages: import the hook, render `loading` skeletons, `error` banner, and the data.
+1. A pure parser in `src/data/foo-report.ts` (strict: throw on a missing key or a wrong type), with a `node --test` file in `tests/`.
+2. The hook in `src/data/foo.ts`: for an admin function, `useAdminLoad(useCallback((signal) => getJson(path, signal, message).then(parseFoo), [path]))`; writes through `postJson`.
+3. If the data needs service-role: add an Edge Function in `../charj/supabase/functions/` (see `docs/EDGE_FUNCTIONS.md`); the hook calls it through `adminFetch` (session token + `apikey`, signs out on 401/403), never `fetch` with hand-built headers.
+4. Short-circuit on `!SUPABASE_CONFIGURED` in the initial state, not in an effect.
+5. Pages render a loading state that keeps the card's shape, an error line with Try again, and the data — never a number the source didn't give.
 
-If the new data needs service-role:
+## Cross-cutting helpers
 
-1. Add an Edge Function in `../charj/supabase/functions/` (see `docs/EDGE_FUNCTIONS.md`).
-2. The hook calls `adminFetch("<function>?…", init)` (`src/lib/admin-fetch.ts`) — it adds the signed-in admin's token + `apikey` and signs out on 401/403.
-3. Defensive: short-circuit on `!SUPABASE_CONFIGURED`, surface as `error: "Admin API not configured"`.
-
-## Cross-cutting UI helpers
-
-A few helpers worth knowing about — they're not data hooks but every list page touches them:
-
-- **`src/components/pagination.tsx`** — exports `<Pagination>` plus `usePaginated<T>(items, resetKey, initialPerPage)`. The hook auto-resets to page 1 when `resetKey` changes (filter / tab) and snaps back to the last valid page when `items` shrinks. Used by chargers, vehicles, reviews, and submissions for client-side slicing; users wires the same `<Pagination>` to the server-paginated `useAdminUsers(page, perPage)` hook directly.
-- **`src/lib/amenity-icons.tsx`** — single source of truth for the 12 amenity slugs (kept in sync with `charj/lib/amenities.ts` and the `set_charger_override` allowlist). Exports `AMENITY_SLUGS`, `AMENITY_LABELS`, `labelForAmenity`, and an `<AmenityIcon slug=… size=… />` component drawn lucide-style. Used by both the add-charger modal chips and the charger detail-drawer chips.
-- **`src/lib/use-global-search.ts`** + **`src/components/search-panel.tsx`** — power the topbar spotlight. The hook debounces `search_chargers` and matches NAV labels in-memory; the panel renders grouped results with arrow-key + ⌘K + ESC handling. Charger picks deep-link via `pendingChargerId` lifted into `App.tsx`.
+- **`src/ui/pager.tsx`** — the list footer; pages keep `?page=` / `?per=` in the hash and slice client-side (or pass them to a server-paged function).
+- **`src/lib/amenities.ts`** + **`amenity-icons.tsx`** — the 12 amenity slugs (in sync with `charj/lib/amenities.ts` and the `set_charger_override` allowlist), their labels, and `<AmenityIcon>`. Used by the add-charger modal, the editor and the drawer.
+- **`src/lib/use-global-search.ts`** + **`src/components/search-panel.tsx`** — the sidebar spotlight. The hook debounces `search_chargers` and matches NAV labels in memory; the panel renders grouped results with arrow-key + ⌘K + Esc handling. A charger pick deep-links to `#/chargers?id=`.

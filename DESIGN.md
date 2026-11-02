@@ -335,7 +335,7 @@ Glyph ink on a filled square or bubble flips with the theme: white on light, bla
 - **Responsive swaps, not shrinking:** the cohort table becomes per-phone chip rows (three chips across) under 768px and a table above it. Inside Usage the swap follows the room the page has, not the viewport: the table shows from 600px of content (at 768 the sidebar leaves ~450px), and once a week has 10 or more installs ("60% (12 of 20)") the chips go one per row on a narrow page.
 - Logical properties only: `inset-inline`, `margin-inline`, `padding-inline-start`, `border-block-start`.
 
-Breakpoints: 768px is the only layout switch; the product must hold at 375 / 768 / 1440 with no horizontal scroll.
+Breakpoints: 768px is the only layout switch; the product must hold at 375 / 768 / 1440 with no horizontal scroll. One exception, inside a single control: under 400px a page action beside the theme toggle shows only its icon in a 36px circle (Chargers' Add charger, see "Large title block"), so the large title never breaks. Inside a page, layouts follow the room the page has (container queries), not the viewport.
 
 ## Elevation & Depth
 
@@ -363,6 +363,7 @@ Continuous soft corners scaled to size: cards 16px, chips and sidebar links 10px
 - **Internal Padding:** 14px top, 16px sides and bottom.
 - **Header:** colour square (22px, 6px radius, 14px glyph at stroke 2.4 in glyph ink), card title 15px/600 filling the row, meta at the end in 15px Secondary Ink with an optional 14px chevron when the card links.
 - **Entry:** rises 14px and fades in over 0.5s, staggered 60ms by order.
+- **Sign-in:** before the app, one 360px Card on the Grouped Ground: "Charj Admin" as a section title with "Sign in to continue" in Subhead Secondary Ink, kit fields, the primary button across the card, and the reason in an Alarm Text error line.
 
 ### Category square
 Filled with the category colour (light: the fill tone from the map). The Today card's square is a 135deg gradient from Active to Queue because it holds all three rings; by the same rule the Usage Funnels card's square is a 135deg gradient of Onboarding, Trip, Navigate and Contributions, the four funnels it holds. A square names a category; it is never an ornament.
@@ -385,7 +386,7 @@ Pills on the ground, not a segmented track: two by two on a phone, one row once 
 - **View tabs** (List · Map · Network, `?view=`): the Community page-tab pills, three across at every width.
 - **The list** is one table at every width. From 860px of page it is a table whose headers sort (`aria-sort`); narrower, each row lays out as a list row (name and power, the place, then status, connectors, access, hours, source and when it changed in Footnote) and a Sort select replaces the headers. Only one page of rows is in the DOM (the kit Pager, `?page=` / `?per=`).
 - **Filters** are Fill chips (label in Secondary Ink, value in Ink, Screens Text while it narrows the rows) inside the card. On a narrow page the search takes its own row and the chips fold behind a "Filters" button with the count in use; open, they sit two to a row with the label above the value, so a value is never cut (a long one wraps, and the longest selects, Power and Updated, get a row each). A chip's menu floats in Card with the tooltip shadow: on a wide page it opens toward whichever side has room, on a narrow one right under the tapped chip, across the panel.
-- **Download CSV**: a Screens Text action at the end of a chart's "Show table" line downloads that chart's rows; the one beside the section title downloads every number in the section.
+- **Download CSV**: a Screens Text action at the end of a chart's "Show table" line downloads that chart's rows; the one beside the section title downloads every number in the section. The line is laid out in flow: a long "Show table" line wraps and the action moves to the next line rather than covering it; the table opens below both, at the full width.
 - **The map** takes the page's full width (the shell's 1120px cap lifts for `?view=map`; the page padding stays) and bleeds to its card's edges. The count and the pin key float at the top in Card with the tooltip shadow (Google's logo and zoom buttons hold the bottom corners). There is only ever one live map: the detail drawer leaves its mini map out over the map view.
 - **The detail drawer** is a side sheet (Card, the dialog shadow over the scrim), Escape or the scrim closes it. Today's opening hours wear the sidebar's current-page treatment (Screens at 14% behind Screens Text), and so does the current status button.
 
@@ -399,7 +400,7 @@ Pills on the ground, not a segmented track: two by two on a phone, one row once 
 ### Dialog
 A native `<dialog>` (the browser keeps focus inside and closes on Escape): Card, 16px radius, at most 560px wide and the viewport less 16px on each side, scrolling inside itself. Section title as its heading; sections split by 0.5px separators; Cancel then the primary action at the end.
 
-The kit has it (`.ui-dialog` in `src/ui/ui.css`, with `.ui-btn`, `.ui-btn-primary`, `.ui-link`, `.ui-error` and `.ui-notice` for the buttons and lines above); the announce / send-now confirm uses it, and a click on the backdrop closes it like Escape.
+The kit has it (`.ui-dialog` in `src/ui/ui.css`, with `.ui-btn`, `.ui-btn-primary`, `.ui-btn-icon`, `.ui-link`, `.ui-error` and `.ui-notice` for the buttons and lines above); Community's Approve and the announce / send-now confirm use it, and every page's buttons are these (no page keeps its own copy). On the announce confirm a press that starts and ends on the backdrop closes it like Escape (a text selection dragged out of it doesn't), and while its request is out neither Escape nor the backdrop closes it.
 
 ### Chips and pills
 - **Stat chip:** Fill, 10px radius, 8px 10px; 12px/500 label above a 600 tabular value. Used for per-phone cohort values on phones.
@@ -428,9 +429,9 @@ The kit has it (`.ui-dialog` in `src/ui/ui.css`, with `.ui-btn`, `.ui-btn-primar
 15px, collapsed borders, 0.5px separators, headers 13px/500 Secondary Ink start-aligned, numeric columns end-aligned and tabular.
 
 ### Navigation
-- **Tab bar (under 768px):** fixed to the bottom, five equal columns, frosted Bar Material, 0.5px top separator, safe-area padding. 24px icon over a 10px/500 label in Idle Grey; the current page in Active. A count badge (18px Alarm pill, 12px/600 white) sits at the icon's end corner. Notifications has no tab: on phones it is the first row of Settings (hidden from 768px, where the sidebar lists it).
-- **Sidebar (768px and up):** sticky, full height, Card background, 0.5px end separator, 22px/700 brand at top. Links 17px with a 22px icon, 9px 10px padding, 10px radius; hover Fill; current page gets Active at 14% behind Active Text at 600. The badge moves inline to the end.
-- **Build ceiling (not yet shipped):** the large title folds into a blurred inline bar on scroll.
+- **Tab bar (under 768px):** fixed to the bottom, five equal columns, frosted Bar Material, 0.5px top separator, safe-area padding. 24px icon over a 10px/500 label in Idle Grey; the current page in Active. A count badge (18px pill filled with Alarm's text tone, 12px/600 in glyph ink, like a count bubble: 5.38:1 light, 6.16:1 dark; white on the base Alarm was 3.55:1) sits at the icon's end corner. Notifications has no tab: on phones it is the first row of Settings (hidden from 768px, where the sidebar lists it).
+- **Sidebar (768px and up):** sticky, full height, Card background, 0.5px end separator, 22px/700 brand at top. Links 17px with a 22px icon, 9px 10px padding, 10px radius; hover Fill; current page gets Active at 14% behind Active Text at 600. The badge moves inline to the end. Search (⌘K) opens its results over the page in Card with the tooltip shadow. A sign-out the server can't take says why under the account line, in Alarm Text (as in Settings).
+- **Folding large title:** once the large title scrolls away, a blurred inline bar (Bar Material, 0.5px bottom separator, the title in 17px/600) pins to the top of the window across the whole main area: the full width on a phone, everything after the sidebar from 768px, however wide the page padding grows and on the full-width map view too. It is decorative (`aria-hidden`); the h1 stays the heading.
 
 ### Empty and "not tracked" states
 - No data for a window that was never measured reads "not tracked" in 13px Secondary Ink. It is never drawn as 0.

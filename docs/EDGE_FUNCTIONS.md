@@ -2,17 +2,21 @@
 
 Live in **`../charj/supabase/functions/`** (mobile-app repo). Deployed against the same Supabase project as the mobile app.
 
-| Function | Purpose |
-|---|---|
-| `admin-users` | List `auth.users` + per-user vehicles / counts |
-| `admin-verify-charger` | Set `is_verified=true` + stamp `verified_at`/`verified_by` |
-| `admin-add-charger` | Insert a new `chargers` row from the dashboard's Add-charger modal |
-| `admin-analytics` | Aggregate app usage report (`get_app_analytics` RPC) for the Analytics page |
-| `admin-confirmations` | List + hide/unhide driver visit reports (`charging_confirmations`) |
-| `admin-set-charger-status` | Pin a charger's status via `set_charger_override` |
-| `admin-update-charger` | Read + atomically edit one charger for the structured editor |
-| `admin-cities` | Insert a `cities` row from the city picker's inline "Add city" form |
-| `admin-notifications` | Region alerts: overview for the Notifications page + cancel / release / announce / dismiss / preview |
+| Function | Purpose | Dashboard |
+|---|---|---|
+| `admin-usage` | App usage report (`admin_usage_report` RPC): `view=summary` for Summary, `view=usage` for Usage | `src/data/usage.ts` |
+| `admin-feedback` | List the feedback inbox (requests, design votes) + resolve / reopen | `src/data/feedback.ts`, the queue |
+| `admin-submissions` | List charger submissions + approve (creates the charger) / reject | `src/data/submissions.ts`, the queue |
+| `admin-review-reports` | List review reports with their review + resolve / reopen | `src/data/review-reports.ts`, the queue |
+| `admin-confirmations` | List + hide/unhide driver visit reports (`charging_confirmations`); `since_days` window | `src/data/visits.ts`, the queue |
+| `admin-users` | List `auth.users` + per-user device, vehicles, visits, activity | `src/data/admin-users.ts` (Usage → Users), the sign-in access check |
+| `admin-notifications` | Region alerts: overview for the Notifications page + cancel / release / announce / dismiss / preview | `src/data/notifications.ts` |
+| `admin-verify-charger` | Set `is_verified=true` + stamp `verified_at`/`verified_by` | `src/data/charger-actions.ts` |
+| `admin-set-charger-status` | Pin a charger's status via `set_charger_override` | `src/data/charger-actions.ts` |
+| `admin-add-charger` | Insert a new `chargers` row from the dashboard's Add-charger modal | `src/components/add-charger-modal.tsx` |
+| `admin-update-charger` | Read + atomically edit one charger for the structured editor | `src/data/charger-editor.ts` |
+| `admin-cities` | Insert a `cities` row from the city picker's inline "Add city" form | `src/data/locations.ts` |
+| `admin-analytics` | The old aggregate report (`get_app_analytics`) | **No longer called** since the Health rebuild (Usage reads `admin-usage`). Kept deployed and unchanged so older bundles keep working; retire it once no one runs them. |
 
 All of them follow the same pattern, all deploy with `--no-verify-jwt`, all answer CORS preflight before the auth check.
 
@@ -30,6 +34,120 @@ apikey: <anon key>
 - Transition: the legacy `ADMIN_API_SECRET` bearer is still accepted while `ADMIN_LEGACY_SECRET_ENABLED` isn't `false`. See [AUTH.md](AUTH.md).
 
 The dashboard never builds these headers by hand — it calls `adminFetch(path, init)` (`src/lib/admin-fetch.ts`), which also signs out on 401/403. Error bodies keep each function's existing shape (`{ error: "Unauthorized" | "Forbidden" }` or the lower-case `unauthorized` / `forbidden`).
+
+## `admin-usage`
+
+**Files**: `../charj/supabase/functions/admin-usage/{index,handler}.ts`
+**RPC**: `public.admin_usage_report(p_view TEXT, p_days INTEGER, p_environment TEXT) RETURNS JSONB` (SECURITY DEFINER, service_role only; latest definition `20261102000011_admin_usage_report_all_designs.sql`)
+**Dashboard**: `useUsage(view, days, environment)` in `src/data/usage.ts`, parsed strictly by `parseUsageReport` in `src/data/usage-report.ts`
+
+```http
+GET /functions/v1/admin-usage?view=summary|usage&days=7|30|90&environment=production|preview|development
+```
+
+Defaults `summary` / `30` / `production`. **400** `Invalid report parameters` on anything else, **503** `Usage reporting is unavailable` when the RPC fails, **405** on non-GET, `Cache-Control: no-store`. The function returns the RPC's JSON as is. Days are Tunis days; users in `analytics_excluded_users` (the test phones) are always left out.
+
+### `view=summary` (Summary page; `days` is accepted but the view is a fixed 30 days)
+
+```ts
+{
+  generated_at, timezone: "Africa/Tunis", environment,
+  today: { active },                   // distinct users with app_opened today
+  avg7,                                // mean daily active over the last 7 days, today included (2 decimals)
+  daily: [{ day, active }],            // last 30 days, oldest first, zeros filled
+  cohort: { install_week, installed, back_7d } | null,  // newest install week whose 7 days are over
+  versions: [{ platform, app_version, ui, users }],     // active in 30 days per build; an upgrader sits in two rows
+  dropped_7d,                          // events the ingestion dropped, last 7 UTC days
+  same_day_last_week: { active },      // a week ago, up to the same time of day
+  languages: [{ language, users }],    // users per app language in 30 days; a switcher counts in both
+}
+```
+
+### `view=usage` (Usage page; the window is `days` Tunis days ending today)
+
+```ts
+{
+  generated_at, timezone, environment, days,
+  daily:     [{ day, platform, ui, active, events }],   // every day × platform × ui, zeros filled
+  cohorts:   [{ install_week, platform, ui, installed, returned_1, returned_7, returned_30,
+                finished_1, finished_7, finished_30 }], // every install week (not cut by days)
+  languages: [{ language, platform, ui, users }],
+  screens:   [{ screen, platform, ui, views, users }],
+  actions:   [{ event_name, detail, platform, ui, events, users }],   // every event but screen_viewed
+  funnels: {
+    onboarding: [{ step, platform, ui, events, users }],  // shown, finished, car_added, car_skipped, reached_map
+    trip:       [{ step, platform, ui, events, users }],  // opened … navigation_launched
+    navigate: { taps: [{ warning, platform, ui, taps, went }], launched: [{ step, platform, ui, events, users }] },
+    contributions: { review_started, reviews_posted, add_started, submitted },   // not split
+    permissions: [{ kind, result, source, ui, count }],                          // no platform
+  },
+  missing_cars: { total_searches, no_result, queries: [{ query, searches }] },  // not split
+  routes: { found, failed: [{ reason, count }], p50_ms, p95_ms },               // not split
+  android_auto: { sessions, minutes, chargers_opened, navigations },           // zeros until the native build
+}
+```
+
+**`ui` and the `'all'` rows.** Every split row carries the build's design: `lune`, `classic` or `unknown` (an older build with no label). For every count of people (daily, cohorts, languages, screens, actions, the onboarding / trip / navigate funnels) the server also returns `ui: 'all'` rows, counted once across designs (`GROUPING SETS`). A phone that moved to Lune inside the window is one person in `'all'` but one in each design row, so the dashboard reads `'all'` for "Any design" and never sums designs. Summing platforms is fine (a user is one install). `parseUsageReport` refuses a usage report whose daily rows have no `'all'` row.
+
+## `admin-feedback`
+
+**Files**: `../charj/supabase/functions/admin-feedback/{index,handler}.ts`
+**Dashboard**: `src/data/feedback.ts`, parsed by `src/data/feedback-report.ts`; the queue's feedback row (`src/data/queue-report.ts`)
+
+```http
+GET  /functions/v1/admin-feedback?page=1&perPage=25&status=open|resolved|all&category=all|requests|<category>
+POST /functions/v1/admin-feedback  { "id": "<uuid>", "resolved": true | false }
+```
+
+- `category` is `bug`, `suggestion`, `charger_data`, `compliment`, `other` or `design` (the Lune design thumbs, with `vote: 'up' | 'down'`). **`category=requests`** is every category but the informational ones (design votes ask for nothing).
+- GET → `{ items, page, perPage, total, summary: { total, open, open_requests, resolved, last_7_days, by_category } }`, newest first. `summary` is all-time. **`summary.open_requests`** counts open rows that ask for something (design votes left out): Needs you, the Community badge and the Open stat read it.
+- POST stamps `resolved_by` with the admin (needs a real session: the legacy secret gets **403** `session_required`) → `{ ok: true, item }`; **404** `feedback_not_found`.
+- **400** `invalid_request`, **503** `feedback_unavailable`. `perPage` ≤ 100.
+
+**Not deployed yet:** `category=requests` and `summary.open_requests` are committed in charj (`4ca3ed2`) but the deployed function predates them. Until it is deployed, the requests read is a **400**: the Feedback tab says so and offers "Show all", and the queue's feedback row and the nav badge stay unknown (never a made-up number). Deploy `admin-feedback` before (or with) the dashboard.
+
+## `admin-submissions`
+
+**Files**: `../charj/supabase/functions/admin-submissions/{index,handler}.ts`
+**RPCs**: `20261102000007_admin_review_submissions.sql`, `20261102000008_submission_reviews_private.sql`
+**Dashboard**: `src/data/submissions.ts`, parsed by `src/data/submissions-report.ts`
+
+```http
+GET  /functions/v1/admin-submissions?status=pending|approved|rejected|all&page=1&perPage=25
+POST /functions/v1/admin-submissions  { "id": "<uuid>", "action": "approve" | "reject", "note"?, "name_ar"?, "address_ar"?, "operator"? }
+```
+
+- GET → `{ items, page, perPage, total, counts: { pending, approved, rejected } }`, newest first. Items carry every column but the raw location, plus `lat` / `lng`; `connectors` is decoded to an array (the app stores a JSON string; anything unreadable comes back as stored). `reviewed_by` / `review_note` come from the service-role-only `community_submission_reviews`.
+- POST approve creates the charger once (following `admin-add-charger`'s conventions) with the admin's `name_ar` / `address_ar` / `operator` when typed (`''` otherwise; never invented; reject ignores them) → `{ ok: true, submission_id, status, charger_id }`. The dashboard then opens `#/chargers?id=<charger_id>&edit=1`, the new charger in its editor.
+- **409** `already_reviewed` (someone got there first: the dashboard re-reads the list and the queue), **404** `submission_not_found`, **422** `{ error: <reason> }` when the submission can't become a charger (`city_not_found`, `connectors_invalid`, `name_missing`, …), **400** `invalid_request` (note ≤ 2000, texts ≤ 200 characters), **403** `session_required` for the legacy secret on POST, **503** `submissions_unavailable`.
+
+## `admin-review-reports`
+
+**Files**: `../charj/supabase/functions/admin-review-reports/{index,handler}.ts`
+**Dashboard**: `src/data/review-reports.ts`, parsed by `src/data/review-reports-report.ts`
+
+```http
+GET  /functions/v1/admin-review-reports?status=open|resolved|all&page=1&perPage=25
+POST /functions/v1/admin-review-reports  { "id": "<uuid>", "resolved": true | false }
+```
+
+- GET → `{ items, page, perPage, total, open }`, newest first; each item `{ id, reason, notes, created_at, resolved, rating: { id, rating, comment, created_at, charger_id, charger_name } | null }` (`null` when the review is gone). `open` is the all-time open count (the queue reads it).
+- POST marks one report resolved or reopens it; nothing is hidden or deleted → `{ ok: true, item }`; **404** `report_not_found`.
+- **400** `invalid_request`, **503** `reports_unavailable`. `review_reports` is service-role only.
+
+## `admin-confirmations`
+
+**Files**: `../charj/supabase/functions/admin-confirmations/{index,handler}.ts`
+**Dashboard**: `src/data/visits.ts`, parsed by `src/data/visits-report.ts`; the queue's couldn't-charge row
+
+```http
+GET  /functions/v1/admin-confirmations?page=1&perPage=25&outcome=all|charged|could_not_charge&visibility=visible|hidden|all[&since_days=1..90]
+POST /functions/v1/admin-confirmations  { "id": "<uuid>", "hidden": true, "reason": "<1–500 chars>" }  // or { id, hidden: false }
+```
+
+- GET → `{ items, page, perPage, total, summary: { total, charged, could_not_charge, hidden, last_7_days, contributors } }`. Items: `{ id, charger_id, charger_name, charger_city, user_id, outcome, reason, connector_type, visit_date, submitted_at, hidden_at, hidden_reason }`. The summary is whole-table, not the filter.
+- **`since_days`** keeps only visits with `visit_date` in that window and adds **`summary.window: { since_days, could_not_charge }`** — couldn't-charge reports in the window, hidden ones left out (the queue reads `since_days=7`). Without it the response is exactly the old one. **400** when it isn't an integer from 1 to 90.
+- POST hides (a reason is required) or unhides via `moderate_charging_confirmation`; hiding takes the report out of the app at once.
 
 ## `admin-users`
 
@@ -303,24 +421,30 @@ Content-Type: application/json
 
 ### Deep-link from search
 
-The topbar search calls `search_chargers` and surfaces results. Clicking a charger row sets `pendingChargerId` in `App.tsx`, which the Chargers page consumes to auto-open the detail drawer. No DB call required for the deep-link itself — it reuses the already-loaded `useChargers()` data.
+The sidebar search (⌘K) calls `search_chargers` and surfaces results. Clicking a charger row navigates to `#/chargers?id=<uuid>`; the Chargers page opens that charger's drawer and drops the `id` from the hash. No extra DB call: it reuses the already-loaded `useChargers()` data.
 
 ## Deployment
 
 ```bash
 cd ../charj
-npx supabase functions deploy admin-users --no-verify-jwt
-npx supabase functions deploy admin-verify-charger --no-verify-jwt
-npx supabase functions deploy admin-add-charger --no-verify-jwt
-npx supabase functions deploy admin-analytics --no-verify-jwt
+npx supabase functions deploy admin-usage --no-verify-jwt
+npx supabase functions deploy admin-feedback --no-verify-jwt
+npx supabase functions deploy admin-submissions --no-verify-jwt
+npx supabase functions deploy admin-review-reports --no-verify-jwt
 npx supabase functions deploy admin-confirmations --no-verify-jwt
+npx supabase functions deploy admin-users --no-verify-jwt
+npx supabase functions deploy admin-notifications --no-verify-jwt
+npx supabase functions deploy admin-verify-charger --no-verify-jwt
 npx supabase functions deploy admin-set-charger-status --no-verify-jwt
+npx supabase functions deploy admin-add-charger --no-verify-jwt
 npx supabase functions deploy admin-update-charger --no-verify-jwt
 npx supabase functions deploy admin-cities --no-verify-jwt
-npx supabase functions deploy admin-notifications --no-verify-jwt
+npx supabase functions deploy admin-analytics --no-verify-jwt   # only for older bundles
 ```
 
-Each deploy bundles `_shared/admin-auth.ts` — a change there means redeploying all nine.
+Each deploy bundles `_shared/admin-auth.ts` — a change there means redeploying every one of them.
+
+**Health rebuild rollout order:** `admin-usage`, `admin-review-reports`, `admin-submissions` and `admin-confirmations` (`since_days`) are live. Deploy `admin-feedback` (`category=requests`, `summary.open_requests`) before pushing the dashboard, or its Needs-you feedback row and the nav badge stay unknown.
 
 **City picker rollout order:** deploy `admin-cities`, `admin-add-charger` and `admin-update-charger` first, then the dashboard. The dashboard also sends the legacy `city` label on add, so an older `admin-add-charger` still accepts it, but only the new one stores `city_id` / `address_ar`.
 
