@@ -552,6 +552,11 @@
         "name": "focus-ring",
         "value": "outline: 3px solid color-mix(in srgb, #0a84ff 70%, transparent); outline-offset: 2px",
         "purpose": "Every focusable element."
+      },
+      {
+        "name": "dialog",
+        "value": "0 24px 60px rgba(0,0,0,.3); scrim rgba(0,0,0,.4)",
+        "purpose": "A confirm step floating over the page (Community's Approve)."
       }
     ],
     "motion": [

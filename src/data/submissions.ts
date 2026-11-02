@@ -1,112 +1,70 @@
-import { useEffect, useState } from "react";
-import { SUPABASE_CONFIGURED, supabase } from "../lib/supabase";
+import { useCallback } from "react";
+import { errorCode, getJson, postJson, useAdminLoad, type AdminLoad } from "./admin-load";
+import {
+  parseReviewResult,
+  parseSubmissions,
+  submissionActionMessage,
+  submissionsPath,
+  type ReviewAction,
+  type ReviewResult,
+  type SubmissionFilter,
+  type SubmissionsPage,
+} from "./submissions-report";
 
-// ── Types matching the community_submissions table ─────────────────────────
-// Schema (see supabase/migrations/20260416000004_create_community_submissions.sql
-// + 20260423000003_community_submissions_app_version.sql):
-//   id UUID, submitted_by TEXT, name TEXT, location GEOMETRY(Point, 4326),
-//   address TEXT, connectors JSONB, photos TEXT[], notes TEXT,
-//   status submission_status ('pending' | 'approved' | 'rejected'),
-//   reviewed_at TIMESTAMPTZ, created_at TIMESTAMPTZ, app_version TEXT.
-// RLS policy submissions_read_own (USING true) lets anon SELECT every row.
+// ── Charger submissions inbox ──────────────────────────────────────────────
+// Source: the admin-submissions Edge Function (approve creates the charger,
+// reject keeps an optional note). Who reviewed and the note live in a
+// service-role-only table, so this reads through adminFetch, not the anon client.
 
-export type SubmissionStatus = "pending" | "approved" | "rejected";
+const ENDPOINT = "admin-submissions";
 
-export type SubmissionConnector = {
-  type?: string;
-  power_kw?: number;
-  count?: number;
+const errorFrom = (text: string): string | undefined => {
+  try {
+    return errorCode(JSON.parse(text));
+  } catch {
+    return undefined;
+  }
 };
 
-export type RawSubmissionRow = {
-  id: string;
-  submitted_by: string;
-  name: string;
-  address: string;
-  connectors: SubmissionConnector[] | null;
-  photos: string[] | null;
-  notes: string;
-  status: SubmissionStatus;
-  reviewed_at: string | null;
-  created_at: string;
-  app_version: string | null;
+/** One page of one status, with the per-status counts. */
+export const useSubmissions = (status: SubmissionFilter, page: number): AdminLoad<SubmissionsPage> => {
+  const load = useCallback(
+    async (signal: AbortSignal) =>
+      parseSubmissions(await getJson(submissionsPath(status, page), signal, (s, text) => submissionActionMessage(s, errorFrom(text)))),
+    [status, page],
+  );
+  return useAdminLoad(load);
 };
 
-// ── UI-shaped submission ───────────────────────────────────────────────────
+/** What the approved charger starts with; blank fields stay '' (never invented). */
+export type ChargerTexts = { nameAr?: string; addressAr?: string; operator?: string };
 
-export type Submission = {
-  id: string;
-  submittedBy: string;
-  name: string;
-  address: string;
-  notes: string;
-  connectors: SubmissionConnector[];
-  photos: string[];
-  status: SubmissionStatus;
-  reviewedAt: string | null;
-  createdAt: string;
-  appVersion: string;
-};
+export type ReviewOutcome =
+  | { ok: true; result: ReviewResult }
+  | { ok: false; status: number; message: string };
 
-const mapRawSubmission = (r: RawSubmissionRow): Submission => ({
-  id: r.id,
-  submittedBy: r.submitted_by || "anonymous",
-  name: r.name,
-  address: r.address ?? "",
-  notes: r.notes ?? "",
-  connectors: r.connectors ?? [],
-  photos: r.photos ?? [],
-  status: r.status,
-  reviewedAt: r.reviewed_at,
-  createdAt: r.created_at,
-  appVersion: r.app_version ?? "",
-});
+const blankToUndefined = (s: string | undefined) => (s && s.trim() ? s.trim() : undefined);
 
-// ── Hook ───────────────────────────────────────────────────────────────────
-
-type UseSubmissionsState = {
-  data: Submission[];
-  loading: boolean;
-  error: string | null;
-};
-
-export const useSubmissions = (): UseSubmissionsState => {
-  const [state, setState] = useState<UseSubmissionsState>({
-    data: [],
-    loading: true,
-    error: null,
-  });
-
-  useEffect(() => {
-    if (!SUPABASE_CONFIGURED) {
-      setState({ data: [], loading: false, error: "Supabase not configured" });
-      return;
-    }
-
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from("community_submissions")
-        .select(
-          "id, submitted_by, name, address, connectors, photos, notes, status, reviewed_at, created_at, app_version",
-        )
-        .order("created_at", { ascending: false });
-
-      if (cancelled) return;
-
-      if (error) {
-        setState({ data: [], loading: false, error: error.message });
-        return;
-      }
-
-      const rows = (data ?? []) as RawSubmissionRow[];
-      setState({ data: rows.map(mapRawSubmission), loading: false, error: null });
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return state;
+/** Approve (creates the charger) or reject one submission. */
+export const reviewSubmission = async (
+  id: string,
+  action: ReviewAction,
+  note?: string,
+  texts: ChargerTexts = {},
+): Promise<ReviewOutcome> => {
+  const payload = {
+    id,
+    action,
+    note: blankToUndefined(note),
+    ...(action === "approve"
+      ? { name_ar: blankToUndefined(texts.nameAr), address_ar: blankToUndefined(texts.addressAr), operator: blankToUndefined(texts.operator) }
+      : {}),
+  };
+  const res = await postJson(ENDPOINT, payload);
+  if (!res.ok) return { ok: false, status: res.status, message: res.error ?? submissionActionMessage(res.status, errorCode(res.body)) };
+  try {
+    return { ok: true, result: parseReviewResult(res.body) };
+  } catch {
+    return { ok: false, status: res.status, message: "The review went through, but its answer couldn't be read. Refresh to see it." };
+  }
 };

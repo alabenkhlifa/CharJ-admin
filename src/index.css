@@ -62,6 +62,9 @@
   /* Depth (floating things only; cards never get a shadow) */
   --shadow-thumb: 0 3px 8px rgba(0, 0, 0, .12), 0 3px 1px rgba(0, 0, 0, .04);
   --shadow-tooltip: 0 8px 30px rgba(0, 0, 0, .18);
+  /* A dialog over the page (Community's approve step) and the scrim behind it. */
+  --shadow-dialog: 0 24px 60px rgba(0, 0, 0, .3);
+  --scrim: rgba(0, 0, 0, .4);
   --bar-blur: saturate(180%) blur(20px);
   --focus-ring: 3px solid color-mix(in srgb, #0a84ff 70%, transparent);
 

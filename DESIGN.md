@@ -242,6 +242,8 @@ A full-saturation category palette (Apple system colours) on a quiet grey ground
 ### Tertiary (Usage categories)
 Each Usage section owns one colour: **Screens Blue** (screens, also charger submissions and the "Show table" link), **Actions Indigo** (actions, also versions and review reports), **Onboarding Yellow** (onboarding), **Trip Teal** (trip), **Navigate Sky** (navigate), **Contributions Purple** (contributions), **Cars Brown** (cars), **Routes Teal-Blue** (routes), **Language Magenta** (languages), **Permission Rust** (permissions), **People Raspberry** (users), **Auto Violet** (Android Auto, once it has data).
 
+On Community, the four queues keep their Needs-you colours (feedback Needs Orange, charger submissions Screens Blue, review reports Actions Indigo, couldn't charge Alarm Red). Its informational cards borrow categories this page doesn't otherwise show: **Contributions Purple** for what drivers contribute that never waits (the Lune design votes and the recent reviews; on Usage the same colour counts reviews posted), and **Navigate Sky** for driver visits (the report a driver sends after going to a charger). A tab shows one of them at a time.
+
 The four added for Usage (languages, permissions, users, android-auto) sit in the hue gaps the Apple system colours leave (magenta, raspberry, violet, rust). Picked by OKLab distance from every tone a Usage page shows (bases, light fills, light and dark text), each at least ΔE 10 from them, and validated as a set with the dataviz palette check in both modes (lightness band, chroma, CVD ≥ 8 pairwise, normal vision ≥ 15, ≥ 3:1 on the card; Auto Violet is under 3:1 on the dark card, which is legal because Android Auto draws no chart). The system was already crowded (Active and Alarm sit ΔE 4.5 apart), so a colour is never the only cue: every card carries its title.
 
 ### Neutral
@@ -333,6 +335,7 @@ Flat by default. Cards sit on the grouped ground by tone alone (white on #f2f2f7
 - **Segment thumb** (`box-shadow: 0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04)`): the selected segment lifting off its track.
 - **Tooltip** (`box-shadow: 0 8px 30px rgba(0,0,0,.18)`): chart tooltip on a card.
 - **Bar material** (`backdrop-filter: saturate(180%) blur(20px)` over Bar Material, 0.5px top separator): the phone tab bar.
+- **Dialog** (`box-shadow: 0 24px 60px rgba(0,0,0,.3)` over a `rgba(0,0,0,.4)` scrim; tokens `--shadow-dialog`, `--scrim`): a confirm step floating over the page (Community's Approve).
 
 ### Named Rules
 **The Tone Not Shadow Rule.** Cards never carry a shadow or border. Separation comes from the ground/card tone step and 0.5px separators inside cards.
@@ -364,6 +367,18 @@ Filled with the category colour (light: the fill tone from the map). The Today c
 
 ### Segmented control
 Fill track, 9px radius, 2px padding, max width 420px, equal columns. Labels 13px/500, selected 600. A Card-coloured thumb (#636366 in dark) slides under the selected segment over 0.32s on the house curve, sized from the selected button. Buttons use `aria-pressed`. It only switches data (Test phones / Production, All / iOS / Android).
+
+### Page tabs (Community)
+Pills on the ground, not a segmented track: two by two on a phone, one row once all four fit with their badges (about 600px of page). 15px/500 Ink; the current tab lifts in Card with the segment-thumb shadow at 600, and is `aria-current="page"`. Each tab is a link (`?tab=`). Its badge is a 22px pill, 12px/600 tabular in glyph ink on the queue's text tone; a real zero is plain Secondary Ink with no fill; an unknown count shows no badge. Labels and zero badges sit on Card or Ground, never on Fill, where Secondary Ink drops under 4.5:1.
+
+### Buttons and fields
+- **Button:** Fill, 10px radius, 34px tall, 6px 14px, 15px/600 Ink. **Primary** (one per item: Approve) is filled with Screens Text in glyph ink, like a bubble, so its label keeps 4.5:1 in both themes.
+- **Text action:** 15px/600 Screens Text, no fill ("Try again", "Show review").
+- **Field:** Fill, 10px radius, 8px 10px, 17px Ink, label above in 13px Secondary Ink. Arabic fields write right to left.
+- **Error line:** 15px Alarm Text (something failed); a done or refused action ("Someone already reviewed this") is a 15px Ink line on Fill above the list.
+
+### Dialog
+A native `<dialog>` (the browser keeps focus inside and closes on Escape): Card, 16px radius, at most 560px wide and the viewport less 16px on each side, scrolling inside itself. Section title as its heading; sections split by 0.5px separators; Cancel then the primary action at the end.
 
 ### Chips and pills
 - **Stat chip:** Fill, 10px radius, 8px 10px; 12px/500 label above a 600 tabular value. Used for per-phone cohort values on phones.

@@ -5,10 +5,7 @@ import { Sidebar } from "./ui/sidebar";
 import { TabBar } from "./ui/tab-bar";
 import { SummaryPage } from "./pages/summary";
 import { ChargersPage } from "./pages/chargers";
-import { SubmissionsPage } from "./pages/submissions";
-import { FeedbackPage } from "./pages/feedback";
-import { ReviewsPage } from "./pages/reviews";
-import { VisitsPage } from "./pages/visits";
+import { CommunityPage } from "./pages/community";
 import { MapPage } from "./pages/map";
 import { SettingsPage } from "./pages/settings";
 import { UsagePage } from "./pages/usage";
@@ -28,10 +25,11 @@ const App = () => {
 
   // Cross-page deep links, carried by the URL rather than React state:
   //   #/chargers?id=<uuid>                — open that charger's detail drawer
+  //   #/chargers?id=<uuid>&edit=1         — …straight in its editor (after approving a submission)
   //   #/usage?section=users&user=<uuid>   — pin the Users list to one driver
   //                                         (old links: ?tab=users&user=)
   const pendingChargerId = route === "chargers" ? params.get("id") : null;
-  const tab = params.get("tab");
+  const pendingChargerEdit = pendingChargerId !== null && params.get("edit") === "1";
 
   // Merge a patch into the current query string instead of replacing it. The
   // Chargers page keeps its search / filters / sort / page there too, so a
@@ -45,8 +43,8 @@ const App = () => {
     replace(route, next);
   };
 
-  // Until the new pages land (Tasks 9-11) each new route renders the page it
-  // replaces, and the old sub-pages stay reachable through their tab param.
+  // Until the new pages land (Tasks 10-11) Chargers and Settings render the
+  // pages they replace.
   const renderPage = () => {
     switch (route) {
       case "summary":
@@ -60,16 +58,7 @@ const App = () => {
       case "usage":
         return <UsagePage params={params} onParams={patchParams} />;
       case "community":
-        if (tab === "submissions") return <SubmissionsPage />;
-        if (tab === "reviews") return <ReviewsPage />;
-        if (tab === "visits") {
-          return (
-            <VisitsPage
-              onOpenDriver={(userId) => navigate("usage", { section: "users", user: userId })}
-            />
-          );
-        }
-        return <FeedbackPage />;
+        return <CommunityPage params={params} onParams={patchParams} navigate={navigate} queue={queue} />;
       case "chargers":
         if (params.get("view") === "map") return <MapPage />;
         return (
@@ -77,9 +66,10 @@ const App = () => {
             params={params}
             onParamsChange={patchParams}
             pendingChargerId={pendingChargerId}
+            pendingChargerEdit={pendingChargerEdit}
             // Drop the id once consumed so closing the drawer and navigating
             // back doesn't silently reopen it — but keep every other param.
-            onChargerOpened={() => patchParams({ id: null })}
+            onChargerOpened={() => patchParams({ id: null, edit: null })}
           />
         );
       case "notifications":

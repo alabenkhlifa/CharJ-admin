@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CATEGORY_LABELS, deviceLine, FEEDBACK_CATEGORIES, feedbackErrorMessage, isInformational, parseFeedbackResponse, VOTE_LABELS,
+  CATEGORY_LABELS, designTally, deviceLine, FEEDBACK_CATEGORIES, feedbackErrorMessage, feedbackPath, isInformational,
+  parseFeedbackResponse, parseFeedbackStrict, VOTE_LABELS,
 } from '../src/data/feedback-report.ts';
 
 // Shaped like the admin-feedback Edge Function's GET response.
@@ -85,7 +86,56 @@ test('design votes: their own category, the vote kept, an empty message is fine,
   assert.equal(summary.openRequests, 1);
 });
 
-test('without open_requests (an older admin-feedback), every open row counts', () => {
+test('without open_requests (an older admin-feedback), open requests are unknown, never the open count with votes in it', () => {
   const { summary } = parseFeedbackResponse({ items: [], total: 0, summary: { total: 4, open: 3, resolved: 1 } });
-  assert.equal(summary.openRequests, 3);
+  assert.equal(summary.openRequests, null);
+  assert.equal(summary.open, 3);
+});
+
+test('parseFeedbackStrict refuses a body without items or summary instead of showing zeros', () => {
+  for (const body of [null, 'oops', [], { items: [] }, { items: 'x', summary: {} }, { summary: {} }]) {
+    assert.throws(() => parseFeedbackStrict(body), /Unexpected response/);
+  }
+  assert.equal(parseFeedbackStrict(fixture()).items.length, 2);
+});
+
+test('feedbackPath asks for one page of one status and category', () => {
+  assert.equal(feedbackPath('open', 'requests', 1), 'admin-feedback?status=open&category=requests&page=1&perPage=25');
+  assert.equal(feedbackPath('all', 'design', 2, 100), 'admin-feedback?status=all&category=design&page=2&perPage=100');
+});
+
+const vote = (id: string, v: 'up' | 'down', at: string, extra: Record<string, unknown> = {}) =>
+  ({ id, category: 'design', vote: v, message: '', platform: '', locale: 'fr', created_at: at, ...extra });
+
+test('designTally counts thumbs, keeps the newest comments and splits by platform when known', () => {
+  const { items } = parseFeedbackResponse({
+    items: [
+      vote('v1', 'up', '2026-11-02T08:00:00Z', { message: 'Magnifique', platform: 'ios' }),
+      vote('v2', 'down', '2026-11-02T09:00:00Z', { message: '  ', platform: 'android' }),
+      vote('v3', 'up', '2026-11-01T09:00:00Z', { platform: 'android' }),
+      vote('v4', 'down', '2026-11-02T10:00:00Z', { message: 'Trop sombre', platform: 'android', locale: 'ar' }),
+      { id: 'x', category: 'design', vote: null, message: 'no thumb', created_at: '2026-11-02T11:00:00Z' },
+    ],
+    total: 5,
+    summary: { total: 5, open: 5, open_requests: 0, resolved: 0, last_7_days: 5, by_category: { design: 5 } },
+  });
+  const t = designTally(items, 5);
+  assert.deepEqual([t.up, t.down, t.votes, t.total], [2, 2, 4, 5]);
+  assert.deepEqual(t.comments.map((c) => c.id), ['v4', 'v1'], 'newest first, blank comments left out');
+  assert.deepEqual(t.platforms, [
+    { platform: 'android', up: 1, down: 2 },
+    { platform: 'ios', up: 1, down: 0 },
+  ]);
+});
+
+test('designTally without platforms gives no split, and caps the comments at five', () => {
+  const items = parseFeedbackResponse({
+    items: Array.from({ length: 7 }, (_, i) => vote(`v${i}`, 'up', `2026-11-0${i + 1}T08:00:00Z`, { message: `n${i}` })),
+    total: 7,
+    summary: { total: 7, open: 7, open_requests: 0, resolved: 0, last_7_days: 7, by_category: { design: 7 } },
+  }).items;
+  const t = designTally(items, 7);
+  assert.equal(t.platforms, null);
+  assert.deepEqual(t.comments.map((c) => c.id), ['v6', 'v5', 'v4', 'v3', 'v2']);
+  assert.deepEqual(designTally([], 0), { up: 0, down: 0, votes: 0, total: 0, comments: [], platforms: null });
 });

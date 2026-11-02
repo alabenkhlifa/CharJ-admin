@@ -211,6 +211,8 @@ type ChargersPageProps = {
   params?: URLSearchParams;
   onParamsChange?: (patch: Record<string, string | null>) => void;
   pendingChargerId?: string | null;
+  // With the pending id: open its editor straight away (Community, after approving a submission).
+  pendingChargerEdit?: boolean;
   onChargerOpened?: () => void;
 };
 
@@ -220,10 +222,12 @@ export const ChargersPage = ({
   params = EMPTY_PARAMS,
   onParamsChange,
   pendingChargerId,
+  pendingChargerEdit = false,
   onChargerOpened,
 }: ChargersPageProps = {}) => {
   const { data: chargers, loading, error, refetch } = useChargers();
   const [selected, setSelected] = useState<Charger | null>(null);
+  const [editOnOpen, setEditOnOpen] = useState(false);
   const [addingLocal, setAddingLocal] = useState(false);
 
   // ── URL-backed state ────────────────────────────────────────────────────
@@ -318,9 +322,10 @@ export const ChargersPage = ({
     const found = chargers.find((c) => c.id === pendingChargerId);
     if (found) {
       setSelected(found);
+      setEditOnOpen(pendingChargerEdit);
       onChargerOpened?.();
     }
-  }, [pendingChargerId, chargers, onChargerOpened]);
+  }, [pendingChargerId, pendingChargerEdit, chargers, onChargerOpened]);
 
   // ── Derived data ────────────────────────────────────────────────────────
 
@@ -502,7 +507,10 @@ export const ChargersPage = ({
   const onSort = (key: SortKey) =>
     setParams({ sort: serializeSort(nextSort(sort, key, DESC_FIRST)), page: null });
 
-  const openCharger = (c: Charger) => setSelected(c);
+  const openCharger = (c: Charger) => {
+    setEditOnOpen(false);
+    setSelected(c);
+  };
 
   return (
     <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -963,7 +971,11 @@ export const ChargersPage = ({
           // carry over when a deep link swaps the open charger.
           key={selected.id}
           charger={selected}
-          onClose={() => setSelected(null)}
+          startEditing={editOnOpen}
+          onClose={() => {
+            setSelected(null);
+            setEditOnOpen(false);
+          }}
           onLocalUpdate={(patch) =>
             setSelected((prev) => (prev ? { ...prev, ...patch } : prev))
           }
@@ -1071,6 +1083,8 @@ const setChargerStatus = async (
 
 type DetailDrawerProps = {
   charger: Charger;
+  /** Open in the editor rather than the detail view. */
+  startEditing?: boolean;
   onClose: () => void;
   onLocalUpdate: (patch: Partial<Charger>) => void;
   refetch: () => Promise<void>;
@@ -1140,8 +1154,8 @@ const MissingMapKeyHint = () => (
   </div>
 );
 
-const DetailDrawer = ({ charger, onClose, onLocalUpdate, refetch }: DetailDrawerProps) => {
-  const [editing, setEditing] = useState(false);
+const DetailDrawer = ({ charger, startEditing = false, onClose, onLocalUpdate, refetch }: DetailDrawerProps) => {
+  const [editing, setEditing] = useState(startEditing);
   const [saved, setSaved] = useState(false);
   const today = todayIndex();
   const theme = useCurrentTheme();

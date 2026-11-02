@@ -1,0 +1,475 @@
+/* Community: the admin's one queue page. Components and their styles come
+   from the kit (src/ui/, ui.css); tokens from src/index.css. Logical
+   properties only, so Arabic flips cleanly. The page width (at most 1120px)
+   comes from the shell. Layouts follow the room the page has (container
+   queries), not the viewport: at 768 the sidebar leaves ~450px. */
+
+.com {
+  container: com / inline-size;
+}
+
+/* ---- tabs: pills on the ground, the current one lifted in Card ---- */
+/* Two by two on a phone, one row once four fit with their badges. Labels
+   and zero badges sit on Card or Ground, never on Fill, so Secondary Ink
+   keeps 4.5:1. */
+.com-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-xs);
+  margin-block-end: var(--s-lg);
+}
+@container com (min-width: 600px) {
+  .com-tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-inline-size: 760px;
+  }
+}
+.com-tabs a {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-xs) 6px;
+  min-inline-size: 0;
+  min-block-size: 40px;
+  padding: 6px 10px;
+  border-radius: var(--r-chip);
+  color: var(--ink);
+  font: 500 15px var(--font);
+  text-align: center;
+  transition: background .2s var(--ease);
+}
+.com-tabs a:hover {
+  background: var(--fill);
+}
+.com-tabs a[aria-current="page"] {
+  background: var(--card);
+  box-shadow: var(--shadow-thumb);
+  font-weight: 600;
+}
+.com-badge {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 22px;
+  block-size: 22px;
+  padding-inline: 7px;
+  border-radius: 11px;
+  color: var(--glyph);
+  font: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+}
+/* A real zero: Secondary Ink, no colour. */
+.com-badge-zero {
+  color: var(--ink-2);
+}
+
+/* ---- tab body ---- */
+.com-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-lg);
+  align-items: start;
+}
+@container com (min-width: 900px) {
+  .com-grid-split {
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  }
+}
+
+/* Filters inside a card. */
+.com-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm) var(--s-md);
+  margin-block-start: var(--s-md);
+}
+.com-bar .ui-seg {
+  flex: 1 1 260px;
+}
+/* Four segments share a phone card (311px at 375): a little less inline
+   padding keeps "Approved" and "Couldn't charge" whole. */
+.com-bar .ui-seg button {
+  padding-inline: 6px;
+}
+.com-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.com-select select {
+  max-inline-size: 100%;
+  padding: 6px var(--s-sm);
+  border: 0;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--ink);
+  font: 500 15px var(--font);
+}
+
+/* Two to four stat numbers (DESIGN.md "28px in paired stats"). */
+.com-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-md);
+  margin-block-start: 10px;
+}
+/* Three side by side even on a phone; four go two by two until they fit in a row. */
+.com-stats-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@container com (min-width: 600px) {
+  .com-stats-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.com-stats > div {
+  min-inline-size: 0;
+}
+.com-stats b {
+  display: block;
+  font: 700 28px/1.15 var(--font);
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.com-stats span {
+  display: block;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.com-stats .com-alarm {
+  color: var(--c-alarm-text);
+}
+
+/* ---- lists ---- */
+.com-list {
+  list-style: none;
+  margin: var(--s-sm) 0 0;
+  padding: 0;
+}
+.com-item {
+  min-inline-size: 0;
+  padding-block: var(--s-md);
+}
+.com-item + .com-item {
+  border-block-start: .5px solid var(--sep);
+}
+.com-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-sm);
+}
+.com-title {
+  min-inline-size: 0;
+  margin: 0;
+  font: 600 17px/1.3 var(--font);
+  overflow-wrap: anywhere;
+}
+.com-when {
+  flex: none;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.com-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-xs) var(--s-sm);
+}
+.com-tags .ui-pill {
+  margin: 0;
+}
+/* The driver's own words: their line breaks kept, long words broken. */
+.com-text {
+  margin: 6px 0 0;
+  max-inline-size: 70ch;
+  font: var(--type-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.com-meta {
+  margin: var(--s-xs) 0 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  overflow-wrap: anywhere;
+}
+.com-meta a,
+.com-text a {
+  color: var(--c-screens-text);
+  font-weight: 600;
+}
+.com-vote {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: var(--type-card-title);
+}
+.com-vote svg {
+  flex: none;
+}
+.com-stars {
+  font: 400 15px var(--font);
+  letter-spacing: 1px;
+}
+.com-stars i {
+  color: var(--sep);
+  font-style: normal;
+}
+
+.com-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm);
+  margin-block-start: 10px;
+}
+
+/* ---- buttons and fields ---- */
+.com-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-block-size: 34px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--ink);
+  font: var(--type-card-title);
+}
+.com-btn:disabled {
+  color: var(--ink-2);
+  cursor: default;
+}
+/* The text tone as fill, so the label in glyph ink keeps 4.5:1 (like bubbles). */
+.com-btn-primary {
+  background: var(--c-screens-text);
+  color: var(--glyph);
+}
+.com-btn-primary:disabled {
+  background: var(--fill);
+  color: var(--ink-2);
+}
+.com-link {
+  padding: var(--s-xs) 0;
+  border: 0;
+  background: none;
+  color: var(--c-screens-text);
+  font: var(--type-card-title);
+  text-align: start;
+}
+.com-link:disabled {
+  color: var(--ink-2);
+  cursor: default;
+}
+.com-id {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-screens-text);
+  font: inherit;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.com-form {
+  display: grid;
+  gap: var(--s-sm);
+  margin-block-start: 10px;
+  max-inline-size: 70ch;
+}
+.com-field {
+  display: grid;
+  gap: var(--s-xs);
+  min-inline-size: 0;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.com-input {
+  inline-size: 100%;
+  min-inline-size: 0;
+  padding: var(--s-sm) 10px;
+  border: 0;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--ink);
+  font: 400 17px/1.3 var(--font);
+  text-align: start;
+}
+textarea.com-input {
+  min-block-size: 76px;
+  resize: vertical;
+}
+
+/* "Someone already reviewed this", a done action: one line above the list. */
+.com-notice {
+  margin: var(--s-md) 0 0;
+  padding: var(--s-sm) var(--s-md);
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  font: var(--type-subhead);
+  overflow-wrap: anywhere;
+}
+/* Something broke: Alarm text is earned here. */
+.com-error {
+  margin: var(--s-sm) 0 0;
+  max-inline-size: 70ch;
+  color: var(--c-alarm-text);
+  font: var(--type-subhead);
+  overflow-wrap: anywhere;
+}
+.com-retry {
+  margin: var(--s-md) 0 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  overflow-wrap: anywhere;
+}
+.com-retry button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-screens-text);
+  font: inherit;
+  font-weight: 600;
+}
+.com-note {
+  margin: 10px 0 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.com-wait {
+  display: flex;
+  align-items: center;
+  min-block-size: 120px;
+}
+
+/* ---- submissions ---- */
+.com-conns {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  font: var(--type-subhead);
+  font-variant-numeric: tabular-nums;
+}
+.com-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-sm);
+  margin-block-start: var(--s-sm);
+}
+.com-photos a {
+  display: block;
+  inline-size: 64px;
+  block-size: 64px;
+  overflow: hidden;
+  border-radius: var(--r-square);
+  background: var(--fill);
+}
+.com-photos img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+.com-near {
+  margin: var(--s-sm) 0 0;
+  font: var(--type-subhead);
+  overflow-wrap: anywhere;
+}
+.com-near b {
+  font-weight: 600;
+}
+.com-near-list {
+  list-style: none;
+  margin: var(--s-xs) 0 0;
+  padding: 0;
+}
+.com-near-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-sm);
+  padding-block: 6px;
+  font: var(--type-subhead);
+}
+.com-near-list li + li {
+  border-block-start: .5px solid var(--sep);
+}
+.com-near-list a {
+  min-inline-size: 0;
+  color: var(--c-screens-text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.com-near-list span {
+  flex: none;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- the approve dialog (a native <dialog>, so focus and Escape are the browser's) ---- */
+.com-dialog {
+  inline-size: min(560px, calc(100vw - 2 * var(--s-lg)));
+  max-block-size: calc(100dvh - 2 * var(--s-lg));
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow-dialog);
+  overflow: auto;
+}
+.com-dialog::backdrop {
+  background: var(--scrim);
+}
+.com-dialog form {
+  display: grid;
+  gap: var(--s-md);
+  padding: 18px var(--s-lg) var(--s-lg);
+}
+.com-dialog h2 {
+  margin: 0;
+  font: var(--type-section);
+  overflow-wrap: anywhere;
+}
+.com-dialog section {
+  min-inline-size: 0;
+  padding-block-start: var(--s-md);
+  border-block-start: .5px solid var(--sep);
+}
+.com-dialog h3 {
+  margin: 0;
+  font: var(--type-card-title);
+}
+.com-dialog .com-form {
+  max-inline-size: none;
+}
+.com-dialog-end {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--s-sm);
+}
+
+/* A small heading inside a card ("Latest comments"). */
+.com-sub {
+  margin: var(--s-lg) 0 0;
+  font: var(--type-card-title);
+}
+
+/* A visit that ended without charging: broken, so Alarm text is earned. */
+.com-failed {
+  color: var(--c-alarm-text);
+}
+.com-item > p.com-tags {
+  margin: 6px 0 0;
+}
