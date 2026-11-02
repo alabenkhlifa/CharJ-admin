@@ -1,0 +1,360 @@
+/* Usage: the page's own layout. Components and their styles come from the
+   kit (src/ui/, ui.css); tokens from src/index.css. Logical properties only,
+   so Arabic flips cleanly. The page width (at most 1120px) comes from the shell. */
+
+/* Cards pair up by the room the page really has, not the viewport: at 768
+   the sidebar leaves ~450px, too narrow for two cards side by side. */
+.use {
+  container: use / inline-size;
+}
+
+.use-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-lg);
+}
+@container use (min-width: 720px) {
+  .use-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Filters: each control keeps room for "Development" (no clipped labels);
+   two share a row once they fit, so four read as 2 + 2, never 3 + 1. */
+.use-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-sm) var(--s-md);
+  margin-block-end: var(--s-lg);
+}
+.use-filters > .ui-seg {
+  flex: 1 1 max(300px, calc(50% - var(--s-md)));
+}
+
+/* Section titles are the Usage questions (DESIGN.md "Section title"). */
+.use-sec {
+  margin: 26px var(--s-xs) 10px;
+  font: var(--type-section);
+}
+
+/* "‹ Usage" above a drill-in's large title, like an iOS back button. */
+.use-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-hairline);
+  margin-block-start: var(--s-xs);
+  margin-inline-start: calc(-1 * var(--s-xs));
+  padding: var(--s-xs);
+  border-radius: var(--r-chip);
+  color: var(--c-screens-text);
+  font: var(--type-body);
+  text-decoration: none;
+}
+.use-back svg {
+  inline-size: 20px;
+  block-size: 20px;
+  flex: none;
+}
+.use-back svg:dir(rtl) {
+  transform: scaleX(-1);
+}
+.use-back + .ui-lt-pin + .ui-lt {
+  padding-block-start: var(--s-xs);
+}
+
+/* A card waiting for the report keeps roughly its loaded height. */
+.use-wait {
+  display: flex;
+  align-items: center;
+}
+.use-wait-preview {
+  min-block-size: 96px; /* hero line and a sparkline or three rows */
+}
+.use-wait-chart {
+  min-block-size: 220px; /* hero line, a 170px chart, "Show table" */
+}
+.use-wait-list {
+  min-block-size: 180px; /* about five rows */
+}
+
+/* Notes under a card's content (13px, Secondary Ink, 70ch). */
+.use-note {
+  margin: 10px 0 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.use-note a {
+  color: var(--c-screens-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.use-cap {
+  margin: 10px 0 0;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.use-d {
+  display: block;
+  margin: var(--s-hairline) 0 0;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.use-dim {
+  color: var(--ink-2);
+}
+.use-nw {
+  white-space: nowrap;
+}
+
+/* Two to four stat numbers side by side (DESIGN.md "28px in paired stats"). */
+.use-stats {
+  display: grid;
+  gap: var(--s-md);
+  margin-block-start: 10px;
+}
+.use-stats > div {
+  min-inline-size: 0;
+}
+.use-stats b {
+  display: block;
+  font: 700 28px/1.15 var(--font);
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+}
+.use-stats span {
+  display: block;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+
+/* The Funnels overview: one line per funnel, its swatch, then its counts. */
+.use-lines {
+  list-style: none;
+  margin: var(--s-sm) 0 0;
+  padding: 0;
+}
+.use-lines li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2px var(--s-md);
+  padding-block: var(--s-sm);
+  font: var(--type-subhead);
+}
+.use-lines li + li {
+  border-block-start: .5px solid var(--sep);
+}
+.use-lines-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-sm);
+}
+.use-lines-name i {
+  flex: none;
+  inline-size: 10px; /* the chart key's swatch */
+  block-size: 10px;
+  border-radius: var(--r-bar);
+}
+.use-lines-v {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The cohort table needs ~600px; a narrower card keeps the chips (the kit
+   swaps by viewport, and at 768 the sidebar leaves ~450px). */
+@container use (max-width: 599px) {
+  .use .ui-coh {
+    display: block;
+  }
+  .use .ui-coh-table {
+    display: none;
+  }
+}
+
+/* Long cells ("60% (12 of 20)") don't fit three chips across a phone: one
+   chip per row there, label at the start, value at the end. */
+@container use (max-width: 599px) {
+  .use-coh-rows .ui-chips {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-xs);
+  }
+  .use-coh-rows .ui-chip {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0 var(--s-sm);
+    padding-block: 6px;
+  }
+  .use-coh-rows .ui-chip small {
+    margin: 0;
+  }
+  .use-coh-rows .ui-chip .ui-pill {
+    display: inline-block;
+    margin: 0;
+    margin-inline-start: 6px;
+  }
+}
+
+/* ---- Users ---- */
+.use-users-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm) var(--s-md);
+  margin-block-start: var(--s-md);
+}
+.use-users-bar .ui-seg {
+  flex: 0 1 260px;
+}
+.use-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-block: var(--s-xs);
+  padding-inline: 10px var(--s-xs);
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  font: 500 13px var(--font);
+  font-variant-numeric: tabular-nums;
+}
+.use-chip button {
+  display: grid;
+  place-items: center;
+  inline-size: 22px;
+  block-size: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-2);
+  font: 600 15px/1 var(--font);
+}
+.use-chip button:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+.use-link {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--c-screens-text);
+  font: var(--type-card-title);
+}
+.use-link:disabled {
+  color: var(--ink-2);
+}
+.use-id {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: var(--type-card-title);
+  font-variant-numeric: tabular-nums;
+}
+.use-id:hover {
+  color: var(--c-screens-text);
+}
+
+/* Users: two-line rows on narrow cards, a table on wide ones. */
+.use-users {
+  list-style: none;
+  margin: var(--s-sm) 0 0;
+  padding: 0;
+}
+.use-user {
+  padding-block: 10px;
+  min-inline-size: 0;
+}
+.use-user + .use-user {
+  border-block-start: .5px solid var(--sep);
+}
+.use-user-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-sm);
+}
+.use-user-who {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-xs) 0;
+  min-inline-size: 0;
+}
+.use-user-when {
+  flex: none;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.use-user .use-d {
+  overflow-wrap: anywhere;
+}
+.use-users-table {
+  display: none;
+}
+@container use (min-width: 720px) {
+  .use-users {
+    display: none;
+  }
+  .use-users-table {
+    display: block;
+  }
+}
+
+/* ---- Car catalog ---- */
+.use-models {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  column-gap: var(--s-xl);
+  margin: var(--s-sm) 0 0;
+  padding: 0;
+}
+.use-models li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-sm);
+  min-inline-size: 0;
+  padding-block: 10px;
+  border-block-start: .5px solid var(--sep);
+}
+.use-model-main {
+  min-inline-size: 0;
+}
+.use-model-name {
+  display: block;
+  font: var(--type-body);
+}
+.use-models .ui-pill {
+  flex: none;
+}
+
+/* "Couldn't load. Try again" */
+.use-retry {
+  margin: 0 0 var(--s-md);
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.use-retry button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-screens-text);
+  font: inherit;
+  font-weight: 600;
+}
+.use .ui-card .use-retry {
+  margin: var(--s-md) 0 0;
+}
+
+.use-foot {
+  margin: 22px var(--s-xs) 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}

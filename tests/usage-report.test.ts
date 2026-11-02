@@ -113,16 +113,6 @@ test("rejects a summary with a nested key missing or a wrong type", () => {
   }
 });
 
-test("the usage view is a typed passthrough until Task 8 parses it", () => {
-  const raw = { generated_at: "2026-11-02T02:53:48Z", timezone: "Africa/Tunis", environment: "preview", days: 30, daily: [] };
-  const report = parseUsageReport("usage", raw);
-  assert.equal(report.environment, "preview");
-  assert.equal(report.days, 30);
-  assert.deepEqual(report.raw, raw);
-  assert.throws(() => parseUsageReport("usage", { ...raw, days: 365 }), /Invalid usage report/);
-  assert.throws(() => parseUsageReport("usage", { ...raw, timezone: undefined }), /Invalid usage report/);
-});
-
 test("the Active goal is the rounded 7-day average, at least 1", () => {
   assert.equal(activeGoal(3.43), 3);
   assert.equal(activeGoal(3.5), 4);

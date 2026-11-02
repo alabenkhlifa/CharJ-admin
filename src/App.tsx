@@ -9,11 +9,9 @@ import { SubmissionsPage } from "./pages/submissions";
 import { FeedbackPage } from "./pages/feedback";
 import { ReviewsPage } from "./pages/reviews";
 import { VisitsPage } from "./pages/visits";
-import { UsersPage } from "./pages/users";
-import { VehiclesPage } from "./pages/vehicles";
 import { MapPage } from "./pages/map";
 import { SettingsPage } from "./pages/settings";
-import { AnalyticsPage } from "./pages/analytics";
+import { UsagePage } from "./pages/usage";
 import { NotificationsPage } from "./pages/notifications";
 import { useQueue } from "./data/queue";
 import { parseUsageEnvironment } from "./data/usage-report";
@@ -29,11 +27,11 @@ const App = () => {
   const queueTotal = queue.data?.total ?? undefined;
 
   // Cross-page deep links, carried by the URL rather than React state:
-  //   #/chargers?id=<uuid>             — open that charger's detail drawer
-  //   #/usage?tab=users&user=<uuid>    — pin the Users table to one driver
+  //   #/chargers?id=<uuid>                — open that charger's detail drawer
+  //   #/usage?section=users&user=<uuid>   — pin the Users list to one driver
+  //                                         (old links: ?tab=users&user=)
   const pendingChargerId = route === "chargers" ? params.get("id") : null;
   const tab = params.get("tab");
-  const userLookup = route === "usage" && tab === "users" ? (params.get("user") ?? "") : "";
 
   // Merge a patch into the current query string instead of replacing it. The
   // Chargers page keeps its search / filters / sort / page there too, so a
@@ -47,7 +45,7 @@ const App = () => {
     replace(route, next);
   };
 
-  // Until the new pages land (Tasks 8-11) each new route renders the page it
+  // Until the new pages land (Tasks 9-11) each new route renders the page it
   // replaces, and the old sub-pages stay reachable through their tab param.
   const renderPage = () => {
     switch (route) {
@@ -60,18 +58,14 @@ const App = () => {
           />
         );
       case "usage":
-        if (tab === "users") {
-          return <UsersPage lookup={userLookup} onClearLookup={() => replace("usage", { tab: "users" })} />;
-        }
-        if (tab === "catalog") return <VehiclesPage />;
-        return <AnalyticsPage />;
+        return <UsagePage params={params} onParams={patchParams} />;
       case "community":
         if (tab === "submissions") return <SubmissionsPage />;
         if (tab === "reviews") return <ReviewsPage />;
         if (tab === "visits") {
           return (
             <VisitsPage
-              onOpenDriver={(userId) => navigate("usage", { tab: "users", user: userId })}
+              onOpenDriver={(userId) => navigate("usage", { section: "users", user: userId })}
             />
           );
         }

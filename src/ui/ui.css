@@ -657,3 +657,46 @@ a.ui-card:hover {
 .ui-tip-r b {
   font-variant-numeric: tabular-nums;
 }
+
+/* ---- pager (list footers) ---- */
+.ui-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm) var(--s-lg);
+  margin-block-start: var(--s-md);
+  padding-block-start: var(--s-md);
+  border-block-start: .5px solid var(--sep);
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  font-variant-numeric: tabular-nums;
+}
+.ui-pager-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ui-pager select {
+  padding: var(--s-xs) var(--s-sm);
+  border: 0;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--ink);
+  font: 500 13px var(--font);
+}
+.ui-pager-steps {
+  display: inline-flex;
+  gap: var(--s-lg);
+  margin-inline-start: auto;
+}
+.ui-pager-steps button {
+  padding: var(--s-xs) 0;
+  border: 0;
+  background: none;
+  color: var(--c-screens-text);
+  font: var(--type-card-title);
+}
+.ui-pager-steps button:disabled {
+  color: var(--ink-2);
+  cursor: default;
+}

@@ -24,6 +24,8 @@ type Props = {
   /** Accessible chart name ("Active phones per day"). */
   label: string;
   formatLabel?: (label: string) => string;
+  /** X-axis ticks, when they need to be shorter than the tooltip and table label. */
+  formatTick?: (label: string) => string;
   height?: number;
   /** Fixed axis top (e.g. the number of test phones); otherwise a round max. */
   yMax?: number;
@@ -39,7 +41,16 @@ const roundedTop = (x: number, y: number, w: number, h: number, r: number) =>
  * ticks, gridlines at 0 / half / max, x labels every 7th from the end. Every
  * column is a focusable hit area with a tooltip; "Show table" has the numbers.
  */
-export const Columns = ({ labels, series, label, formatLabel = shortDay, height = 170, yMax, labelHeader = "Day" }: Props) => {
+export const Columns = ({
+  labels,
+  series,
+  label,
+  formatLabel = shortDay,
+  formatTick = formatLabel,
+  height = 170,
+  yMax,
+  labelHeader = "Day",
+}: Props) => {
   const [ref, box] = useBoxWidth<HTMLDivElement>();
   const { tip, target } = useChartTip();
   const n = labels.length;
@@ -103,7 +114,7 @@ export const Columns = ({ labels, series, label, formatLabel = shortDay, height 
         {labels.map((lab, i) =>
           (n - 1 - i) % 7 === 0 ? (
             <text key={lab} className="ui-tick" x={tx(GUTTER + band * i + band / 2)} y={H - 5} textAnchor="middle">
-              {formatLabel(lab)}
+              {formatTick(lab)}
             </text>
           ) : null,
         )}

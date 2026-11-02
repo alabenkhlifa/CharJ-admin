@@ -23,13 +23,23 @@ type State<V extends UsageView> = {
   requestKey: string;
 };
 
-export const useUsage = <V extends UsageView>(view: V, days: UsageDays, environment: UsageEnvironment) => {
+/**
+ * `enabled: false` skips the request (a Usage drill-in that doesn't read the
+ * report, such as Users) and reports neither loading nor an error.
+ */
+export const useUsage = <V extends UsageView>(
+  view: V,
+  days: UsageDays,
+  environment: UsageEnvironment,
+  { enabled = true }: { enabled?: boolean } = {},
+) => {
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision((n) => n + 1), []);
   const requestKey = JSON.stringify([view, days, environment, revision]);
   const [state, setState] = useState<State<V>>({ data: null, loading: true, error: null, requestKey: "" });
 
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
     let active = true;
@@ -64,10 +74,14 @@ export const useUsage = <V extends UsageView>(view: V, days: UsageDays, environm
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [view, days, environment, requestKey]);
+  }, [view, days, environment, requestKey, enabled]);
 
   // A new request (another environment, or a retry) shows loading at once
   // rather than the previous environment's numbers.
-  const current = state.requestKey === requestKey ? state : { data: null, loading: true, error: null };
+  const current = !enabled
+    ? { data: null, loading: false, error: null }
+    : state.requestKey === requestKey
+      ? state
+      : { data: null, loading: true, error: null };
   return { data: current.data, loading: current.loading, error: current.error, refresh };
 };
