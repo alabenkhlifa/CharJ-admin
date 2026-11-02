@@ -92,6 +92,7 @@ try {
     await page.reload();
     await page.locator(".ui-side nav a", { hasText: "Usage" }).click();
     eq(await hashOf(page), "#/usage", "sidebar link goes to Usage");
+    await page.waitForSelector('.ui-side nav a[aria-current=page]:has-text("Usage")', { timeout: 3000 }).catch(() => {});
     eq(await page.locator(".ui-side nav a[aria-current=page]").allInnerTexts(), ["Usage"], "active sidebar link is marked");
     await page.locator(".ui-side nav a", { hasText: "Notifications" }).click();
     eq(await hashOf(page), "#/notifications", "sidebar reaches Notifications");
@@ -113,6 +114,8 @@ try {
     await page.waitForSelector(".ui-tabs");
     await page.locator(".ui-tabs a", { hasText: "Chargers" }).click();
     eq(await hashOf(page), "#/chargers", "tab bar goes to Chargers");
+    // The hash changes at once; React renders the new page on its next task.
+    await page.waitForSelector('.ui-tabs a[aria-current=page]:has-text("Chargers")', { timeout: 3000 }).catch(() => {});
     eq(await page.locator(".ui-tabs a[aria-current=page]").allInnerTexts(), ["Chargers"], "active tab is marked");
     const tabs = await page.locator(".ui-tabs").boundingBox();
     ok(Math.abs(tabs.y + tabs.height - 844) < 1, "tab bar sits at the bottom edge");

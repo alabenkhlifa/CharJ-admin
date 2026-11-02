@@ -7,9 +7,11 @@
   min-block-size: 100vh;
   background: var(--ground);
 }
+/* Inline padding is the page token: the kit's large title pins a bar that
+   bleeds exactly that far (DESIGN.md: 16px on phones, 28px from 768px). */
 .shell-main {
   min-inline-size: 0;
-  padding: 16px 14px calc(88px + env(safe-area-inset-bottom));
+  padding: 16px var(--page-pad-inline) calc(88px + env(safe-area-inset-bottom));
 }
 .shell-side {
   display: none;
@@ -206,10 +208,10 @@
     grid-template-columns: 260px minmax(0, 1fr);
   }
   .shell-main {
-    padding: 28px 32px 48px;
+    padding: 28px var(--page-pad-inline) 48px;
   }
   .shell[data-density="compact"] .shell-main {
-    padding: 20px 24px 40px;
+    padding: 20px var(--page-pad-inline) 40px;
   }
   .shell-side {
     display: block;

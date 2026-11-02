@@ -3,7 +3,7 @@ import { useRoute } from "./lib/use-route";
 import type { RouteParams } from "./lib/use-route";
 import { Sidebar } from "./ui/sidebar";
 import { TabBar } from "./ui/tab-bar";
-import { OverviewPage } from "./pages/overview";
+import { SummaryPage } from "./pages/summary";
 import { ChargersPage } from "./pages/chargers";
 import { SubmissionsPage } from "./pages/submissions";
 import { FeedbackPage } from "./pages/feedback";
@@ -15,17 +15,18 @@ import { MapPage } from "./pages/map";
 import { SettingsPage } from "./pages/settings";
 import { AnalyticsPage } from "./pages/analytics";
 import { NotificationsPage } from "./pages/notifications";
+import { useQueue } from "./data/queue";
+import { parseUsageEnvironment } from "./data/usage-report";
 
-type AppProps = {
-  /** Open items in Community, for the nav badge. Task 7 passes it. */
-  queueTotal?: number;
-};
-
-const App = ({ queueTotal }: AppProps) => {
+const App = () => {
   const [tweaks, setTweak, resolvedTheme] = useTweaks();
   // The active page lives in the URL hash, so a refresh (or a bookmark, or a
   // link pasted to someone else) lands on the same page instead of Summary.
   const { route, params, navigate, replace } = useRoute();
+  // What waits in Community: Summary's Needs you and the nav badge. Reloaded
+  // on every page change, so working the queue in Community updates both.
+  const queue = useQueue(route);
+  const queueTotal = queue.data?.total ?? undefined;
 
   // Cross-page deep links, carried by the URL rather than React state:
   //   #/chargers?id=<uuid>             — open that charger's detail drawer
@@ -46,12 +47,18 @@ const App = ({ queueTotal }: AppProps) => {
     replace(route, next);
   };
 
-  // Until the new pages land (Tasks 7-11) each new route renders the page it
+  // Until the new pages land (Tasks 8-11) each new route renders the page it
   // replaces, and the old sub-pages stay reachable through their tab param.
   const renderPage = () => {
     switch (route) {
       case "summary":
-        return <OverviewPage onAddCharger={() => navigate("chargers", { add: "1" })} />;
+        return (
+          <SummaryPage
+            env={parseUsageEnvironment(params.get("env"))}
+            onEnv={(env) => patchParams({ env })}
+            queue={queue}
+          />
+        );
       case "usage":
         if (tab === "users") {
           return <UsersPage lookup={userLookup} onClearLookup={() => replace("usage", { tab: "users" })} />;

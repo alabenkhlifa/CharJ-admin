@@ -121,6 +121,59 @@ a.ui-card:hover {
   color: var(--ink-2);
 }
 
+/* ---- list rows (Needs you) ---- */
+.ui-rows {
+  list-style: none;
+  margin: var(--s-sm) 0 0;
+  padding: 0;
+}
+.ui-rows li + li {
+  border-block-start: .5px solid var(--sep);
+}
+.ui-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding-block: 11px;
+  color: inherit;
+}
+/* A linked row: the hover tone bleeds past the text, inside the card padding. */
+.ui-row-link {
+  margin-inline: calc(-1 * var(--s-sm));
+  padding-inline: var(--s-sm);
+  border-radius: var(--r-chip);
+  text-decoration: none;
+  transition: background .2s var(--ease);
+}
+.ui-row-link:hover {
+  background: var(--card-pressed);
+}
+.ui-row-main {
+  min-inline-size: 0;
+}
+.ui-row-t {
+  display: block;
+  font: var(--type-body);
+}
+.ui-row-d {
+  display: block;
+  margin-block-start: var(--s-hairline);
+  overflow: hidden;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ui-row-end {
+  display: flex;
+  align-items: center;
+  gap: var(--s-sm);
+}
+.ui-row-chev {
+  color: var(--c-idle);
+}
+
 /* ---- pill ---- */
 .ui-pill {
   display: inline-block;

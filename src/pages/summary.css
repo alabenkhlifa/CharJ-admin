@@ -1,0 +1,101 @@
+/* Summary (Home): the page's own layout. Components and their styles come
+   from the kit (src/ui/, ui.css); tokens from src/index.css. Logical
+   properties only so Arabic flips cleanly. */
+
+.sum {
+  max-inline-size: 1120px;
+  margin-inline: auto;
+}
+
+/* Highlight sentence under the large title. */
+.sum-hl {
+  margin: calc(-1 * var(--s-sm)) var(--s-xs) var(--s-lg);
+  max-inline-size: 70ch;
+  font: var(--type-subhead);
+}
+
+.sum-env {
+  margin-block-end: var(--s-lg);
+}
+
+.sum-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-lg);
+}
+@media (min-width: 768px) {
+  .sum-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Dropped events: shown only when the ingestion cap was hit. */
+.sum-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-sm);
+  margin-block-end: var(--s-lg);
+  padding: var(--s-md) var(--s-lg);
+  border-radius: var(--r-card);
+  background: var(--card);
+  animation: ui-rise var(--dur-rise) var(--ease) both;
+}
+.sum-warn p {
+  margin: 0;
+  min-inline-size: 0;
+  font: var(--type-subhead);
+}
+.sum-warn b {
+  color: var(--c-alarm-text);
+  font-weight: 600;
+}
+
+/* Versions and the languages line. */
+.sum-vers {
+  list-style: none;
+  margin: var(--s-sm) 0 0;
+  padding: 0;
+}
+.sum-vers li,
+.sum-lang {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--s-xs) var(--s-md);
+  padding-block: var(--s-sm);
+  font: var(--type-subhead);
+}
+.sum-vers li + li {
+  border-block-start: .5px solid var(--sep);
+}
+.sum-vers em,
+.sum-lang em {
+  color: var(--ink-2);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sum-lang {
+  margin: 0;
+  border-block-start: .5px solid var(--sep);
+}
+.sum-lang abbr {
+  text-decoration: none;
+}
+
+/* "Some counts couldn't load. Try again" under a card's content. */
+.sum-retry {
+  margin: var(--s-md) 0 0;
+  max-inline-size: 70ch;
+  color: var(--ink-2);
+  font: var(--type-footnote);
+}
+.sum-retry button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-screens-text);
+  font: inherit;
+  font-weight: 600;
+}
