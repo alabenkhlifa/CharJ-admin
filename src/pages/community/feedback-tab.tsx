@@ -22,6 +22,7 @@ import { HealthCard } from "../../ui/health-card";
 import { Pager } from "../../ui/pager";
 import { Pill } from "../../ui/pill";
 import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Stats, Thumb, Waiting, When } from "./bits";
+import { useSaving } from "./use-saving";
 import { ago, nf, useClampPage, useNow } from "./format";
 import type { CommunityView } from "./params";
 
@@ -54,16 +55,21 @@ const Vote = ({ vote }: { vote: NonNullable<FeedbackItem["vote"]> }) => (
   </span>
 );
 
-type RowProps = { item: FeedbackItem; onFlip: (next: FeedbackItem) => void };
+type RowProps = {
+  item: FeedbackItem;
+  onFlip: (next: FeedbackItem) => void;
+  /** Wraps the POST so the card's Refresh waits for it (useSaving). */
+  track: <T>(work: Promise<T>) => Promise<T>;
+};
 
-const FeedbackRow = ({ item, onFlip }: RowProps) => {
+const FeedbackRow = ({ item, onFlip, track }: RowProps) => {
   const now = useNow();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const toggle = async () => {
     setBusy(true);
     setError(null);
-    const res = await setFeedbackResolved(item.id, !item.resolved);
+    const res = await track(setFeedbackResolved(item.id, !item.resolved));
     setBusy(false);
     if (!res.ok) return setError(res.message);
     // The server's row when it sent one; else the change it confirmed.
@@ -103,12 +109,12 @@ const FeedbackRow = ({ item, onFlip }: RowProps) => {
       {isInformational(item) && !item.resolved && <p className="com-meta">Informational: not counted as waiting.</p>}
       {resolvedLine && <p className="com-meta">{resolvedLine}</p>}
       <div className="com-actions">
-        <button type="button" className="com-btn" onClick={() => void toggle()} disabled={busy}>
+        <button type="button" className="ui-btn" onClick={() => void toggle()} disabled={busy}>
           {busy ? (item.resolved ? "Reopening…" : "Resolving…") : item.resolved ? "Reopen" : "Resolve"}
         </button>
       </div>
       {error && (
-        <p className="com-error" role="alert">
+        <p className="ui-error" role="alert">
           {error}
         </p>
       )}
@@ -144,6 +150,7 @@ const FeedbackCard = ({ view, onParams, onChanged, votes }: CardProps) => {
   const data = feedback.data;
   const past = useClampPage(page, data?.total ?? null, FEEDBACK_PER_PAGE, (n) => onParams({ page: n > 1 ? String(n) : null }));
   const byCategory = data?.summary.byCategory;
+  const { saving, track } = useSaving();
 
   let body: ReactNode;
   if (feedback.error) {
@@ -179,6 +186,7 @@ const FeedbackCard = ({ view, onParams, onChanged, votes }: CardProps) => {
             <FeedbackRow
               key={item.id}
               item={item}
+              track={track}
               onFlip={(next) => {
                 feedback.patch((d) => flipCounts(d, item, next));
                 onChanged();
@@ -262,6 +270,7 @@ const FeedbackCard = ({ view, onParams, onChanged, votes }: CardProps) => {
         </label>
         <RefreshButton
           busy={feedback.loading}
+          saving={saving}
           onRefresh={() => {
             feedback.refresh();
             votes.refresh();

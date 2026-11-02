@@ -1,40 +1,5 @@
-import type { CSSProperties, ReactNode } from "react";
-
-type IconProps = {
-  size?: number;
-  stroke?: number;
-  fill?: string;
-  style?: CSSProperties;
-  className?: string;
-};
-
-type RawIconProps = IconProps & {
-  d?: string;
-  children?: ReactNode;
-};
-
-const RawIcon = ({
-  d,
-  size = 16,
-  stroke = 1.6,
-  fill = "none",
-  children,
-  ...rest
-}: RawIconProps) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill={fill}
-    stroke="currentColor"
-    strokeWidth={stroke}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...rest}
-  >
-    {d ? <path d={d} /> : children}
-  </svg>
-);
+import type { ReactNode } from "react";
+import { RawIcon, type IconProps } from "./raw-icon";
 
 export const Icons = {
   Overview: (p: IconProps) => (

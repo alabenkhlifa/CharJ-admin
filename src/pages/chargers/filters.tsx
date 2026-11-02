@@ -144,7 +144,7 @@ export const ChargerFilterBar = ({ filters: f, chargers, onFilter, onClear, coun
         </div>
         <button
           type="button"
-          className="chg-btn chg-filters-toggle"
+          className="ui-btn chg-filters-toggle"
           aria-expanded={open}
           aria-controls={panelId}
           onClick={() => setOpen((v) => !v)}
@@ -158,7 +158,7 @@ export const ChargerFilterBar = ({ filters: f, chargers, onFilter, onClear, coun
           )}
         </button>
         {narrowed && (
-          <button type="button" className="chg-link" onClick={onClear}>
+          <button type="button" className="ui-link chg-link" onClick={onClear}>
             Clear {count > 0 ? `${count} filter${count === 1 ? "" : "s"}` : "search"}
           </button>
         )}

@@ -85,9 +85,13 @@ export const RetryLine = ({ children, onRetry, more }: { children: ReactNode; on
   </p>
 );
 
-/** Read the list (and the queue) again, by hand: nothing here reloads on a timer. */
-export const RefreshButton = ({ busy, onRefresh }: { busy: boolean; onRefresh: () => void }) => (
-  <button type="button" className="com-link com-refresh" onClick={onRefresh} disabled={busy}>
+/**
+ * Read the list (and the queue) again, by hand: nothing here reloads on a
+ * timer. `saving`: a row's change is still on its way, and a read started now
+ * could land after it with the old row, so Refresh waits for it.
+ */
+export const RefreshButton = ({ busy, saving = false, onRefresh }: { busy: boolean; saving?: boolean; onRefresh: () => void }) => (
+  <button type="button" className="ui-link com-refresh" onClick={onRefresh} disabled={busy || saving} title={saving && !busy ? "Saving a change…" : undefined}>
     {busy ? "Refreshing…" : "Refresh"}
   </button>
 );

@@ -94,12 +94,12 @@ const ReportRow = ({ report, onFlip }: { report: ReviewReport; onFlip: (next: Re
         </details>
       )}
       <div className="com-actions">
-        <button type="button" className="com-btn" onClick={() => void toggle()} disabled={busy}>
+        <button type="button" className="ui-btn" onClick={() => void toggle()} disabled={busy}>
           {busy ? (report.resolved ? "Reopening…" : "Resolving…") : report.resolved ? "Reopen" : "Resolve"}
         </button>
       </div>
       {error && (
-        <p className="com-error" role="alert">
+        <p className="ui-error" role="alert">
           {error}
         </p>
       )}

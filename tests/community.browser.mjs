@@ -297,7 +297,7 @@ const shot = async (page, name) => {
 // aside), no segmented label is clipped; plus the open dialog inside the viewport.
 const fits = (page) => page.evaluate(() => {
   const bad = [];
-  const boxes = [...document.querySelectorAll(".com .ui-card"), ...document.querySelectorAll(".com-tabs a"), ...document.querySelectorAll(".com-dialog[open]")];
+  const boxes = [...document.querySelectorAll(".com .ui-card"), ...document.querySelectorAll(".com-tabs a"), ...document.querySelectorAll(".ui-dialog[open]")];
   for (const box of boxes) {
     const c = box.getBoundingClientRect();
     const name = box.querySelector("h2")?.textContent ?? box.textContent.slice(0, 20);
@@ -319,7 +319,7 @@ const fits = (page) => page.evaluate(() => {
   const strip = document.querySelector(".com-tabs")?.getBoundingClientRect();
   const main = document.querySelector(".com")?.getBoundingClientRect();
   if (strip && main && (strip.left < main.left - 0.5 || strip.right > main.right + 0.5)) bad.push("the tab strip pokes out of the page");
-  const dialog = document.querySelector(".com-dialog[open]")?.getBoundingClientRect();
+  const dialog = document.querySelector(".ui-dialog[open]")?.getBoundingClientRect();
   if (dialog && (dialog.left < 0 || dialog.right > innerWidth || dialog.top < 0 || dialog.bottom > innerHeight + 0.5)) bad.push("the dialog leaves the viewport");
   const rows = [...document.querySelectorAll(".com-tabs a")].map((a) => Math.round(a.getBoundingClientRect().y));
   return { bad, tabRows: new Set(rows).size };
@@ -417,8 +417,15 @@ try {
     eq((await tabs(page))[0].badge, "2", "resolve: the Feedback badge follows");
     eq(await navBadge(page), "9", "resolve: the nav badge follows");
     ok(requests.includes("POST admin-feedback"), "resolve: one POST");
+    // While the flip is on its way, Refresh waits: a read started then could land after it with the old row.
+    S.postDelay = 800;
     await first.getByRole("button", { name: "Reopen" }).click();
+    await first.getByRole("button", { name: "Reopening…" }).waitFor();
+    ok(await page.locator("#com-feedback .com-refresh").isDisabled(), "reopen: Refresh is off while the change is on its way");
     await first.getByRole("button", { name: "Resolve" }).waitFor();
+    S.postDelay = 0;
+    await page.waitForFunction(() => !document.querySelector("#com-feedback .com-refresh")?.disabled);
+    ok(true, "reopen: Refresh is back once the change landed");
     await page.waitForFunction(() => document.querySelector(".com-tabs a .com-badge")?.textContent === "3");
     eq(await stats(page, "#com-feedback"), ["3 Open requests", "1 Resolved", "2 Received, 7 days", "4 Received, all time"], "reopen: back to 3");
 
@@ -540,7 +547,7 @@ try {
 
     // Approve: the confirm step.
     await lac.getByRole("button", { name: "Approve…" }).click();
-    const dialog = page.locator(".com-dialog[open]");
+    const dialog = page.locator(".ui-dialog[open]");
     await dialog.waitFor();
     eq(await dialog.locator("h2").innerText(), "Approve this charger?", "approve: a confirm step");
     eq(await dialog.locator("h3").first().innerText(), "Borne Lac 2", "approve: the charger name");
@@ -550,7 +557,7 @@ try {
     eq(await dialog.locator(".com-near-list li").allInnerTexts().then((t) => t.map((x) => x.replace(/\s+/g, " "))), ["Shell Lac 22 m"], "approve: the nearby charger with its distance");
     eq(await dialog.locator(".com-near-list a").getAttribute("href"), `#/chargers?id=${SHELL}`, "approve: the nearby charger opens in Chargers");
     eq(await page.locator("gmp-map, .gm-style").count(), 0, "approve: no live map in the dialog");
-    ok(await page.evaluate(() => document.activeElement?.closest(".com-dialog") !== null), "approve: focus moves into the dialog");
+    ok(await page.evaluate(() => document.activeElement?.closest(".ui-dialog") !== null), "approve: focus moves into the dialog");
     eq(await dialog.getByLabel("Arabic name").getAttribute("dir"), "rtl", "approve: the Arabic fields write right to left");
     await dialog.getByLabel("Arabic name").fill("بورن البحيرة 2");
     await dialog.getByLabel("Operator").fill("Lac Mall");
@@ -560,10 +567,10 @@ try {
 
     // 422: the reason in plain words; the dialog stays.
     await dialog.getByRole("button", { name: "Approve", exact: true }).click();
-    await dialog.locator(".com-error").waitFor();
-    eq(await dialog.locator(".com-error").innerText(), "No city matches this location. Check the pin, or add the city in Chargers first.", "422: the server's reason in plain words");
+    await dialog.locator(".ui-error").waitFor();
+    eq(await dialog.locator(".ui-error").innerText(), "No city matches this location. Check the pin, or add the city in Chargers first.", "422: the server's reason in plain words");
     eq(S.posts.at(-1).body, { id: S1, action: "approve", name_ar: "بورن البحيرة 2", operator: "Lac Mall" }, "approve: the POST carries the Arabic name and operator, nothing invented");
-    eq(await page.locator(".com-dialog[open]").count(), 1, "422: the dialog stays open");
+    eq(await page.locator(".ui-dialog[open]").count(), 1, "422: the dialog stays open");
 
     // 200: open the new charger in its editor; the queue reloads.
     const badgeBefore = await navBadge(page);
@@ -585,13 +592,13 @@ try {
     eq((await tabs(page))[1].badge, "2", "after approve: the Submissions badge is 2");
     const gammarth = items(page, "#com-submissions").first();
     await gammarth.getByRole("button", { name: "Approve…" }).click();
-    await page.locator(".com-dialog[open]").waitFor();
-    eq(await page.locator(".com-dialog[open] .com-near").innerText(), "No charger within 100 m.", "approve: nothing nearby says so");
+    await page.locator(".ui-dialog[open]").waitFor();
+    eq(await page.locator(".ui-dialog[open] .com-near").innerText(), "No charger within 100 m.", "approve: nothing nearby says so");
     const gets = count(requests, "admin-submissions?status=pending&page=1&perPage=25");
-    await page.locator(".com-dialog[open]").getByRole("button", { name: "Approve", exact: true }).click();
+    await page.locator(".ui-dialog[open]").getByRole("button", { name: "Approve", exact: true }).click();
     await page.locator("#com-submissions .com-notice").waitFor();
     eq(await page.locator("#com-submissions .com-notice").innerText(), "Someone already reviewed this. The list now shows where it stands.", "409: Someone already reviewed this");
-    eq(await page.locator(".com-dialog[open]").count(), 0, "409: the dialog closes");
+    eq(await page.locator(".ui-dialog[open]").count(), 0, "409: the dialog closes");
     await page.waitForFunction(() => document.querySelectorAll("#com-submissions .com-list > .com-item").length === 1);
     ok(count(requests, "admin-submissions?status=pending&page=1&perPage=25") > gets, "409: the list is read again");
     await page.waitForFunction(() => document.querySelectorAll(".com-tabs a .com-badge")[1]?.textContent === "1");
@@ -633,10 +640,10 @@ try {
     // Deleted on the server after the list was read.
     S.submissions = S.submissions.filter((x) => x.id !== S1);
     await items(page, "#com-submissions").first().getByRole("button", { name: "Approve…" }).click();
-    await page.locator(".com-dialog[open]").getByRole("button", { name: "Approve", exact: true }).click();
+    await page.locator(".ui-dialog[open]").getByRole("button", { name: "Approve", exact: true }).click();
     await page.locator("#com-submissions .com-notice").waitFor();
     eq(await page.locator("#com-submissions .com-notice").innerText(), "This submission no longer exists. The list now shows where it stands.", "404 approve: said plainly");
-    eq(await page.locator(".com-dialog[open]").count(), 0, "404 approve: the dialog closes");
+    eq(await page.locator(".ui-dialog[open]").count(), 0, "404 approve: the dialog closes");
     await page.waitForFunction(() => document.querySelectorAll("#com-submissions .com-list > .com-item").length === 2);
     await page.waitForFunction(() => document.querySelectorAll(".com-tabs a .com-badge")[1]?.textContent === "2");
     ok(true, "404 approve: the list and the badge are read again");
@@ -657,8 +664,8 @@ try {
     await page.goto(`${base}/${LINKS.submissions}`);
     await ready(page, "#com-submissions");
     await items(page, "#com-submissions").first().getByRole("button", { name: "Approve…" }).click();
-    await page.locator(".com-dialog[open]").getByRole("button", { name: "Approve", exact: true }).click();
-    await page.locator(".com-dialog[open]").getByRole("button", { name: "Approving…" }).waitFor();
+    await page.locator(".ui-dialog[open]").getByRole("button", { name: "Approve", exact: true }).click();
+    await page.locator(".ui-dialog[open]").getByRole("button", { name: "Approving…" }).waitFor();
     // Back button / another tab while the POST is out: the dialog goes with the tab.
     await page.evaluate(() => { location.hash = "#/community?tab=reviews"; });
     await page.waitForSelector("#com-reports");
@@ -760,8 +767,14 @@ try {
     await page.waitForFunction(() => document.querySelectorAll(".com-tabs a .com-badge")[3]?.textContent === "1");
     eq((await tabs(page))[3].badge, "1", "hide: the Driver visits badge follows (hidden reports don't wait)");
     ok((await page.locator("#com-visits > .com-meta").innerText()).includes("1 couldn't charge in the last 7 days"), "hide: the window line agrees with the badge (2 → 1)");
+    S.postDelay = 800;
     await marsa.getByRole("button", { name: "Unhide" }).click();
+    await marsa.getByRole("button", { name: "Unhiding…" }).waitFor();
+    ok(await page.locator("#com-visits .com-refresh").isDisabled(), "unhide: Refresh is off while the change is on its way");
     await marsa.getByRole("button", { name: "Hide…" }).waitFor();
+    S.postDelay = 0;
+    await page.waitForFunction(() => !document.querySelector("#com-visits .com-refresh")?.disabled);
+    ok(true, "unhide: Refresh is back once the change landed");
     eq(S.posts.at(-1).body, { id: V1, hidden: false }, "unhide: the POST");
     await page.waitForFunction(() => document.querySelectorAll(".com-tabs a .com-badge")[3]?.textContent === "2");
     ok(true, "unhide: the badge goes back to 2");
@@ -820,18 +833,18 @@ try {
           const badgeContrast = await contrasts(page, ".com-tabs .com-badge, .com-tabs a > span:first-child");
           ok(badgeContrast.every((c) => c.ratio >= 4.5), `${tag}: tab labels and badges reach 4.5:1`, badgeContrast);
           if (tab === "submissions") {
-            const btn = await contrasts(page, ".com-btn-primary");
+            const btn = await contrasts(page, ".ui-btn-primary");
             ok(btn.every((c) => c.ratio >= 4.5), `${tag}: the primary button reaches 4.5:1`, btn);
             await items(page, card).first().getByRole("button", { name: "Approve…" }).click();
-            await page.locator(".com-dialog[open]").waitFor();
-            await page.locator(".com-dialog[open]").getByRole("button", { name: "Approve", exact: true }).click();
-            await page.locator(".com-dialog[open] .com-error").waitFor();
+            await page.locator(".ui-dialog[open]").waitFor();
+            await page.locator(".ui-dialog[open]").getByRole("button", { name: "Approve", exact: true }).click();
+            await page.locator(".ui-dialog[open] .ui-error").waitFor();
             const dfit = await fits(page);
             ok(dfit.bad.length === 0, `${tag}: the dialog fits, with an error`, dfit);
             if (width === 1440 && colorScheme === "light") await page.screenshot({ path: `${output}/t9-1440-approve.png` });
             await page.keyboard.press("Escape");
-            await page.locator(".com-dialog[open]").waitFor({ state: "detached" }).catch(() => {});
-            eq(await page.locator(".com-dialog[open]").count(), 0, `${tag}: Escape closes the dialog`);
+            await page.locator(".ui-dialog[open]").waitFor({ state: "detached" }).catch(() => {});
+            eq(await page.locator(".ui-dialog[open]").count(), 0, `${tag}: Escape closes the dialog`);
           }
           if (width === 768 && tab === "submissions") await shot(page, "t9-768-light.png");
           if (width === 1440 && tab === "feedback") await shot(page, `t9-1440-${colorScheme}.png`);
@@ -854,7 +867,7 @@ try {
       await queueSettled(page);
       const fit = await fits(page);
       ok(fit.bad.length === 0, `390 ${colorScheme} ${tab}: fits`, fit);
-      const all = await contrasts(page, ".com .com-meta, .com .com-when, .com .ui-pill, .com .com-badge, .com .com-stats span, .com .com-btn, .com .com-near-list span");
+      const all = await contrasts(page, ".com .com-meta, .com .com-when, .com .ui-pill, .com .com-badge, .com .com-stats span, .com .ui-btn, .com .com-near-list span");
       const low = all.filter((c) => c.ratio < 4.5);
       ok(low.length === 0, `390 ${colorScheme} ${tab}: secondary text, pills, badges and buttons reach 4.5:1`, low);
       if (tab === "feedback") await shot(page, `t9-390-${colorScheme}.png`);

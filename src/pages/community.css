@@ -232,45 +232,7 @@
   margin-block-start: 10px;
 }
 
-/* ---- buttons and fields ---- */
-.com-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-block-size: 34px;
-  padding: 6px 14px;
-  border: 0;
-  border-radius: var(--r-chip);
-  background: var(--fill);
-  color: var(--ink);
-  font: var(--type-card-title);
-}
-.com-btn:disabled {
-  color: var(--ink-2);
-  cursor: default;
-}
-/* The text tone as fill, so the label in glyph ink keeps 4.5:1 (like bubbles). */
-.com-btn-primary {
-  background: var(--c-screens-text);
-  color: var(--glyph);
-}
-.com-btn-primary:disabled {
-  background: var(--fill);
-  color: var(--ink-2);
-}
-.com-link {
-  padding: var(--s-xs) 0;
-  border: 0;
-  background: none;
-  color: var(--c-screens-text);
-  font: var(--type-card-title);
-  text-align: start;
-}
-.com-link:disabled {
-  color: var(--ink-2);
-  cursor: default;
-}
+/* ---- buttons and fields (buttons are the kit's .ui-btn and .ui-link) ---- */
 /* Refresh sits at the end of a card's filter bar. */
 .com-refresh {
   margin-inline-start: auto;
@@ -326,13 +288,6 @@ textarea.com-input {
   overflow-wrap: anywhere;
 }
 /* Something broke: Alarm text is earned here. */
-.com-error {
-  margin: var(--s-sm) 0 0;
-  max-inline-size: 70ch;
-  color: var(--c-alarm-text);
-  font: var(--type-subhead);
-  overflow-wrap: anywhere;
-}
 .com-retry {
   margin: var(--s-md) 0 0;
   max-inline-size: 70ch;
@@ -424,48 +379,9 @@ textarea.com-input {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---- the approve dialog (a native <dialog>, so focus and Escape are the browser's) ---- */
-.com-dialog {
-  inline-size: min(560px, calc(100vw - 2 * var(--s-lg)));
-  max-block-size: calc(100dvh - 2 * var(--s-lg));
-  padding: 0;
-  border: 0;
-  border-radius: var(--r-card);
-  background: var(--card);
-  color: var(--ink);
-  box-shadow: var(--shadow-dialog);
-  overflow: auto;
-}
-.com-dialog::backdrop {
-  background: var(--scrim);
-}
-.com-dialog form {
-  display: grid;
-  gap: var(--s-md);
-  padding: 18px var(--s-lg) var(--s-lg);
-}
-.com-dialog h2 {
-  margin: 0;
-  font: var(--type-section);
-  overflow-wrap: anywhere;
-}
-.com-dialog section {
-  min-inline-size: 0;
-  padding-block-start: var(--s-md);
-  border-block-start: .5px solid var(--sep);
-}
-.com-dialog h3 {
-  margin: 0;
-  font: var(--type-card-title);
-}
-.com-dialog .com-form {
+/* ---- the approve dialog: the kit's .ui-dialog (src/ui/ui.css) ---- */
+.com-approve .com-form {
   max-inline-size: none;
-}
-.com-dialog-end {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--s-sm);
 }
 
 /* A small heading inside a card ("Latest comments"). */

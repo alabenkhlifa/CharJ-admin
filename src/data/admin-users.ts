@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { adminFetch } from "../lib/admin-fetch";
 import { SUPABASE_CONFIGURED } from "../lib/supabase";
+import { NOT_CONFIGURED } from "./admin-load";
 
 // ── Types matching the admin-users Edge Function response ─────────────────
 // Function lives at: ${VITE_SUPABASE_URL}/functions/v1/admin-users
@@ -143,27 +144,18 @@ export const useAdminUsers = (
   filter: AdminUsersFilter = "all",
   lookup = "",
 ) => {
-  const [state, setState] = useState<UseAdminUsersState>({
-    data: [],
-    total: 0,
-    loading: true,
-    error: null,
-  });
+  // Not configured is known at load: no request, no effect needed.
+  const [state, setState] = useState<UseAdminUsersState>(() =>
+    SUPABASE_CONFIGURED
+      ? { data: [], total: 0, loading: true, error: null }
+      : { data: [], total: 0, loading: false, error: NOT_CONFIGURED },
+  );
   const [revision, setRevision] = useState(0);
 
   const refresh = useCallback(() => setRevision((n) => n + 1), []);
 
   useEffect(() => {
-    if (!SUPABASE_CONFIGURED) {
-      setState({
-        data: [],
-        total: 0,
-        loading: false,
-        error:
-          "Admin API not configured. Set VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY.",
-      });
-      return;
-    }
+    if (!SUPABASE_CONFIGURED) return;
 
     let cancelled = false;
     const controller = new AbortController();

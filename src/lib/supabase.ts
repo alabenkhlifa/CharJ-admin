@@ -8,9 +8,8 @@ export const SUPABASE_ANON_KEY = ANON;
 
 if (!URL || !ANON) {
   // Fail loud at module import — easier than chasing "fetch returned null"
-  // surprises later. The admin can still render with mock data only if we
-  // gate at the call site.
-  // eslint-disable-next-line no-console
+  // surprises later. Every hook checks SUPABASE_CONFIGURED and shows
+  // "not configured" instead of numbers.
   console.warn(
     "[charj-admin] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY not set — Supabase queries will fail.",
   );

@@ -17,6 +17,7 @@ import { Pager } from "../../ui/pager";
 import { Pill } from "../../ui/pill";
 import { Segmented } from "../../ui/segmented";
 import { ComIcon, LOADING, Note, RefreshButton, RetryLine, Stats, Waiting, When } from "./bits";
+import { useSaving } from "./use-saving";
 import { nf, shortId, useClampPage } from "./format";
 import type { CommunityView } from "./params";
 
@@ -49,9 +50,15 @@ const WINDOW_OPTIONS: { v: string; l: string }[] = [
   { v: "90", l: "90 days" },
 ];
 
-type RowProps = { visit: Visit; onOpenDriver: (id: string) => void; onFlip: (next: Visit) => void };
+type RowProps = {
+  visit: Visit;
+  onOpenDriver: (id: string) => void;
+  onFlip: (next: Visit) => void;
+  /** Wraps the POST so the card's Refresh waits for it (useSaving). */
+  track: <T>(work: Promise<T>) => Promise<T>;
+};
 
-const VisitRow = ({ visit, onOpenDriver, onFlip }: RowProps) => {
+const VisitRow = ({ visit, onOpenDriver, onFlip, track }: RowProps) => {
   // Hiding needs a reason (the RPC refuses a blank one): the form opens inline.
   const [hiding, setHiding] = useState(false);
   const [reason, setReason] = useState("");
@@ -62,7 +69,7 @@ const VisitRow = ({ visit, onOpenDriver, onFlip }: RowProps) => {
     setBusy(true);
     setError(null);
     const why = reason.trim();
-    const err = await moderateVisit(visit.id, hide, why);
+    const err = await track(moderateVisit(visit.id, hide, why));
     setBusy(false);
     if (err) return setError(err);
     setHiding(false);
@@ -117,10 +124,10 @@ const VisitRow = ({ visit, onOpenDriver, onFlip }: RowProps) => {
             <input className="com-input" dir="auto" maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
           </label>
           <div className="com-actions">
-            <button type="submit" className="com-btn" disabled={busy || !reason.trim()}>
+            <button type="submit" className="ui-btn" disabled={busy || !reason.trim()}>
               {busy ? "Hiding…" : "Hide"}
             </button>
-            <button type="button" className="com-btn" onClick={() => setHiding(false)} disabled={busy}>
+            <button type="button" className="ui-btn" onClick={() => setHiding(false)} disabled={busy}>
               Cancel
             </button>
           </div>
@@ -128,18 +135,18 @@ const VisitRow = ({ visit, onOpenDriver, onFlip }: RowProps) => {
       ) : (
         <div className="com-actions">
           {hidden ? (
-            <button type="button" className="com-btn" onClick={() => void apply(false)} disabled={busy}>
+            <button type="button" className="ui-btn" onClick={() => void apply(false)} disabled={busy}>
               {busy ? "Unhiding…" : "Unhide"}
             </button>
           ) : (
-            <button type="button" className="com-btn" onClick={() => setHiding(true)}>
+            <button type="button" className="ui-btn" onClick={() => setHiding(true)}>
               Hide…
             </button>
           )}
         </div>
       )}
       {error && (
-        <p className="com-error" role="alert">
+        <p className="ui-error" role="alert">
           {error}
         </p>
       )}
@@ -152,6 +159,7 @@ export const VisitsTab = ({ view, onParams, onChanged, onOpenDriver }: Props) =>
   const data = visits.data;
   const { page, since } = view;
   const past = useClampPage(page, data?.total ?? null, VISITS_PER_PAGE, (n) => onParams({ page: n > 1 ? String(n) : null }));
+  const { saving, track } = useSaving();
 
   let body: ReactNode;
   if (visits.error) body = <RetryLine onRetry={visits.refresh}>Couldn't load visits. {visits.error}</RetryLine>;
@@ -171,6 +179,7 @@ export const VisitsTab = ({ view, onParams, onChanged, onOpenDriver }: Props) =>
             <VisitRow
               key={v.id}
               visit={v}
+              track={track}
               onOpenDriver={onOpenDriver}
               onFlip={(next) => {
                 visits.patch((d) => flipVisit(d, v, next));
@@ -238,6 +247,7 @@ export const VisitsTab = ({ view, onParams, onChanged, onOpenDriver }: Props) =>
           <Segmented label="Visit date" value={since ? String(since) : "all"} options={WINDOW_OPTIONS} onChange={(v) => onParams({ since: v === "all" ? null : v, page: null })} />
           <RefreshButton
             busy={visits.loading}
+            saving={saving}
             onRefresh={() => {
               visits.refresh();
               onChanged();

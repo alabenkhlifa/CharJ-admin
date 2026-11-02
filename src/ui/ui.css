@@ -444,15 +444,12 @@ a.ui-card:hover {
   inline-size: 22px;
   block-size: 22px;
 }
-.ui-lt-pin {
-  position: sticky;
-  inset-block-start: 0;
-  z-index: 5;
-  block-size: 0;
-}
+/* Fixed to the window over the main area: the whole width on a phone; from
+   768px it starts after the shell's sidebar (shell.css). */
 .ui-lt-bar {
-  position: absolute;
-  inset-inline: calc(-1 * var(--page-pad-inline));
+  position: fixed;
+  z-index: 5;
+  inset-inline: 0;
   inset-block-start: 0;
   display: flex;
   align-items: center;
@@ -540,16 +537,28 @@ a.ui-card:hover {
 .ui-details summary::-webkit-details-marker {
   display: none;
 }
-/* "Show table" with an action at the end of its line; the table opens below
-   at the full width. */
+/* "Show table" with an action at the end of its line, both in flow: a long
+   summary wraps and the action moves to the next line rather than covering
+   it. The table takes a line of its own below, at the full width. */
 .ui-details-row {
-  position: relative;
-  display: flow-root; /* keeps the details' top margin inside, level with the action */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--s-lg);
+  margin-block-start: 10px;
+}
+.ui-details-row > .ui-details {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  margin-block-start: 0;
 }
 .ui-details-action {
-  position: absolute;
-  inset-block-start: 10px;
-  inset-inline-end: 0;
+  flex: none;
+  margin-inline-start: auto;
+}
+.ui-details-table {
+  flex: 1 1 100%;
+  min-inline-size: 0;
 }
 
 /* ---- cohort chips (phones) / table (768px and up) ---- */
@@ -760,6 +769,11 @@ a.ui-card:hover {
 .ui-btn:disabled {
   color: var(--ink-2);
   cursor: default;
+}
+/* An icon alone (Open in Google Maps): a 34px square, its name in aria-label. */
+.ui-btn.ui-btn-icon {
+  inline-size: 34px;
+  padding: 0;
 }
 /* One per item. The text tone as fill, so the label in glyph ink keeps
    4.5:1 in both themes (like a bubble). */

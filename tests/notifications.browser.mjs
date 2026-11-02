@@ -186,6 +186,8 @@ let empty = false;
 // The next overview GET answers 500, or waits until released.
 let failGets = 0;
 let holdGets = null;
+// While set, an announce POST waits for it (the dialog is busy meanwhile).
+let holdAnnounce = null;
 const overview = (chargerId) => {
   const own = (row) => !chargerId || row.charger_id === chargerId;
   return {
@@ -271,6 +273,7 @@ try {
     const body = request.postDataJSON();
     posts.push(body);
     if (body.action === "preview") return route.fulfill({ json: preview(body) });
+    if (body.action === "announce" && holdAnnounce) await holdAnnounce;
     if (body.action === "announce" && body.update_event_id === UPDATE.agareb) {
       return route.fulfill({ status: 429, json: { error: "announce_rate_limited" } });
     }
@@ -482,8 +485,28 @@ try {
   await dialog.getByText("≈ 12 people following this governorate or charger · 7 with push enabled", { exact: true }).waitFor();
   await page.screenshot({ path: `${output}/announce-dialog-1440.png` });
   await page.screenshot({ path: `${shots}/t11-announce-dialog-1440-dark.png` });
+  // A press that starts inside the dialog and ends on the backdrop (a text
+  // selection dragged out) is not a backdrop click: the dialog stays.
+  const inside = await dialog.getByRole("region", { name: "English preview" }).boundingBox();
+  await page.mouse.move(inside.x + 10, inside.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(8, 8, { steps: 4 });
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+  ok((await page.getByRole("dialog").count()) === 1, "a press dragged out to the backdrop keeps the dialog open");
+  // Escape while the announce POST is out closes nothing; the notice shows once it lands.
+  let releaseAnnounce;
+  holdAnnounce = new Promise((resolve) => { releaseAnnounce = resolve; });
   await dialog.getByRole("button", { name: "Announce", exact: true }).click();
+  await dialog.getByRole("button", { name: "Sending…", exact: true }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(200);
+  ok((await page.getByRole("dialog").count()) === 1, "Escape while the announce is sending keeps the dialog open");
+  ok(await dialog.getByRole("button", { name: "Sending…", exact: true }).isVisible(), "…and it is still sending");
+  holdAnnounce = null;
+  releaseAnnounce();
   await page.getByText("Announcement queued for Ennakl La Marsa. The dispatcher sends it at its next run.", { exact: true }).waitFor();
+  ok((await page.getByRole("dialog").count()) === 0, "once the announce lands the dialog closes and the notice shows");
   assert.deepEqual(lastPost(), { action: "announce", update_event_id: UPDATE.marsa });
 
   // ── 429: rate limit surfaces in the dialog ────────────────────────────
@@ -590,6 +613,7 @@ try {
   await page.getByRole("alert").first().waitFor();
   const alerts = await page.locator(".notif .notif-retry").allInnerTexts();
   ok(alerts.length === 3 && alerts.every((t) => t.startsWith("Couldn't load.") && t.includes("Try again")), "error: Couldn't load + Try again, no numbers", alerts);
+  ok((await page.locator(".notif [role=alert]").count()) === 1, "error: one failed read is announced once (the other cards say it as plain text)");
   await page.locator(".notif .notif-retry button").first().click();
   await page.getByTestId("pending-item").first().waitFor();
   ok(true, "error: Try again loads the page");

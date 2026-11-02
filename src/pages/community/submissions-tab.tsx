@@ -157,10 +157,10 @@ const SubmissionItem = ({ s, nearby, onApprove, onRejected, onConflict }: ItemPr
       <ReviewLine s={s} />
       {s.status === "pending" && !rejecting && (
         <div className="com-actions">
-          <button type="button" className="com-btn com-btn-primary" onClick={onApprove}>
+          <button type="button" className="ui-btn ui-btn-primary" onClick={onApprove}>
             Approve…
           </button>
-          <button type="button" className="com-btn" onClick={() => setRejecting(true)}>
+          <button type="button" className="ui-btn" onClick={() => setRejecting(true)}>
             Reject…
           </button>
         </div>
@@ -178,17 +178,17 @@ const SubmissionItem = ({ s, nearby, onApprove, onRejected, onConflict }: ItemPr
             <textarea className="com-input" dir="auto" maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} />
           </label>
           <div className="com-actions">
-            <button type="submit" className="com-btn" disabled={busy}>
+            <button type="submit" className="ui-btn" disabled={busy}>
               {busy ? "Rejecting…" : "Reject"}
             </button>
-            <button type="button" className="com-btn" onClick={() => setRejecting(false)} disabled={busy}>
+            <button type="button" className="ui-btn" onClick={() => setRejecting(false)} disabled={busy}>
               Cancel
             </button>
           </div>
         </form>
       )}
       {error && (
-        <p className="com-error" role="alert">
+        <p className="ui-error" role="alert">
           {error}
         </p>
       )}

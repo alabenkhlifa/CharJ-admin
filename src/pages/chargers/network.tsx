@@ -79,7 +79,7 @@ const rowsCsv = (stem: string, header: string, rows: HBarRow[]) => () =>
   downloadCsv(stampedFilename(stem), [[header, "Chargers"], ...rows.map((r) => [r.name, r.values[0] ?? 0])]);
 
 const Csv = ({ what, onClick }: { what: string; onClick: () => void }) => (
-  <button type="button" className="chg-link chg-csv" onClick={onClick} aria-label={`Download ${what} as CSV`}>
+  <button type="button" className="ui-link chg-link chg-csv" onClick={onClick} aria-label={`Download ${what} as CSV`}>
     <ChgIcon name="download" /> Download CSV
   </button>
 );

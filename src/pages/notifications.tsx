@@ -38,7 +38,7 @@ import "./notifications.css";
 // Colours (DESIGN.md "On Notifications"): the alerts themselves (pending,
 // history) wear Screens Blue, the catalogue's colour, since every alert is
 // news about a charger; suggestions wait for you, so Needs Orange; followers
-// are people, Users Raspberry; the opt-in ask is Permission Rust.
+// are people, People Raspberry; the opt-in ask is Permission Rust.
 
 type DialogTarget = { action: "announce" | "release"; id: string; chargerName: string; detail: string };
 
@@ -125,10 +125,14 @@ const kindLabel = (item: PendingNotification) =>
       ? UPDATE_CLASS_LABELS[item.update_class]
       : "Update";
 
-/** A card's body while the overview loads or failed: no numbers. */
-const Waiting = ({ error, onRetry }: { error: string | null; onRetry: () => void }) =>
+/**
+ * A card's body while the overview loads or failed: no numbers. One failed
+ * read fills every card, so only the first (`alert`) is announced; the
+ * others say the same as plain text.
+ */
+const Waiting = ({ error, onRetry, alert = false }: { error: string | null; onRetry: () => void; alert?: boolean }) =>
   error ? (
-    <p className="notif-retry" role="alert">
+    <p className="notif-retry" role={alert ? "alert" : undefined}>
       Couldn't load. {error}{" "}
       <button type="button" onClick={onRetry}>
         Try again
@@ -611,7 +615,7 @@ export const NotificationsPage = () => {
             announcements go at the next run.
           </p>
           {!data ? (
-            <Waiting error={error} onRetry={refresh} />
+            <Waiting error={error} onRetry={refresh} alert />
           ) : data.pending.length === 0 ? (
             <EmptyList title="Nothing pending">When you add a charger, its digest waits here for 30 minutes before it goes out.</EmptyList>
           ) : (

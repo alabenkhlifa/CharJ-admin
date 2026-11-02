@@ -114,17 +114,15 @@ type UseEvModelsState = {
 };
 
 export const useEvModels = (): UseEvModelsState => {
-  const [state, setState] = useState<UseEvModelsState>({
-    data: [],
-    loading: true,
-    error: null,
-  });
+  // Not configured is known at load: no request, no effect needed.
+  const [state, setState] = useState<UseEvModelsState>(() =>
+    SUPABASE_CONFIGURED
+      ? { data: [], loading: true, error: null }
+      : { data: [], loading: false, error: "Supabase not configured" },
+  );
 
   useEffect(() => {
-    if (!SUPABASE_CONFIGURED) {
-      setState({ data: [], loading: false, error: "Supabase not configured" });
-      return;
-    }
+    if (!SUPABASE_CONFIGURED) return;
 
     let cancelled = false;
     (async () => {

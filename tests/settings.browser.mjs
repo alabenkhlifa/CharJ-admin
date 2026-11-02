@@ -261,6 +261,24 @@ try {
     ok((await page.evaluate(() => localStorage.getItem("charj-admin-auth"))) !== null, "…and the session is still there");
     await context.close();
   }
+  {
+    // The sidebar's sign out (768px and up) says the same when it fails.
+    const { context, page } = await open({ width: 1440, height: 900, logout: "down" });
+    await go(page, "#/summary");
+    await page.locator(".ui-side-foot").getByRole("button", { name: "Sign out", exact: true }).click();
+    const alert = page.locator(".ui-side [role=alert]");
+    await alert.waitFor();
+    ok((await alert.innerText()).startsWith("Couldn't sign out:"), "sidebar: an unreachable server says so", await alert.innerText());
+    ok(await page.locator(".ui-side-foot").getByRole("button", { name: "Sign out", exact: true }).isEnabled(), "sidebar: …and sign out can be tried again");
+    ok((await page.evaluate(() => localStorage.getItem("charj-admin-auth"))) !== null, "sidebar: …and the session is still there");
+    const fit = await page.evaluate(() => {
+      const side = document.querySelector(".ui-side").getBoundingClientRect();
+      const a = document.querySelector(".ui-side [role=alert]").getBoundingClientRect();
+      return a.left >= side.left - 0.5 && a.right <= side.right + 0.5 && a.bottom <= side.bottom + 0.5;
+    });
+    ok(fit, "sidebar: the reason fits inside the sidebar");
+    await context.close();
+  }
 
   // ---- 5. Build info: real version and commit ----
   {
@@ -269,9 +287,11 @@ try {
     const [version, commit] = await page.locator(".set-build dd").allInnerTexts();
     const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
     eq(version, pkg.version, "the version is package.json's");
-    ok(/^[0-9a-f]{7,12}$/.test(commit), "the commit is a short hash", commit);
+    // A short hash, "+dirty" when the bundle was built from uncommitted changes.
+    const built = /^([0-9a-f]{7,12})(\+dirty)?$/.exec(commit);
+    ok(built !== null, "the commit is a short hash, maybe marked +dirty", commit);
     // A commit this repo really has (the server may have started on an earlier HEAD).
-    const type = execFileSync("git", ["cat-file", "-t", commit], { cwd: new URL("..", import.meta.url) }).toString().trim();
+    const type = execFileSync("git", ["cat-file", "-t", built[1]], { cwd: new URL("..", import.meta.url) }).toString().trim();
     eq(type, "commit", "the commit exists in this repo");
     await context.close();
   }

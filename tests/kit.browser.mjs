@@ -241,6 +241,33 @@ try {
     await context.close();
   }
 
+  // ---- kit polish: Columns past a fixed top, labelled bubbles, the ring legend's spoken value, pointer moves ----
+  {
+    const { context, page } = await open({});
+    await page.locator("#card-edges").scrollIntoViewIfNeeded();
+    await page.waitForTimeout(400);
+    const clamp = await page.evaluate(() => {
+      const svg = document.querySelector('svg[aria-label="Columns over their fixed top"]');
+      const top = svg.getBoundingClientRect().top;
+      const ticks = [...svg.querySelectorAll(":scope > text.ui-tick")].map((t) => Number(t.textContent)).filter(Number.isFinite);
+      const marks = [...svg.querySelectorAll("path")].map((p) => Math.round(p.getBoundingClientRect().top - top));
+      return { max: Math.max(...ticks), highest: Math.min(...marks) };
+    });
+    ok(clamp.max >= 5 && clamp.highest >= 0, "columns: data past the fixed top gets a round max, no bar leaves the chart", clamp);
+    ok((await page.locator('#card-bubbles [role="img"][aria-label="active"]').count()) === 1, "bubble: a labelled bubble is an image with that name");
+    ok((await page.locator("#card-bubbles .ui-bub-zero").getAttribute("role")) === "img", "bubble: …the zero one too");
+    const spoken = await page.locator("#card-edges .ui-legend button").getAttribute("aria-label");
+    ok(spoken === "Big: 1,234 phones. Show the card.", "rings: the legend reads the value as shown (1,234)", spoken);
+    // Pointer moves only re-render the tooltip: the chart's hit rects stay the same nodes and the tooltip follows.
+    const hit = page.locator('svg[aria-label="Columns over their fixed top"] rect.ui-hit').nth(2);
+    const b = await hit.boundingBox();
+    await page.evaluate(() => { window.__hit = document.querySelectorAll('svg[aria-label="Columns over their fixed top"] rect.ui-hit')[2]; });
+    for (let i = 0; i < 5; i += 1) await page.mouse.move(b.x + 2 + i * 2, b.y + b.height / 2);
+    ok((await tipText(page))?.includes("5"), "pointer moves: the tooltip shows the column", await tipText(page));
+    ok(await page.evaluate(() => window.__hit === document.querySelectorAll('svg[aria-label="Columns over their fixed top"] rect.ui-hit')[2]), "pointer moves: the chart's marks are untouched");
+    await context.close();
+  }
+
   // ---- reduced motion ----
   {
     const { context, page } = await open({ reducedMotion: "reduce" });

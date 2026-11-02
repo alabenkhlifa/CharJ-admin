@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { tone as baseTone } from "./category";
-import type { Tip } from "./use-chart-tip";
+import { useTip, type TipStore } from "./use-chart-tip";
 import "./ui.css";
 
 const EDGE = 8;
@@ -13,8 +13,10 @@ const OFFSET = 12;
  * it sits on the reading side in RTL too. Visual only: hit targets carry the
  * same text as their aria-label.
  */
-export const ChartTooltip = ({ tip }: { tip: Tip | null }) => {
+export const ChartTooltip = ({ tip: store }: { tip: TipStore }) => {
   const ref = useRef<HTMLDivElement>(null);
+  // Only this subscribes: moving the pointer re-renders the tooltip, not the chart.
+  const tip = useTip(store);
 
   useLayoutEffect(() => {
     const el = ref.current;

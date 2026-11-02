@@ -28,11 +28,8 @@ import type {
   Day,
   DayDraft,
 } from "../data/charger-editor-model";
-import {
-  AMENITY_SLUGS,
-  AmenityIcon,
-  labelForAmenity,
-} from "../lib/amenity-icons";
+import { AMENITY_SLUGS, labelForAmenity } from "../lib/amenities";
+import { AmenityIcon } from "../lib/amenity-icons";
 import { Icons } from "../lib/icons";
 import { CityPicker } from "./city-picker";
 import "./edit-charger-drawer.css";

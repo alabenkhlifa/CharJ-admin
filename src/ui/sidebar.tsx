@@ -32,6 +32,8 @@ export const Sidebar = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const search = useGlobalSearch(query);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   // ⌘K / Ctrl+K opens + focuses the search anywhere in the app.
   useEffect(() => {
@@ -60,6 +62,16 @@ export const Sidebar = ({
   const flatHits: SearchHit[] = [...search.routes, ...search.chargers];
   // Typing resets the cursor; clamp it when results shrink under it.
   const cursor = Math.min(activeIndex, Math.max(flatHits.length - 1, 0));
+
+  // Like Settings: a sign-out the server can't take leaves the session, and says why.
+  const signOut = async () => {
+    if (!session) return;
+    setSigningOut(true);
+    setSignOutError(null);
+    const failed = await session.signOut();
+    setSigningOut(false);
+    if (failed) setSignOutError(`Couldn't sign out: ${failed}`);
+  };
 
   const pick = (hit: SearchHit) => {
     if (hit.kind === "route") onNavigate(hit.k);
@@ -162,11 +174,16 @@ export const Sidebar = ({
           {session?.email ?? "Signed in"}
         </span>
         {session && (
-          <button type="button" onClick={() => void session.signOut()} title="Sign out" aria-label="Sign out">
+          <button type="button" onClick={() => void signOut()} disabled={signingOut} title="Sign out" aria-label={signingOut ? "Signing out…" : "Sign out"}>
             <Icons.SignOut size={16} />
           </button>
         )}
       </div>
+      {signOutError && (
+        <p className="ui-error ui-side-error" role="alert">
+          {signOutError}
+        </p>
+      )}
     </aside>
   );
 };

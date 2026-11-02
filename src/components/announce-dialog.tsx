@@ -17,7 +17,9 @@ import "./announce-dialog.css";
 // in all three languages plus the recipient estimate *before* the admin
 // commits. Used by the Notifications page and the charger detail drawer.
 // A native <dialog> (DESIGN.md "Dialog"): the browser keeps focus inside and
-// closes it on Escape; a click on the backdrop closes it too.
+// closes it on Escape; a click on the backdrop closes it too (a press that
+// started inside the body and was dragged out doesn't). While the POST is
+// out, neither closes it.
 
 type AnnounceDialogProps = {
   // announce → update_event_id, release → event_id
@@ -50,6 +52,9 @@ export const AnnounceDialog = ({ action, id, chargerName, detail, onClose, onDon
   const [preview, setPreview] = useState<PreviewState>({ status: "loading" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Where the press began: only a press that starts and ends on the backdrop
+  // closes (a text selection dragged out of the body doesn't).
+  const pressedBackdrop = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -121,9 +126,14 @@ export const AnnounceDialog = ({ action, id, chargerName, detail, onClose, onDon
         if (busy) e.preventDefault();
       }}
       onClose={onClose}
+      onPointerDown={(e) => {
+        pressedBackdrop.current = e.target === e.currentTarget;
+      }}
       onClick={(e) => {
         // The backdrop: a click outside the body lands on the dialog itself.
-        if (e.target === e.currentTarget) close();
+        const backdrop = e.target === e.currentTarget && pressedBackdrop.current;
+        pressedBackdrop.current = false;
+        if (backdrop) close();
       }}
     >
       <div className="ui-dialog-body">

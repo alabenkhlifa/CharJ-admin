@@ -40,10 +40,12 @@ export type QueueState = {
 };
 
 /**
- * `refreshKey`: pass something that changes when the queue may have moved
- * (App passes the route, so coming back from Community reloads it).
+ * Read on mount, again on `refresh()` (every Community action calls it) and
+ * whenever the window gets the focus back (another tab, the phone unlocked).
+ * Moving between pages inside the app reads nothing: only a Community action
+ * changes the queue from here, and that already refreshes it.
  */
-export const useQueue = (refreshKey?: string): QueueState => {
+export const useQueue = (): QueueState => {
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision((n) => n + 1), []);
   const [state, setState] = useState<Omit<QueueState, "refresh">>({
@@ -75,7 +77,12 @@ export const useQueue = (refreshKey?: string): QueueState => {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [refreshKey, revision]);
+  }, [revision]);
+
+  useEffect(() => {
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [refresh]);
 
   return { ...state, refresh };
 };

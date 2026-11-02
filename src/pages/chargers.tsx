@@ -201,7 +201,7 @@ export const ChargersPage = ({
         withSort && (
           <button
             type="button"
-            className="chg-link chg-export"
+            className="ui-link chg-link chg-export"
             onClick={exportCsv}
             disabled={loading || sorted.length === 0}
             title="Download the rows currently shown, in this order"
@@ -225,7 +225,7 @@ export const ChargersPage = ({
             : "No chargers match this search and these filters."}
         </Empty>
         {chargers.length > 0 && narrowed && (
-          <button type="button" className="chg-btn" onClick={clearAll}>
+          <button type="button" className="ui-btn" onClick={clearAll}>
             Clear search and filters
           </button>
         )}
@@ -256,7 +256,7 @@ export const ChargersPage = ({
         trailing={
           <button
             type="button"
-            className="chg-btn chg-btn-primary chg-add"
+            className="ui-btn ui-btn-primary chg-add"
             onClick={() => setAddingLocal(true)}
             disabled={!SUPABASE_CONFIGURED}
             title={SUPABASE_CONFIGURED ? "Add charger" : "Admin API not configured"}
@@ -279,7 +279,7 @@ export const ChargersPage = ({
       {missing && (
         <p className="chg-notice" role="status">
           No charger with the id {pendingChargerId.slice(0, 8)}… is in the list. It may have been removed.{" "}
-          <button type="button" className="chg-link" onClick={() => setParams({ id: null, edit: null })}>
+          <button type="button" className="ui-link chg-link" onClick={() => setParams({ id: null, edit: null })}>
             Dismiss
           </button>
         </p>

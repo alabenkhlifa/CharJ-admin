@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { ThemeToggle } from "./theme-toggle";
 import "./ui.css";
 
@@ -12,8 +13,10 @@ type Props = {
 /**
  * The page's large title, with the light/dark toggle at its end edge on every
  * page. Once it scrolls away, a blurred inline bar with the same title pins
- * to the top of the scroll area. The bar is decorative: the h1 stays the page
- * heading.
+ * to the top of the window across the whole main area (the shell's padding,
+ * however wide, and the full-width map view too). The bar is decorative: the
+ * h1 stays the page heading. It lives in <body>, fixed, so no page container
+ * can box it in.
  */
 export const LargeTitle = ({ title, subtitle, trailing }: Props) => {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -32,11 +35,12 @@ export const LargeTitle = ({ title, subtitle, trailing }: Props) => {
 
   return (
     <>
-      <div className="ui-lt-pin">
+      {createPortal(
         <div className="ui-lt-bar" data-on={folded} aria-hidden="true">
           <span>{title}</span>
-        </div>
-      </div>
+        </div>,
+        document.body,
+      )}
       <header className="ui-lt">
         <div>
           <h1 ref={heading}>{title}</h1>

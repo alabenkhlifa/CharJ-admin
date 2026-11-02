@@ -100,7 +100,7 @@ export const ApproveDialog = ({ submission: s, nearby, onCancel, onApproved, onC
   return (
     <dialog
       ref={ref}
-      className="com-dialog"
+      className="ui-dialog com-approve"
       aria-labelledby="com-approve-title"
       onCancel={(e) => {
         if (busy) e.preventDefault();
@@ -109,13 +109,14 @@ export const ApproveDialog = ({ submission: s, nearby, onCancel, onApproved, onC
     >
       <form
         method="dialog"
+        className="ui-dialog-body"
         onSubmit={(e) => {
           e.preventDefault();
           void approve();
         }}
       >
         <h2 id="com-approve-title">Approve this charger?</h2>
-        <section aria-label="Charger">
+        <section className="ui-dialog-sec" aria-label="Charger">
           <h3>
             <bdi>{s.name || "Unnamed charger"}</bdi>
           </h3>
@@ -148,11 +149,11 @@ export const ApproveDialog = ({ submission: s, nearby, onCancel, onApproved, onC
             </p>
           )}
         </section>
-        <section aria-label="Nearby check">
+        <section className="ui-dialog-sec" aria-label="Nearby check">
           <h3>Already on the map?</h3>
           <NearbyCheck nearby={nearby} />
         </section>
-        <section aria-label="Charger details">
+        <section className="ui-dialog-sec" aria-label="Charger details">
           <h3>Charger details (optional)</h3>
           <div className="com-form">
             <label className="com-field">
@@ -171,15 +172,15 @@ export const ApproveDialog = ({ submission: s, nearby, onCancel, onApproved, onC
           <p className="com-meta">Left blank, they stay empty. The charger editor opens next, to finish the charger.</p>
         </section>
         {error && (
-          <p className="com-error" role="alert">
+          <p className="ui-error" role="alert">
             {error}
           </p>
         )}
-        <div className="com-dialog-end">
-          <button type="button" className="com-btn" onClick={() => ref.current?.close()} disabled={busy}>
+        <div className="ui-dialog-end">
+          <button type="button" className="ui-btn" onClick={() => ref.current?.close()} disabled={busy}>
             Cancel
           </button>
-          <button type="submit" className="com-btn com-btn-primary" disabled={busy}>
+          <button type="submit" className="ui-btn ui-btn-primary" disabled={busy}>
             {busy ? "Approving…" : "Approve"}
           </button>
         </div>

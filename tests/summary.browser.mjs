@@ -329,15 +329,20 @@ try {
     await page.waitForTimeout(900);
     ok(await inView("#card-back"), "tap: Came back brings its card into view");
 
-    // A row opens its Community tab; coming back reloads the queue.
-    const before = requests.filter((x) => x.startsWith("admin-feedback")).length;
+    // A row opens its Community tab. Moving between pages doesn't read the
+    // queue again (only a Community action or the window's focus does).
+    const queueReads = () => requests.filter((x) => x === "admin-feedback?status=open&category=requests&page=1&perPage=3").length;
+    const before = queueReads();
     await page.locator("#card-needs a", { hasText: "Open feedback" }).click();
     ok((await page.evaluate(() => location.hash)) === "#/community?tab=feedback&status=open", "link: Open feedback lands on its tab");
     await page.waitForSelector(".sum", { state: "detached" });
     await page.goBack();
     await page.waitForSelector(".ui-rings");
     await page.waitForTimeout(500);
-    ok(requests.filter((x) => x.startsWith("admin-feedback")).length > before, "link: the queue reloads after a page change", { before, requests });
+    eq(queueReads(), before, "link: moving between pages doesn't read the queue again");
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    for (let i = 0; i < 40 && queueReads() === before; i += 1) await page.waitForTimeout(50);
+    ok(queueReads() > before, "focus: the window getting the focus back reads the queue again", { before, after: queueReads() });
     eq(await hscroll(page), 0, "env: no horizontal scroll");
     await context.close();
   }

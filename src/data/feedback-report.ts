@@ -63,18 +63,6 @@ export const INFORMATIONAL_CATEGORIES: readonly FeedbackCategory[] = ["design"];
 export const isInformational = (item: Pick<FeedbackItem, "category">): boolean =>
   INFORMATIONAL_CATEGORIES.includes(item.category);
 
-const ZERO_BY_CATEGORY = (): Record<FeedbackCategory, number> =>
-  Object.fromEntries(FEEDBACK_CATEGORIES.map((c) => [c, 0])) as Record<FeedbackCategory, number>;
-
-export const EMPTY_FEEDBACK_SUMMARY: FeedbackSummary = {
-  total: 0,
-  open: 0,
-  openRequests: 0,
-  resolved: 0,
-  last7Days: 0,
-  byCategory: ZERO_BY_CATEGORY(),
-};
-
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 const str = (value: unknown): string => (typeof value === "string" ? value : "");

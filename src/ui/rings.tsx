@@ -26,6 +26,9 @@ const STROKE = 15;
 const TICK_GAP = 4;
 /** A zero keeps a dot so the ring stays legible. */
 const FLOOR = 0.0001;
+const nf = new Intl.NumberFormat("en-US");
+/** The value as the legend shows it ("1,234"), not the raw number. */
+const spoken = (value: number | string) => (typeof value === "number" ? nf.format(value) : value);
 
 type ArcProps = { ring: Ring; r: number; drawn: boolean };
 
@@ -128,7 +131,7 @@ export const Rings = ({ rings }: { rings: Ring[] }) => {
             </>
           );
           return ring.onPick ? (
-            <button key={ring.id} type="button" onClick={ring.onPick} aria-label={`${ring.label}: ${ring.value} ${ring.unit}. Show the card.`}>
+            <button key={ring.id} type="button" onClick={ring.onPick} aria-label={`${ring.label}: ${spoken(ring.value)} ${ring.unit}. Show the card.`}>
               {body}
             </button>
           ) : (

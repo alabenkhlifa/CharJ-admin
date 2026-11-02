@@ -266,3 +266,17 @@ test("count bubbles: glyph digits on the category text tone reach 4.5:1 in both 
     }
   }
 });
+
+test("the nav badge (Community queue) is glyph ink on Alarm's text tone, 4.5:1 in both themes", () => {
+  const shell = readFileSync(new URL("../src/ui/shell.css", import.meta.url), "utf8");
+  const at = shell.indexOf(".ui-nav-badge {");
+  assert.ok(at >= 0, "missing .ui-nav-badge");
+  const rule = shell.slice(at, shell.indexOf("}", at));
+  assert.match(rule, /background: var\(--c-alarm-text\);/);
+  assert.match(rule, /color: var\(--glyph\);/);
+  assert.doesNotMatch(rule, /#[0-9a-f]{3,6}\b/i, "no hardcoded colour");
+  for (const [name, theme, min] of [["light", light, 5.38], ["dark", dark, 6.16]] as const) {
+    const r = contrast(resolve(theme, "--glyph"), resolve(theme, "--c-alarm-text"));
+    assert.ok(r >= 4.5 && r >= min - 0.01, `${name} badge: ${r.toFixed(2)}`);
+  }
+});

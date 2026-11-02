@@ -426,7 +426,7 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 
 /**
  * Active phones and events per platform. 7 and 30 days are daily; 90 days are
- * Monday weeks (lib/time-range's grain), where active is the average per
+ * Monday weeks, where active is the average per
  * measured day (distinct phones can't be summed over days) and events are
  * summed. Days nobody measured (lib/tracking) are null and stay out of every
  * average. `from` drops the days before it (a Lune chart starts at its first event).

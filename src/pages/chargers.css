@@ -14,12 +14,12 @@
   flex: none;
 }
 
-/* ---- title action, buttons, text actions ---- */
+/* ---- title action, buttons, text actions (the kit's .ui-btn / .ui-link) ---- */
 /* Beside the large title's theme toggle a small phone has no room for the
    words (the title would break): the button shows the plus in a 36px circle
    and keeps "Add charger" as its name for assistive tech and the tooltip. */
 @media (max-width: 399px) {
-  .chg-btn.chg-add {
+  .ui-btn.chg-add {
     inline-size: 36px;
     min-block-size: 36px;
     padding: 0;
@@ -34,52 +34,11 @@
     white-space: nowrap;
   }
 }
-.chg-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-block-size: 34px;
-  padding: 6px 14px;
-  border: 0;
-  border-radius: var(--r-chip);
-  background: var(--fill);
-  color: var(--ink);
-  font: var(--type-card-title);
-  white-space: nowrap;
-  text-decoration: none;
-}
-.chg-btn:disabled {
-  color: var(--ink-2);
-  cursor: default;
-}
-/* The text tone as fill, so the label in glyph ink keeps 4.5:1 (like bubbles). */
-.chg-btn-primary {
-  background: var(--c-screens-text);
-  color: var(--glyph);
-}
-.chg-btn-primary:disabled {
-  background: var(--fill);
-  color: var(--ink-2);
-}
-.chg-btn-icon {
-  inline-size: 34px;
-  padding: 0;
-}
 .chg-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: var(--s-xs) 0;
-  border: 0;
-  background: none;
-  color: var(--c-screens-text);
-  font: var(--type-card-title);
   white-space: nowrap;
-}
-.chg-link:disabled {
-  color: var(--ink-2);
-  cursor: default;
 }
 
 /* ---- view tabs: pills on the ground, like Community's page tabs ---- */
@@ -293,7 +252,7 @@
 }
 /* Wide: every chip shows, the table headers sort. */
 @container chg (min-width: 860px) {
-  .chg-filters-toggle,
+  .ui-btn.chg-filters-toggle,
   .chg-sort {
     display: none;
   }
@@ -918,7 +877,7 @@
 .chg-announce-n {
   font-variant-numeric: tabular-nums;
 }
-.chg-announce .chg-btn {
+.chg-announce .ui-btn {
   margin-block-start: var(--s-xs);
 }
 .chg-minimap {

@@ -29,7 +29,7 @@ type Props = {
   /** X-axis ticks, when they need to be shorter than the tooltip and table label. */
   formatTick?: (label: string) => string;
   height?: number;
-  /** Fixed axis top (e.g. the number of test phones); otherwise a round max. */
+  /** Fixed axis top (e.g. the number of test phones); a round max otherwise, or when a column is taller. */
   yMax?: number;
   /** First column header of the table view. */
   labelHeader?: string;
@@ -85,7 +85,10 @@ export const Columns = ({
     const H = height;
     const band = (W - GUTTER) / n;
     const bw = Math.max(4, band - 4);
-    const top = yMax ?? niceMax(Math.max(1, ...totals));
+    // A fixed top only while it holds every column (and is a real positive
+    // number); taller data gets a round max, so no bar runs off the chart.
+    const highest = Math.max(1, ...totals);
+    const top = yMax !== undefined && Number.isFinite(yMax) && yMax >= highest ? yMax : niceMax(highest);
     const y = (v: number) => H - BOTTOM - (v / top) * (H - BOTTOM - TOP);
     // Marks are drawn left-to-right and mirrored as a group in RTL; text is
     // placed with tx() so it never renders backwards. text-anchor start/end

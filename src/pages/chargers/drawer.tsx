@@ -9,7 +9,8 @@ import { useLocations } from "../../data/locations";
 import { withCityNames } from "../../data/locations-model";
 import { useChargerNotifications } from "../../data/notifications";
 import { suggestionDiff, UPDATE_CLASS_LABELS } from "../../data/notifications-report";
-import { AmenityIcon, labelForAmenity } from "../../lib/amenity-icons";
+import { labelForAmenity } from "../../lib/amenities";
+import { AmenityIcon } from "../../lib/amenity-icons";
 import { darkMapStyle, lightMapStyle, MAP_BACKGROUND, pinIcon } from "../../lib/map-styles";
 import { SUPABASE_CONFIGURED } from "../../lib/supabase";
 import { useCurrentTheme } from "../../lib/use-theme";
@@ -166,7 +167,7 @@ export const DetailDrawer = ({ charger, startEditing = false, showMap = true, no
     return (
       <button
         type="button"
-        className="chg-btn chg-status-btn"
+        className="ui-btn chg-status-btn"
         aria-pressed={on}
         disabled={on || statusBusy !== null || !SUPABASE_CONFIGURED}
         onClick={() => handleSetStatus(next)}
@@ -229,7 +230,7 @@ export const DetailDrawer = ({ charger, startEditing = false, showMap = true, no
                 {nf.format(suggestion.recipient_estimate)} recipients · {nf.format(suggestion.push_estimate)} with push
                 {moreSuggestions > 0 && ` · ${moreSuggestions} more on the Notifications page`}
               </p>
-              <button type="button" className="chg-btn chg-btn-primary" onClick={() => setAnnouncing(true)}>
+              <button type="button" className="ui-btn ui-btn-primary" onClick={() => setAnnouncing(true)}>
                 <ChgIcon name="bell" /> Announce update
               </button>
             </div>
@@ -350,7 +351,7 @@ export const DetailDrawer = ({ charger, startEditing = false, showMap = true, no
               ) : (
                 <button
                   type="button"
-                  className="chg-btn chg-btn-primary"
+                  className="ui-btn ui-btn-primary"
                   onClick={handleVerify}
                   disabled={verifying || !SUPABASE_CONFIGURED}
                   title={SUPABASE_CONFIGURED ? undefined : "Admin API not configured"}
@@ -358,10 +359,10 @@ export const DetailDrawer = ({ charger, startEditing = false, showMap = true, no
                   <ChgIcon name="verify" /> {verifying ? "Verifying…" : "Verify"}
                 </button>
               )}
-              <button type="button" className="chg-btn" onClick={() => setEditing(true)} disabled={verifying || statusBusy !== null}>
+              <button type="button" className="ui-btn" onClick={() => setEditing(true)} disabled={verifying || statusBusy !== null}>
                 Edit charger
               </button>
-              <a className="chg-btn chg-btn-icon" href={mapsUrl} target="_blank" rel="noopener noreferrer" aria-label="Open in Google Maps" title="Open in Google Maps">
+              <a className="ui-btn ui-btn-icon" href={mapsUrl} target="_blank" rel="noopener noreferrer" aria-label="Open in Google Maps" title="Open in Google Maps">
                 <ChgIcon name="external" />
               </a>
             </div>

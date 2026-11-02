@@ -40,20 +40,17 @@ const matchRoutes = (q: string): RouteHit[] => {
 };
 
 export const useGlobalSearch = (rawQuery: string): GlobalSearchState => {
-  const [chargers, setChargers] = useState<ChargerHit[]>([]);
-  const [loading, setLoading] = useState(false);
+  // The last answer and the query it answers. Loading is derived: the query
+  // moved on and its answer hasn't arrived. The previous hits stay on screen
+  // meanwhile, so typing doesn't flicker the list empty.
+  const [answer, setAnswer] = useState<{ query: string; hits: ChargerHit[] } | null>(null);
 
   const trimmed = rawQuery.trim();
   const routes = matchRoutes(trimmed);
+  const searching = SUPABASE_CONFIGURED && trimmed.length >= MIN_QUERY;
 
   useEffect(() => {
-    if (!SUPABASE_CONFIGURED || trimmed.length < MIN_QUERY) {
-      setChargers([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
+    if (!searching) return;
     let cancelled = false;
     const handle = window.setTimeout(async () => {
       const { data, error } = await supabase.rpc("search_chargers", {
@@ -66,8 +63,7 @@ export const useGlobalSearch = (rawQuery: string): GlobalSearchState => {
       if (cancelled) return;
 
       if (error) {
-        setChargers([]);
-        setLoading(false);
+        setAnswer({ query: trimmed, hits: [] });
         return;
       }
 
@@ -82,19 +78,21 @@ export const useGlobalSearch = (rawQuery: string): GlobalSearchState => {
           charger: c,
         }));
 
-      setChargers(hits);
-      setLoading(false);
+      setAnswer({ query: trimmed, hits });
     }, DEBOUNCE_MS);
 
     return () => {
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [trimmed]);
+  }, [searching, trimmed]);
 
+  // While a longer or shorter version of the same query loads, its hits stay.
+  const related = answer !== null && (answer.query === trimmed || trimmed.startsWith(answer.query) || answer.query.startsWith(trimmed));
+  const chargers = searching && related ? answer.hits : [];
   return {
     query: trimmed,
-    loading,
+    loading: searching && answer?.query !== trimmed,
     routes,
     chargers,
     total: routes.length + chargers.length,

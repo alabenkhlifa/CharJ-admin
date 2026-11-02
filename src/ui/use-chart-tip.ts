@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FocusEvent, type PointerEvent } from "react";
+import { useEffect, useState, useSyncExternalStore, type FocusEvent, type PointerEvent } from "react";
 import type { Category } from "./category";
 
 /** `color` (a domain mark colour) wins over `tone` for the swatch. */
@@ -22,49 +22,81 @@ const above = (el: Element) => {
 };
 
 /**
- * Tooltip state for a chart plus props for each hit target: focusable,
+ * One chart's tooltip, outside React state: a pointer move updates only the
+ * tooltip (which subscribes), never the chart and its table. While a tip is
+ * shown the store listens for scrolls and outside taps.
+ */
+export type TipStore = {
+  get: () => Tip | null;
+  subscribe: (listener: () => void) => () => void;
+};
+
+const createTipStore = () => {
+  let tip: Tip | null = null;
+  let mode: Mode | null = null;
+  let target: Element | null = null;
+  const listeners = new Set<() => void>();
+  const emit = () => listeners.forEach((l) => l());
+
+  const onScroll = () => {
+    if (mode === "focus" && target && tip) {
+      tip = { ...tip, ...above(target) };
+      emit();
+    } else hide();
+  };
+  const onOutside = (e: globalThis.PointerEvent) => {
+    if (mode === "pinned" && e.target !== target) hide();
+  };
+  const listen = (on: boolean) => {
+    if (on) {
+      window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+      document.addEventListener("pointerdown", onOutside, { capture: true });
+    } else {
+      window.removeEventListener("scroll", onScroll, { capture: true });
+      document.removeEventListener("pointerdown", onOutside, { capture: true });
+    }
+  };
+
+  function show(m: Mode, el: Element, at: { x: number; y: number }, title: string, rows: TipRow[]) {
+    if (tip === null) listen(true);
+    mode = m;
+    target = el;
+    tip = { ...at, title, rows };
+    emit();
+  }
+  function hide() {
+    if (tip === null) return;
+    listen(false);
+    mode = null;
+    target = null;
+    tip = null;
+    emit();
+  }
+
+  const store: TipStore = {
+    get: () => tip,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+  return { store, show, hide, mode: () => mode, target: () => target };
+};
+
+/** The current tip of a chart's store (for ChartTooltip). */
+export const useTip = (store: TipStore): Tip | null => useSyncExternalStore(store.subscribe, store.get, store.get);
+
+/**
+ * Tooltip store for a chart plus props for each hit target: focusable,
  * labelled, shown on hover, tap and focus.
  */
 export const useChartTip = () => {
-  const [tip, setTip] = useState<Tip | null>(null);
-  const mode = useRef<Mode | null>(null);
-  const target = useRef<Element | null>(null);
-  const open = tip !== null;
-
-  useEffect(() => {
-    if (!open) return;
-    const hide = () => {
-      mode.current = null;
-      target.current = null;
-      setTip(null);
-    };
-    const onScroll = () => {
-      const el = target.current;
-      if (mode.current === "focus" && el) setTip((t) => (t ? { ...t, ...above(el) } : null));
-      else hide();
-    };
-    const onOutside = (e: globalThis.PointerEvent) => {
-      if (mode.current === "pinned" && e.target !== target.current) hide();
-    };
-    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
-    document.addEventListener("pointerdown", onOutside, { capture: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll, { capture: true });
-      document.removeEventListener("pointerdown", onOutside, { capture: true });
-    };
-  }, [open]);
+  const [tips] = useState(createTipStore);
+  // A chart that goes away takes its listeners with it.
+  useEffect(() => () => tips.hide(), [tips]);
 
   const bind = (title: string, rows: TipRow[]) => {
-    const show = (m: Mode, el: Element, at: { x: number; y: number }) => {
-      mode.current = m;
-      target.current = el;
-      setTip({ ...at, title, rows });
-    };
-    const hide = () => {
-      mode.current = null;
-      target.current = null;
-      setTip(null);
-    };
+    const show = (m: Mode, el: Element, at: { x: number; y: number }) => tips.show(m, el, at, title, rows);
     const atPointer = (e: PointerEvent<SVGElement>) => ({ x: e.clientX, y: e.clientY });
     return {
       tabIndex: 0,
@@ -77,18 +109,18 @@ export const useChartTip = () => {
         show(e.pointerType === "mouse" ? "hover" : "pinned", e.currentTarget, atPointer(e));
       },
       onPointerLeave: (e: PointerEvent<SVGElement>) => {
-        if (e.pointerType === "mouse" && mode.current === "hover") hide();
+        if (e.pointerType === "mouse" && tips.mode() === "hover") tips.hide();
       },
       onFocus: (e: FocusEvent<SVGElement>) => {
         // A tap that also focuses keeps its pinned tooltip at the finger.
-        if (mode.current === "pinned" && target.current === e.currentTarget) return;
+        if (tips.mode() === "pinned" && tips.target() === e.currentTarget) return;
         show("focus", e.currentTarget, above(e.currentTarget));
       },
       onBlur: () => {
-        if (mode.current !== "pinned") hide();
+        if (tips.mode() !== "pinned") tips.hide();
       },
     };
   };
 
-  return { tip, target: bind };
+  return { tip: tips.store, target: bind };
 };

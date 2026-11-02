@@ -18,9 +18,10 @@ const App = () => {
   // The active page lives in the URL hash, so a refresh (or a bookmark, or a
   // link pasted to someone else) lands on the same page instead of Summary.
   const { route, params, navigate, replace } = useRoute();
-  // What waits in Community: Summary's Needs you and the nav badge. Reloaded
-  // on every page change, so working the queue in Community updates both.
-  const queue = useQueue(route);
+  // What waits in Community: Summary's Needs you and the nav badge. Read once,
+  // then after every Community action and when the window gets the focus
+  // back; moving between pages reads nothing.
+  const queue = useQueue();
   const queueTotal = queue.data?.total ?? undefined;
 
   // Cross-page deep links, carried by the URL rather than React state:

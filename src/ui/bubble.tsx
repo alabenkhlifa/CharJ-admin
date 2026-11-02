@@ -19,6 +19,8 @@ export const Bubble = ({ n, tone, label }: Props) => (
   <span
     className={n ? "ui-bub" : "ui-bub ui-bub-zero"}
     style={n ? { background: toneText(tone) } : undefined}
+    // A span only takes a name with a role; without a label the digits are the text.
+    role={label ? "img" : undefined}
     aria-label={label}
   >
     {nf.format(n)}

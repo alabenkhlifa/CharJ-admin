@@ -183,6 +183,11 @@ export const KitPage = () => {
             <Bubble n={0} tone="screens" label="zero" />
           </div>
         </HealthCard>
+        <HealthCard title="Edges" color="actions" icon={<I d={P.bars} />} meta="kit polish" id="card-edges">
+          {/* Data past a fixed top gets a round max; a big ring value is read as shown. */}
+          <Columns labels={days.slice(-5)} series={[{ name: "Phones", tone: "actions", values: [1, 2, 5, 0, 1] }]} label="Columns over their fixed top" yMax={2} height={120} />
+          <Rings rings={[{ id: "big", label: "Big", value: 1234, unit: "phones", progress: 0.5, tone: "actions", onPick: () => scrollToId("card-edges") }]} />
+        </HealthCard>
       </Grid>
       <div style={{ height: 600 }} />
     </main>

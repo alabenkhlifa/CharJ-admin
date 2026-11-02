@@ -270,7 +270,7 @@ const contrasts = (page, selector) => page.evaluate((sel) => {
   });
 }, selector);
 const TEXT_SELECTORS = [
-  ".chg-tabs a", ".ui-lt p", ".ms-label", ".ms-value", ".chg-sel > span", ".chg-sel select", ".chg-link", ".chg-btn",
+  ".chg-tabs a", ".ui-lt p", ".ms-label", ".ms-value", ".chg-sel > span", ".chg-sel select", ".chg-link", ".ui-btn",
   ".chg-table th", ".chg-c-city", ".chg-c-updated", ".chg-c-hours", ".chg-mark", ".chg-pill", ".ui-pager", ".ui-meta",
   ".chg-note", ".chg-lede", ".ui-val > span", ".ui-details summary", ".chg-count",
 ].join(", ");
@@ -422,7 +422,7 @@ try {
     await settle(page);
     let fit = await fits(page);
     ok(fit.bad.length === 0, "drawer 375: fits", fit);
-    const low = await lowContrast(page, ".chg-drawer .chg-d-id, .chg-drawer dt, .chg-drawer h3, .chg-drawer .chg-days span, .chg-drawer .chg-days b, .chg-drawer .chg-btn, .chg-drawer .chg-pill, .chg-drawer .chg-d-done, .chg-drawer .chg-d-verified");
+    const low = await lowContrast(page, ".chg-drawer .chg-d-id, .chg-drawer dt, .chg-drawer h3, .chg-drawer .chg-days span, .chg-drawer .chg-days b, .chg-drawer .ui-btn, .chg-drawer .chg-pill, .chg-drawer .chg-d-done, .chg-drawer .chg-d-verified");
     ok(low.length === 0, "drawer 375: every text ≥ 4.5:1", low);
     await shot(page, "t10-390-drawer.png", { full: false });
     await page.setViewportSize({ width: 1440, height: 1000 });
