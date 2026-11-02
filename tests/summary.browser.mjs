@@ -114,7 +114,9 @@ const open = async ({ width = 390, height = 844, colorScheme = "light", server, 
     assert.equal(request.headers().authorization, "Bearer test.admin.session");
     if (name === "admin-usage") {
       if (server.usageStatus) return route.fulfill({ status: server.usageStatus, json: { error: "Usage reporting is unavailable" } });
-      return route.fulfill({ json: server.usage(url.searchParams.get("environment")) });
+      const environment = url.searchParams.get("environment");
+      if (server.delay?.[environment]) await new Promise((r) => setTimeout(r, server.delay[environment]));
+      return route.fulfill({ json: server.usage(environment) });
     }
     if (server.fail?.includes(name)) return route.fulfill({ status: 500, json: { error: "boom" } });
     const body = server.queue[name];
@@ -158,6 +160,35 @@ const shot = async (page, name) => {
   await page.screenshot({ path: `${output}/${name}` });
   await page.setViewportSize({ width, height });
 };
+const square = (page, card) => page.$eval(`${card} .ui-sq`, (q) => q.getAttribute("style") ?? "");
+// Every card's content stays inside it: no element pokes out, no text is cut
+// off (one-line ellipsis rows aside), and the Today legend keeps its room.
+const fits = (page) => page.evaluate(() => {
+  const bad = [];
+  for (const card of document.querySelectorAll(".sum .ui-card, .sum .sum-warn")) {
+    const c = card.getBoundingClientRect();
+    const name = card.querySelector("h2")?.textContent ?? card.className;
+    for (const el of card.querySelectorAll("*")) {
+      if (el.closest(".ui-sr") || el.closest("svg")) continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width && !r.height) continue;
+      if (r.left < c.left - 0.5 || r.right > c.right + 0.5) bad.push(`${name}: ${el.className || el.tagName} pokes out`);
+      const cs = getComputedStyle(el);
+      if (cs.display === "inline" || cs.textOverflow === "ellipsis" || el.scrollWidth <= el.clientWidth + 1) continue;
+      // Content wider than its box: cut off when the box clips it, or when it runs past the card
+      // (where the next card paints over it). A row's hover bleed inside the card padding is fine.
+      const clipped = cs.overflowX !== "visible";
+      const runsOut = r.left + el.scrollWidth > c.right + 0.5;
+      if (clipped || runsOut) bad.push(`${name}: ${el.className || el.tagName} is cut off`);
+    }
+  }
+  const legend = document.querySelector(".ui-legend")?.getBoundingClientRect().width ?? 0;
+  if (legend < 140) bad.push(`legend only ${Math.round(legend)}px`);
+  const cards = [...document.querySelectorAll(".sum-grid > .ui-card")].map((x) => Math.round(x.getBoundingClientRect().x));
+  const rings = document.querySelector(".ui-rings svg")?.getBoundingClientRect();
+  const beside = !!rings && document.querySelector(".ui-legend").getBoundingClientRect().top < rings.bottom;
+  return { bad, columns: new Set(cards).size, legend: Math.round(legend), beside };
+});
 const settle = (page) => page.waitForTimeout(1600); // rings 1.2s, numbers 0.7s
 const LINKS = [
   "#/community?tab=feedback&status=open",
@@ -185,11 +216,12 @@ try {
     eq(r.map((x) => x.detail), ["Nothing waiting", "Nothing waiting", "Nothing waiting", "Nothing waiting"], "zero: every Needs-you row says Nothing waiting");
     ok(r.every((x) => x.zero && x.bubble === "0"), "zero: zero bubbles, never coloured", r);
     eq(await page.locator("#card-needs .ui-meta").innerText(), "0 waiting", "zero: Needs you meta");
-    eq(await page.locator(".sum-hl").count(), 0, "zero: no highlight sentence when both days are 0");
-    eq(await hero(page, "#card-active"), "0.0 avg / day", "zero: 0.0 avg / day");
+    eq(await page.locator(".sum-hl").innerText(), "", "zero: no highlight sentence when both days are 0 (its line stays)");
+    eq(await hero(page, "#card-active"), "0.0 avg / day, last 7 days", "zero: 0.0 avg / day, named for its window");
     eq(await page.locator("#card-active .ui-bars i").count(), 30, "zero: 30 bars");
     eq(await page.locator("#card-active .ui-bars i.ui-bar-zero").count(), 30, "zero: every day is a Fill stub");
     ok((await page.locator("#card-back").innerText()).includes("Fills in once an install week has had its 7 days"), "zero: Came back explains when it fills in");
+    ok((await square(page, "#card-back")).includes("--c-idle-fill"), "zero: the Came back square goes Idle Grey with no cohort");
     ok((await page.getByText("No one opened the app in the last 30 days.").count()) === 1, "zero: Versions empty state");
     eq(await page.locator(".sum-warn").count(), 0, "zero: no dropped warning");
     eq(await page.locator(".ui-nav-badge").count(), 0, "zero: no Community badge");
@@ -229,7 +261,8 @@ try {
         eq(r.map((x) => x.href), LINKS, "snapshot: each row links to its Community tab");
         eq(await page.locator("#card-needs .ui-meta").innerText(), "4 waiting", "snapshot: Needs you meta");
         eq(await page.locator(".ui-tabs .ui-nav-badge").innerText(), "4", "snapshot: Community tab badge is the queue total");
-        eq(await hero(page, "#card-active"), "3.4 avg / day", "snapshot: 3.4 avg / day");
+        eq(await hero(page, "#card-active"), "3.4 avg / day, last 7 days", "snapshot: 3.4 avg / day, last 7 days (the 7-day average, not the 30 days)");
+        eq(await page.locator("#card-active .ui-bars").getAttribute("aria-label"), "Phones that opened the app per day, last 30 days: 1 phone today, 3.4 a day over the last 7 days, peak 6.", "snapshot: the sparkline's label carries its numbers");
         eq(await page.locator("#card-active .ui-bars i:not(.ui-bar-zero)").count(), prod.dau_30d.filter((d) => d.dau).length, "snapshot: a bar per day with phones");
         eq(await page.locator("#card-active .ui-ax").innerText(), "4 Oct\nToday", "snapshot: axis from 4 Oct to Today");
         eq(await page.locator("#card-active").getAttribute("href"), "#/usage?env=production", "snapshot: Active phones opens Usage for the same data");
@@ -244,6 +277,8 @@ try {
         ok(Math.abs(today.y - needs.y) < 1 && needs.x > today.x, `${tag}: Needs you sits beside the rings`, { today, needs });
       }
       eq(await hscroll(page), 0, `${tag}: no horizontal scroll`);
+      const fit = await fits(page);
+      ok(fit.bad.length === 0, `${tag}: every card's content fits inside it`, fit);
       await shot(page, `t7-${width}-${colorScheme}.png`);
       await context.close();
     }
@@ -251,12 +286,20 @@ try {
 
   // ---- 3. Environment switch, ring taps, links ----
   {
-    const server = { usage: (env) => (env === "development" ? development() : production()), queue: queueBodies() };
+    const server = { usage: (env) => (env === "development" ? development() : production()), queue: queueBodies(), delay: { development: 1200 } };
     const { context, page, requests } = await open({ server });
     await page.goto(`${base}/#/summary`);
     await page.waitForSelector(".ui-rings");
+    await settle(page);
+    const tall = await page.evaluate(() => document.querySelector(".sum-grid").offsetHeight);
     await page.locator(".ui-seg button", { hasText: "Development" }).click();
     await page.waitForFunction(() => document.querySelector(".ui-card .ui-meta")?.textContent === "development");
+    // While the development report loads: the same five cards, no numbers from production.
+    eq(await page.locator(".sum-grid > .ui-card").count(), 5, "env: the card shells stay while the report loads");
+    eq(await page.$$eval("#card-active .sum-wait, #card-back .sum-wait", (w) => w.map((x) => x.textContent)), ["Loading…", "Loading…"], "env: the cards say Loading…");
+    eq(await page.locator(".sum .ui-rings, .sum .ui-val, .sum .ui-bars, .sum .sum-vers").count(), 0, "env: never the previous environment's numbers");
+    const loadingTall = await page.evaluate(() => document.querySelector(".sum-grid").offsetHeight);
+    ok(loadingTall >= tall * 0.85, "env: the page keeps its height while loading", { tall, loadingTall });
     await page.waitForSelector(".ui-rings");
     await settle(page);
     ok((await page.evaluate(() => location.hash)) === "#/summary?env=development", "env: the choice is in the URL");
@@ -294,6 +337,52 @@ try {
     await context.close();
   }
 
+  // ---- 3b. Narrow and middle widths: 768 (sidebar + one column) and 1024 ----
+  {
+    const big = () => ({
+      ...production(),
+      today: { active: 1234 },
+      daily: production().daily.map((d) => ({ ...d, active: d.active * 300 })),
+      cohort: { install_week: "2026-10-19", installed: 1234, back_7d: 1000 },
+      versions: [{ platform: "android", app_version: "1.10.12", ui: "classic", users: 12345 }, ...production().versions],
+      dropped_7d: 12345,
+      languages: [{ language: "fr", users: 12345 }, { language: "ar", users: 2345 }, { language: "en", users: 345 }],
+    });
+    const many = { ...queueBodies(), "admin-review-reports": { items: [], page: 1, perPage: 3, total: 1234, open: 1234 } };
+    for (const [width, fixture, queue] of [[375, production, queueBodies()], [375, big, many], [768, production, queueBodies()], [1024, production, queueBodies()], [1100, production, queueBodies()], [768, big, many], [1024, big, many], [1100, big, many]]) {
+      const server = { usage: fixture, queue };
+      const { context, page } = await open({ width, height: 1000, server });
+      await page.goto(`${base}/#/summary`);
+      await page.waitForSelector(".ui-rings");
+      await settle(page);
+      const tag = `${width} ${fixture === big ? "4-digit numbers" : "snapshot"}`;
+      const fit = await fits(page);
+      ok(fit.bad.length === 0, `${tag}: every card's content fits inside it`, fit);
+      eq(fit.columns, width >= 1100 ? 2 : 1, `${tag}: ${width >= 1100 ? "two columns" : "one column, too narrow to pair cards"}`);
+      ok(fit.beside, `${tag}: the legend sits beside the rings`, fit);
+      eq(await hscroll(page), 0, `${tag}: no horizontal scroll`);
+      if (width === 768 && fixture === production) await shot(page, "t7-768-light.png");
+      await context.close();
+    }
+  }
+
+  // ---- 3c. Came back with 10 or more installs: a percentage with its count ----
+  {
+    const server = { usage: () => ({ ...production(), cohort: { install_week: "2026-10-19", installed: 12, back_7d: 3 } }), queue: queueBodies() };
+    const { context, page } = await open({ server });
+    await page.goto(`${base}/#/summary`);
+    await page.waitForSelector(".ui-rings");
+    await settle(page);
+    eq((await legend(page))[1], "Came back 3 of 12 in 7 days", "12 installs: the legend keeps counts");
+    eq(await hero(page, "#card-back"), "25% 3 of 12", "12 installs: the card shows the percentage with its count");
+    ok(!(await page.locator("#card-back").innerText()).includes("Counts only"), "12 installs: no small-sample note");
+    ok((await square(page, "#card-back")).includes("--c-came-back-fill"), "12 installs: the square is Came back green");
+    eq(await page.$$eval(".ui-rings svg > g", (g) => g.length), 3, "12 installs: only Active is segmented (goal 3)");
+    const fill = await arcs(page);
+    ok(fill.length === 2 && Math.abs(fill[0] - 0.25) < 0.001, "12 installs: Came back is a continuous ring at 3/12", fill);
+    await context.close();
+  }
+
   // ---- 4. Dropped events ----
   {
     const server = { usage: () => ({ ...production(), dropped_7d: 12 }), queue: queueBodies() };
@@ -313,7 +402,8 @@ try {
     await page.goto(`${base}/#/summary`);
     await page.getByText("Couldn't load today's numbers.", { exact: false }).waitFor();
     ok((await page.locator(".ui-card").first().innerText()).includes("Usage reporting is unavailable right now."), "error: the report error is said plainly");
-    eq(await page.locator("#card-active").count(), 0, "error: no usage cards drawn from nothing");
+    eq(await page.$$eval("#card-active, #card-back, .ui-card:has(.sum-wait-versions)", (c) => c.map((x) => x.querySelector(".sum-wait")?.textContent)), ["Couldn't load.", "Couldn't load.", "Couldn't load."], "error: the usage cards stay, saying they couldn't load");
+    eq(await page.locator(".sum .ui-val, .sum .ui-bars, .sum .sum-vers").count(), 0, "error: no numbers drawn from nothing");
     await page.waitForSelector("#card-needs .ui-bub");
     const r = await rows(page);
     eq([r[3].detail, r[3].bubble], ["Couldn't load", null], "error: a failed source is not a zero");

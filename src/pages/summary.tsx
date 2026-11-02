@@ -204,46 +204,110 @@ const TodayRings = ({ report, queue }: { report: SummaryReport; queue: QueueStat
   return <Rings rings={rings} />;
 };
 
-const ActiveCard = ({ report, href }: { report: SummaryReport; href: string }) => (
-  <HealthCard title="Active phones" color="active" icon={ICON.pulse} meta="30 days" href={href} id="card-active" index={1}>
-    <HeroValue value={report.avg7} decimals={1} unit="avg / day" />
-    <Bars
-      data={report.daily.map((d) => ({ key: d.day, value: d.active }))}
-      tone="active"
-      axis={report.daily.length ? { start: shortDay(report.daily[0].day), end: "Today" } : undefined}
-      label={`Phones that opened the app per day, last ${report.daily.length} days`}
-    />
-  </HealthCard>
+const LOADING = "Loading…";
+
+/** A usage card's body while the report loads or failed: no numbers, about the loaded height. */
+const Waiting = ({ size, children }: { size: "rings" | "active" | "back" | "versions"; children: ReactNode }) => (
+  <div className={`sum-wait sum-wait-${size}`} aria-busy={children === LOADING}>
+    {typeof children === "string" ? <Empty size="body">{children}</Empty> : children}
+  </div>
 );
 
-const CameBackCard = ({ report, href }: { report: SummaryReport; href: string }) => {
-  const cohort = report.cohort && report.cohort.installed > 0 ? report.cohort : null;
-  let value: number | string = "—";
-  let unit = "";
-  let note = "Fills in once an install week has had its 7 days to come back.";
-  if (cohort) {
-    const { percent, counts } = countOrPercentParts(cohort.back_7d, cohort.installed);
-    const week = `Installs from the week of ${shortDay(cohort.install_week)} that opened the app again within 7 days.`;
-    if (percent) {
-      value = percent;
-      unit = counts;
-      note = week;
-    } else {
-      value = cohort.back_7d;
-      unit = `of ${nf.format(cohort.installed)}`;
-      note = `${week} Counts only, since under 10 installs is too few for a percentage.`;
-    }
+const ActiveCard = ({ report, waiting, href }: { report: SummaryReport | null; waiting: string; href: string }) => {
+  if (!report) {
+    return (
+      <HealthCard title="Active phones" color="active" icon={ICON.pulse} meta="30 days" href={href} id="card-active" index={1}>
+        <Waiting size="active">{waiting}</Waiting>
+      </HealthCard>
+    );
   }
+  const peak = Math.max(0, ...report.daily.map((d) => d.active));
+  const avg = report.avg7.toLocaleString("en-US", { maximumFractionDigits: 1 });
   return (
-    <HealthCard title="Came back" color="came-back" icon={ICON.back} meta="7 days" href={href} id="card-back" index={3}>
-      <HeroValue value={value} unit={unit} />
-      <Empty size="body">{note}</Empty>
+    <HealthCard title="Active phones" color="active" icon={ICON.pulse} meta="30 days" href={href} id="card-active" index={1}>
+      <HeroValue value={report.avg7} decimals={1} unit="avg / day, last 7 days" />
+      {/* No tooltip or table here: the whole card links to Usage, where the full chart has both. */}
+      <Bars
+        data={report.daily.map((d) => ({ key: d.day, value: d.active }))}
+        tone="active"
+        axis={report.daily.length ? { start: shortDay(report.daily[0].day), end: "Today" } : undefined}
+        label={`Phones that opened the app per day, last ${report.daily.length} days: ${plural(report.today.active, "phones")} today, ${avg} a day over the last 7 days, peak ${nf.format(peak)}.`}
+      />
     </HealthCard>
   );
 };
 
-const VersionsCard = ({ report }: { report: SummaryReport }) => {
-  const { rows, versions } = versionRows(report.versions);
+const CameBackCard = ({ report, waiting, href }: { report: SummaryReport | null; waiting: string; href: string }) => {
+  const cohort = report?.cohort && report.cohort.installed > 0 ? report.cohort : null;
+  // The square goes Idle Grey while no install week has finished its 7 days (DESIGN.md empty states).
+  const color = report && !cohort ? "idle" : "came-back";
+  let body: ReactNode;
+  if (!report) {
+    body = <Waiting size="back">{waiting}</Waiting>;
+  } else if (!cohort) {
+    body = (
+      <>
+        <HeroValue value="—" />
+        <Empty size="body">Fills in once an install week has had its 7 days to come back.</Empty>
+      </>
+    );
+  } else {
+    const { percent, counts } = countOrPercentParts(cohort.back_7d, cohort.installed);
+    const week = `Installs from the week of ${shortDay(cohort.install_week)} that opened the app again within 7 days.`;
+    body = percent ? (
+      <>
+        <HeroValue value={percent} unit={counts} />
+        <Empty size="body">{week}</Empty>
+      </>
+    ) : (
+      <>
+        <HeroValue value={cohort.back_7d} unit={`of ${nf.format(cohort.installed)}`} />
+        <Empty size="body">{week} Counts only, since under 10 installs is too few for a percentage.</Empty>
+      </>
+    );
+  }
+  return (
+    <HealthCard title="Came back" color={color} icon={ICON.back} meta="7 days" href={href} id="card-back" index={3}>
+      {body}
+    </HealthCard>
+  );
+};
+
+const VersionsCard = ({ report, waiting }: { report: SummaryReport | null; waiting: string }) => {
+  const { rows, versions } = versionRows(report?.versions ?? []);
+  let body: ReactNode;
+  if (!report) {
+    body = <Waiting size="versions">{waiting}</Waiting>;
+  } else if (!rows.length) {
+    body = <Empty size="body">No one opened the app in the last 30 days.</Empty>;
+  } else {
+    body = (
+      <>
+        <ul className="sum-vers">
+          {rows.map((r) => (
+            <li key={r.key}>
+              <span>
+                {r.name}
+                <Pill>{r.ui}</Pill>
+              </span>
+              <em>{plural(r.users, "users")}</em>
+            </li>
+          ))}
+        </ul>
+        <p className="sum-lang">
+          <span>Users per language</span>
+          <em>
+            {languageCounts(report.languages).map((l, i) => (
+              <span key={l.language}>
+                {i > 0 && " · "}
+                <abbr title={LANGUAGE_NAME[l.language] ?? l.language}>{l.label}</abbr> {nf.format(l.users)}
+              </span>
+            ))}
+          </em>
+        </p>
+      </>
+    );
+  }
   return (
     <HealthCard
       title="Versions in use"
@@ -252,34 +316,7 @@ const VersionsCard = ({ report }: { report: SummaryReport }) => {
       meta={rows.length ? plural(versions, "versions") : undefined}
       index={4}
     >
-      {rows.length ? (
-        <>
-          <ul className="sum-vers">
-            {rows.map((r) => (
-              <li key={r.key}>
-                <span>
-                  {r.name}
-                  <Pill>{r.ui}</Pill>
-                </span>
-                <em>{plural(r.users, "users")}</em>
-              </li>
-            ))}
-          </ul>
-          <p className="sum-lang">
-            <span>Users per language</span>
-            <em>
-              {languageCounts(report.languages).map((l, i) => (
-                <span key={l.language}>
-                  {i > 0 && " · "}
-                  <abbr title={LANGUAGE_NAME[l.language] ?? l.language}>{l.label}</abbr> {nf.format(l.users)}
-                </span>
-              ))}
-            </em>
-          </p>
-        </>
-      ) : (
-        <Empty size="body">No one opened the app in the last 30 days.</Empty>
-      )}
+      {body}
     </HealthCard>
   );
 };
@@ -296,7 +333,9 @@ const Dropped = ({ n }: { n: number }) => (
 
 export const SummaryPage = ({ env, onEnv, queue }: Props) => {
   const usage = useUsage("summary", 30, env);
+  // Null while loading another environment or retrying: never the previous numbers.
   const report = usage.data;
+  const waiting = usage.error ? "Couldn't load." : LOADING;
   const [openedAt] = useState(() => Date.now());
   const usageHref = buildHash("usage", { env });
 
@@ -308,30 +347,31 @@ export const SummaryPage = ({ env, onEnv, queue }: Props) => {
   return (
     <div className="sum">
       <LargeTitle title="Summary" subtitle={longDay.format(asOf)} />
-      {sentence && <p className="sum-hl">{sentence}.</p>}
+      <p className="sum-hl">{sentence && `${sentence}.`}</p>
       <div className="sum-env">
         <Segmented label="Data" value={env} options={ENV_OPTIONS} onChange={onEnv} />
       </div>
       {report && report.dropped_7d > 0 && <Dropped n={report.dropped_7d} />}
+      {/* The card shells stay mounted while the report loads, so the page keeps its shape. */}
       <div className="sum-grid">
         <HealthCard title="Today" color="rings" icon={ICON.rings} meta={env} index={0}>
           {report ? (
             // Keyed by environment so the rings refill when the data switches.
             <TodayRings key={env} report={report} queue={queue} />
-          ) : usage.error ? (
-            <RetryLine onRetry={usage.refresh}>Couldn't load today's numbers. {usage.error}</RetryLine>
           ) : (
-            <Empty size="body">Loading…</Empty>
+            <Waiting size="rings">
+              {usage.error ? (
+                <RetryLine onRetry={usage.refresh}>Couldn't load today's numbers. {usage.error}</RetryLine>
+              ) : (
+                LOADING
+              )}
+            </Waiting>
           )}
         </HealthCard>
         <NeedsYou queue={queue} />
-        {report && (
-          <>
-            <ActiveCard report={report} href={usageHref} />
-            <CameBackCard report={report} href={usageHref} />
-            <VersionsCard report={report} />
-          </>
-        )}
+        <ActiveCard report={report} waiting={waiting} href={usageHref} />
+        <CameBackCard report={report} waiting={waiting} href={usageHref} />
+        <VersionsCard report={report} waiting={waiting} />
       </div>
     </div>
   );

@@ -2,15 +2,19 @@
    from the kit (src/ui/, ui.css); tokens from src/index.css. Logical
    properties only so Arabic flips cleanly. */
 
+/* The page width (at most 1120px) comes from the shell. The grid pairs cards
+   by the room it really has, not the viewport: at 768 the sidebar leaves
+   ~450px, too narrow for two cards side by side. */
 .sum {
-  max-inline-size: 1120px;
-  margin-inline: auto;
+  container: sum / inline-size;
 }
 
-/* Highlight sentence under the large title. */
+/* Highlight sentence under the large title; its line is kept while the
+   report loads so the page doesn't jump. */
 .sum-hl {
   margin: calc(-1 * var(--s-sm)) var(--s-xs) var(--s-lg);
   max-inline-size: 70ch;
+  min-block-size: 1lh;
   font: var(--type-subhead);
 }
 
@@ -23,10 +27,30 @@
   grid-template-columns: minmax(0, 1fr);
   gap: var(--s-lg);
 }
-@media (min-width: 768px) {
+/* Two cards of at least ~350px: the Today legend then fits beside the rings. */
+@container sum (min-width: 720px) {
   .sum-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* A card waiting for the report keeps roughly its loaded height, so an
+   environment switch or a retry doesn't collapse the page. */
+.sum-wait {
+  display: flex;
+  align-items: center;
+}
+.sum-wait-rings {
+  min-block-size: 170px; /* the rings and their three-entry legend */
+}
+.sum-wait-active {
+  min-block-size: 140px; /* hero line, 64px bars, axis */
+}
+.sum-wait-back {
+  min-block-size: 84px; /* hero line, two lines of note */
+}
+.sum-wait-versions {
+  min-block-size: 112px; /* about three rows */
 }
 
 /* Dropped events: shown only when the ingestion cap was hit. */

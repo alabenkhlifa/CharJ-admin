@@ -8,10 +8,13 @@
   background: var(--ground);
 }
 /* Inline padding is the page token: the kit's large title pins a bar that
-   bleeds exactly that far (DESIGN.md: 16px on phones, 28px from 768px). */
+   bleeds exactly that far (DESIGN.md: 16px on phones, 28px from 768px).
+   Past that, the padding grows so the content stays at most 1120px wide,
+   centred (DESIGN.md "Layout"); every page inherits it. */
 .shell-main {
+  --content-max: 1120px;
   min-inline-size: 0;
-  padding: 16px var(--page-pad-inline) calc(88px + env(safe-area-inset-bottom));
+  padding: 16px max(var(--page-pad-inline), (100% - var(--content-max)) / 2) calc(88px + env(safe-area-inset-bottom));
 }
 .shell-side {
   display: none;
@@ -208,10 +211,10 @@
     grid-template-columns: 260px minmax(0, 1fr);
   }
   .shell-main {
-    padding: 28px var(--page-pad-inline) 48px;
+    padding-block: 28px 48px;
   }
   .shell[data-density="compact"] .shell-main {
-    padding: 20px var(--page-pad-inline) 40px;
+    padding-block: 20px 40px;
   }
   .shell-side {
     display: block;
