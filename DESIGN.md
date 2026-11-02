@@ -17,13 +17,18 @@ colors:
   contributions: "#af52de"
   idle: "#8e8e93"
   active-text-light: "#d70f3f"
-  came-back-text-light: "#248a3d"
+  came-back-text-light: "#1f7f37"
   queue-text-light: "#0071a4"
   needs-you-text-light: "#c93400"
   alarm-text-light: "#d70015"
   screens-text-light: "#0040dd"
   actions-text-light: "#3634a3"
   routes-text-light: "#0e7083"
+  onboarding-text-light: "#8a6a00"
+  trip-text-light: "#007b75"
+  navigate-text-light: "#0071a4"
+  cars-text-light: "#7a6142"
+  contributions-text-light: "#8944ab"
   onboarding-fill-light: "#a37f00"
   trip-fill-light: "#00807a"
   navigate-fill-light: "#0071a4"
@@ -36,6 +41,7 @@ colors:
   screens-text-dark: "#409cff"
   actions-text-dark: "#7d7aff"
   routes-text-dark: "#5ac8e0"
+  contributions-text-dark: "#da8fff"
   grouped-ground-light: "#f2f2f7"
   card-light: "#ffffff"
   card-pressed-light: "#f7f7fa"
@@ -244,12 +250,15 @@ Each Usage section owns one colour: **Screens Blue** (screens, also charger subm
 | Alarm | alarm | alarm-text-light | alarm-text-light | alarm-text-dark |
 | Screens | screens | screens-text-light | base | screens-text-dark |
 | Actions | actions | actions-text-light | base | actions-text-dark |
-| Onboarding | onboarding | (none yet) | onboarding-fill-light | (none yet) |
-| Trip | trip | (none yet) | trip-fill-light | (none yet) |
-| Navigate | navigate | (none yet) | navigate-fill-light | (none yet) |
+| Onboarding | onboarding | onboarding-text-light | onboarding-fill-light | base |
+| Trip | trip | trip-text-light | trip-fill-light | base |
+| Navigate | navigate | navigate-text-light | navigate-fill-light | base |
 | Routes | routes | routes-text-light | routes-text-light | routes-text-dark |
-| Cars | cars | (none yet) | cars-fill-light | (none yet) |
-| Contributions | contributions | (none yet) | base | (none yet) |
+| Cars | cars | cars-text-light | cars-fill-light | base |
+| Contributions | contributions | contributions-text-light | base | contributions-text-dark |
+| Idle | idle | ink-secondary-light | base | ink-secondary-dark |
+
+Every coloured text tone meets 4.5:1 on both Card and Grouped Ground in its theme (checked with the WCAG formula; `tests/tokens.test.ts` keeps it so). Idle text is Secondary Ink, like any other secondary text.
 
 Glyph ink on a filled square or bubble flips with the theme: white on light, black on dark (`--glyph`). Rings, chart bars and progress bars always use the base tone; the darker tones exist for small filled shapes and coloured text, where the base fails contrast on white.
 

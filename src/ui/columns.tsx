@@ -55,7 +55,8 @@ export const Columns = ({ labels, series, label, formatLabel = shortDay, height 
     const top = yMax ?? niceMax(Math.max(1, ...totals));
     const y = (v: number) => H - BOTTOM - (v / top) * (H - BOTTOM - TOP);
     // Marks are drawn left-to-right and mirrored as a group in RTL; text is
-    // placed with tx() so it never renders backwards.
+    // placed with tx() so it never renders backwards. text-anchor start/end
+    // already follow the inherited CSS direction, so anchors stay fixed.
     const tx = (x: number) => (box.rtl ? W - x : x);
     const ticks = top <= 2 ? [0, 1, 2] : [0, top / 2, top];
     chart = (
@@ -95,7 +96,7 @@ export const Columns = ({ labels, series, label, formatLabel = shortDay, height 
           ))}
         </g>
         {ticks.map((t) => (
-          <text key={t} className="ui-tick" x={tx(GUTTER - 8)} y={y(t) + 4} textAnchor={box.rtl ? "start" : "end"}>
+          <text key={t} className="ui-tick" x={tx(GUTTER - 8)} y={y(t) + 4} textAnchor="end">
             {nf.format(t)}
           </text>
         ))}

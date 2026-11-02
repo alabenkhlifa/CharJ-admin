@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    <link rel="icon" href="data:," />
+    <title>UI kit fixture</title>
+    <!-- Dev-only fixture for tests/kit.browser.mjs (served by `vite`, never built).
+         Same theme script as /index.html; ?rtl flips the document. -->
+    <script>
+      (function () {
+        var t = null;
+        try {
+          var p = JSON.parse(localStorage.getItem("charj-admin:tweaks") || "null");
+          if (p && (p.v === 2 ? p.theme === "light" || p.theme === "dark" : p.theme === "light")) t = p.theme;
+        } catch (e) {}
+        if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", t);
+        if (location.search.indexOf("rtl") >= 0) document.documentElement.dir = "rtl";
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

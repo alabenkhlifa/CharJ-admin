@@ -43,6 +43,12 @@ const MAP: [string, "light" | "dark" | "both", string][] = [
   ["screens-text-light", "light", "--c-screens-text"],
   ["actions-text-light", "light", "--c-actions-text"],
   ["routes-text-light", "light", "--c-routes-text"],
+  ["onboarding-text-light", "light", "--c-onboarding-text"],
+  ["trip-text-light", "light", "--c-trip-text"],
+  ["navigate-text-light", "light", "--c-navigate-text"],
+  ["cars-text-light", "light", "--c-cars-text"],
+  ["contributions-text-light", "light", "--c-contributions-text"],
+  ["ink-secondary-light", "light", "--c-idle-text"],
   ["active-text-dark", "dark", "--c-active-text"],
   ["came-back-text-dark", "dark", "--c-came-back-text"],
   ["queue-text-dark", "dark", "--c-queue-text"],
@@ -51,6 +57,13 @@ const MAP: [string, "light" | "dark" | "both", string][] = [
   ["screens-text-dark", "dark", "--c-screens-text"],
   ["actions-text-dark", "dark", "--c-actions-text"],
   ["routes-text-dark", "dark", "--c-routes-text"],
+  ["contributions-text-dark", "dark", "--c-contributions-text"],
+  ["ink-secondary-dark", "dark", "--c-idle-text"],
+  // Categories with no dark text tone use their base.
+  ["onboarding", "dark", "--c-onboarding-text"],
+  ["trip", "dark", "--c-trip-text"],
+  ["navigate", "dark", "--c-navigate-text"],
+  ["cars", "dark", "--c-cars-text"],
   // Light fills (squares, bubbles) from the category colour map.
   ["active", "light", "--c-active-fill"],
   ["came-back-text-light", "light", "--c-came-back-fill"],
@@ -115,4 +128,43 @@ test("shape and motion tokens match DESIGN.md", () => {
   assert.equal(root["--stagger"], "60ms");
   assert.equal(root["--dur-ring"], "1.2s");
   assert.match(root["--font"], /^-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter Variable", Roboto, system-ui, sans-serif$/);
+});
+
+// WCAG 2 contrast; rgba colours are composited over the background first.
+const rgb = (c: string, bg?: number[]): number[] => {
+  const hex = /^#([0-9a-f]{6})$/i.exec(c);
+  if (hex) return [0, 2, 4].map((i) => parseInt(hex[1].slice(i, i + 2), 16));
+  const m = /^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/.exec(c);
+  assert.ok(m && bg, `cannot read colour ${c}`);
+  const a = Number(m[4]);
+  return [1, 2, 3].map((i, k) => Number(m[i]) * a + bg[k] * (1 - a));
+};
+const lum = (c: number[]) =>
+  c
+    .map((v) => v / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+    .reduce((acc, v, i) => acc + v * [0.2126, 0.7152, 0.0722][i], 0);
+const contrast = (fg: string, bg: string) => {
+  const b = rgb(bg);
+  const [hi, lo] = [lum(rgb(fg, b)), lum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+test("every coloured text tone reads at 4.5:1 on Card and Grouped Ground in both themes", () => {
+  for (const [name, theme] of [["light", light], ["dark", dark]] as const) {
+    for (const surface of ["--card", "--ground"]) {
+      const bg = resolve(theme, surface);
+      for (const c of CATEGORIES) {
+        if (c === "idle") continue; // Secondary Ink, checked below
+        const fg = resolve(theme, `--c-${c}-text`);
+        const ratio = contrast(fg, bg);
+        assert.ok(ratio >= 4.5, `${name} ${c} text ${fg} on ${surface} ${bg}: ${ratio.toFixed(2)}`);
+      }
+    }
+  }
+});
+
+test("idle text is Secondary Ink", () => {
+  assert.equal(resolve(light, "--c-idle-text"), resolve(light, "--ink-2"));
+  assert.equal(resolve(dark, "--c-idle-text"), resolve(dark, "--ink-2"));
 });

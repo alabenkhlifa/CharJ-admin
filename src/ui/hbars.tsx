@@ -50,6 +50,8 @@ export const HBars = ({ rows, series, label, labelHeader = "Name" }: Props) => {
     const L = W < 420 ? 112 : 128;
     const max = Math.max(1, ...totals);
     const x = (v: number) => (v / max) * (W - L - END);
+    // Mirror x for text in RTL; text-anchor start/end follow the inherited
+    // CSS direction by themselves, so the anchors stay fixed.
     const tx = (px: number) => (box.rtl ? W - px : px);
     chart = (
       <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="group" aria-label={label}>
@@ -88,10 +90,10 @@ export const HBars = ({ rows, series, label, labelHeader = "Name" }: Props) => {
           const yy = ri * ROW + 8;
           return (
             <g key={r.name} aria-hidden="true">
-              <text className="ui-lbl" x={tx(L - 10)} y={yy + 12} textAnchor={box.rtl ? "start" : "end"}>
+              <text className="ui-lbl" x={tx(L - 10)} y={yy + 12} textAnchor="end">
                 {fit(r.name, Math.floor((L - 14) / CHAR))}
               </text>
-              <text className="ui-vl" x={tx(L + x(totals[ri]) + 8)} y={yy + 12} textAnchor={box.rtl ? "end" : "start"}>
+              <text className="ui-vl" x={tx(L + x(totals[ri]) + 8)} y={yy + 12} textAnchor="start">
                 {nf.format(totals[ri])}
               </text>
             </g>

@@ -124,27 +124,26 @@ html[data-theme="light"] {
   --track: .16;
   --glyph: #ffffff;
 
-  /* Coloured text on light surfaces: the darker accessible tone. Categories
-     with no text tone in DESIGN.md ("none yet") use their light fill tone, or
-     the base where the fill is the base. */
+  /* Coloured text on light surfaces: the darker accessible tone, at least
+     4.5:1 on Card and Grouped Ground. Idle text is Secondary Ink. */
   --c-active-text: #d70f3f;
-  --c-came-back-text: #248a3d;
+  --c-came-back-text: #1f7f37;
   --c-queue-text: #0071a4;
   --c-needs-you-text: #c93400;
   --c-alarm-text: #d70015;
   --c-screens-text: #0040dd;
   --c-actions-text: #3634a3;
   --c-routes-text: #0e7083;
-  --c-onboarding-text: #a37f00;
-  --c-trip-text: #00807a;
+  --c-onboarding-text: #8a6a00;
+  --c-trip-text: #007b75;
   --c-navigate-text: #0071a4;
   --c-cars-text: #7a6142;
-  --c-contributions-text: var(--c-contributions);
-  --c-idle-text: var(--c-idle);
+  --c-contributions-text: #8944ab;
+  --c-idle-text: var(--ink-2);
 
   /* Squares and bubbles carrying a glyph (white on light). */
   --c-active-fill: var(--c-active);
-  --c-came-back-fill: #248a3d;
+  --c-came-back-fill: #1f7f37;
   --c-queue-fill: #0071a4;
   --c-needs-you-fill: #c93400;
   --c-alarm-fill: #d70015;
@@ -185,8 +184,8 @@ html[data-theme="dark"] {
   --c-trip-text: var(--c-trip);
   --c-navigate-text: var(--c-navigate);
   --c-cars-text: var(--c-cars);
-  --c-contributions-text: var(--c-contributions);
-  --c-idle-text: var(--c-idle);
+  --c-contributions-text: #da8fff;
+  --c-idle-text: var(--ink-2);
 
   /* Dark: every fill is the base tone, glyphs are black. */
   --c-active-fill: var(--c-active);
